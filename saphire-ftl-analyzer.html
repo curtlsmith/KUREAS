@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saphire FTL Minimal Cut Set Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+        }
+
+        .upload-section.dragover {
+            background: #e8ebff;
+            border-color: #764ba2;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .tree-view {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .tree-node {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+
+        .gate {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .event {
+            color: #007bff;
+        }
+
+        .cut-sets {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .cut-set {
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .cut-set-header {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .cut-set-events {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .error-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .example-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Saphire FTL Minimal Cut Set Analyzer</h1>
+            <p>Upload your fault tree logic file to generate minimal cut sets</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-section" id="uploadSection">
+                <div>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <h3 style="margin: 15px 0;">Drop FTL file here or click to browse</h3>
+                    <input type="file" id="fileInput" accept=".ftl,.txt">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                        Choose File
+                    </button>
+                    <p style="margin-top: 15px; color: #666; font-size: 14px;">
+                        Supported formats: .ftl, .txt
+                    </p>
+                </div>
+            </div>
+
+            <div id="resultsSection" class="hidden">
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="generateCutSets()">Generate Cut Sets</button>
+                    <button class="btn btn-secondary" onclick="exportResults()">Export Results</button>
+                    <button class="btn btn-secondary" onclick="loadNewFile()">Load New File</button>
+                    <button class="btn btn-success" onclick="loadExample()">Load Example</button>
+                </div>
+
+                <div id="messageBox"></div>
+
+                <div class="stats" id="statsSection" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="gateCount">0</div>
+                        <div class="stat-label">Gates</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="eventCount">0</div>
+                        <div class="stat-label">Basic Events</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="cutSetCount">0</div>
+                        <div class="stat-label">Minimal Cut Sets</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Fault Tree Structure</h2>
+                    <div class="tree-view" id="treeView"></div>
+                </div>
+
+                <div class="section" id="cutSetsSection" style="display: none;">
+                    <h2>Minimal Cut Sets</h2>
+                    <div class="cut-sets" id="cutSetsView"></div>
+                </div>
+            </div>
+
+            <div class="example-section">
+                <h3 style="margin-bottom: 10px;">Example FTL Format</h3>
+                <p style="margin-bottom: 10px;">Click "Load Example" to see a sample fault tree, or create your own file:</p>
+                <pre>* Fault Tree: System Failure
+TOP-EVENT := OR-1
+OR-1 := AND-1 | POWER-FAILURE
+AND-1 := PUMP-FAILS & BACKUP-PUMP-FAILS
+PUMP-FAILS := MECHANICAL-FAILURE | ELECTRICAL-FAILURE
+BACKUP-PUMP-FAILS := BASIC-EVENT
+POWER-FAILURE := BASIC-EVENT
+MECHANICAL-FAILURE := BASIC-EVENT
+ELECTRICAL-FAILURE := BASIC-EVENT</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let faultTree = null;
+        let minimalCutSets = [];
+
+        // File upload handling
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadSection.addEventListener('click', () => fileInput.click());
+
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    parseFTL(content);
+                    displayTree();
+                    document.getElementById('uploadSection').classList.add('hidden');
+                    document.getElementById('resultsSection').classList.remove('hidden');
+                    showMessage('File loaded successfully!', 'info');
+                } catch (error) {
+                    showMessage('Error parsing file: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function loadExample() {
+            const example = `* Fault Tree: System Failure Example
+* This is a sample fault tree for demonstration
+TOP-EVENT := OR-1
+OR-1 := AND-1 | POWER-FAILURE
+AND-1 := PUMP-FAILS & BACKUP-PUMP-FAILS
+PUMP-FAILS := MECHANICAL-FAILURE | ELECTRICAL-FAILURE
+BACKUP-PUMP-FAILS := BASIC-EVENT
+POWER-FAILURE := BASIC-EVENT
+MECHANICAL-FAILURE := BASIC-EVENT
+ELECTRICAL-FAILURE := BASIC-EVENT`;
+
+            try {
+                parseFTL(example);
+                displayTree();
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+                showMessage('Example loaded successfully!', 'info');
+            } catch (error) {
+                showMessage('Error loading example: ' + error.message, 'error');
+            }
+        }
+
+        function parseFTL(content) {
+            faultTree = {
+                topEvent: null,
+                gates: {},
+                events: new Set(),
+                comments: []
+            };
+
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+
+            for (const line of lines) {
+                // Skip comments
+                if (line.startsWith('*')) {
+                    faultTree.comments.push(line.substring(1).trim());
+                    continue;
+                }
+
+                // Parse gate/event definitions
+                if (line.includes(':=')) {
+                    const [left, right] = line.split(':=').map(s => s.trim());
+
+                    if (!faultTree.topEvent) {
+                        faultTree.topEvent = left;
+                    }
+
+                    // Parse right side for operators
+                    if (right.includes('|')) {
+                        // OR gate
+                        const inputs = right.split('|').map(s => s.trim());
+                        faultTree.gates[left] = {
+                            type: 'OR',
+                            inputs: inputs
+                        };
+                    } else if (right.includes('&')) {
+                        // AND gate
+                        const inputs = right.split('&').map(s => s.trim());
+                        faultTree.gates[left] = {
+                            type: 'AND',
+                            inputs: inputs
+                        };
+                    } else {
+                        // Simple assignment or basic event
+                        if (right === 'BASIC-EVENT' || right === 'BASIC' || !faultTree.gates[right]) {
+                            faultTree.events.add(left);
+                        } else {
+                            // It's a reference to another gate
+                            faultTree.gates[left] = {
+                                type: 'TRANSFER',
+                                inputs: [right]
+                            };
+                        }
+                    }
+                }
+            }
+
+            // Identify all basic events
+            const allReferencedNodes = new Set();
+            for (const gate in faultTree.gates) {
+                faultTree.gates[gate].inputs.forEach(input => allReferencedNodes.add(input));
+            }
+
+            allReferencedNodes.forEach(node => {
+                if (!faultTree.gates[node] && !faultTree.events.has(node)) {
+                    faultTree.events.add(node);
+                }
+            });
+
+            return faultTree;
+        }
+
+        function displayTree() {
+            const treeView = document.getElementById('treeView');
+            treeView.innerHTML = '';
+
+            if (!faultTree || !faultTree.topEvent) {
+                treeView.innerHTML = '<p>No fault tree loaded</p>';
+                return;
+            }
+
+            const treeHtml = renderNode(faultTree.topEvent, 0);
+            treeView.innerHTML = treeHtml;
+
+            // Update stats
+            document.getElementById('gateCount').textContent = Object.keys(faultTree.gates).length;
+            document.getElementById('eventCount').textContent = faultTree.events.size;
+            document.getElementById('statsSection').style.display = 'grid';
+        }
+
+        function renderNode(nodeName, level) {
+            const indent = '  '.repeat(level);
+            const gate = faultTree.gates[nodeName];
+
+            if (!gate) {
+                // It's a basic event
+                return `${indent}<div class="tree-node"><span class="event">${nodeName}</span></div>`;
+            }
+
+            let html = `${indent}<div class="tree-node"><span class="gate">${nodeName}</span> [${gate.type}]</div>`;
+
+            if (gate.inputs) {
+                gate.inputs.forEach(input => {
+                    html += renderNode(input, level + 1);
+                });
+            }
+
+            return html;
+        }
+
+        function generateCutSets() {
+            if (!faultTree || !faultTree.topEvent) {
+                showMessage('No fault tree loaded', 'error');
+                return;
+            }
+
+            try {
+                minimalCutSets = computeMinimalCutSets(faultTree.topEvent);
+                displayCutSets();
+                showMessage(`Generated ${minimalCutSets.length} minimal cut sets`, 'info');
+            } catch (error) {
+                showMessage('Error generating cut sets: ' + error.message, 'error');
+            }
+        }
+
+        function computeMinimalCutSets(topEvent) {
+            // Compute all cut sets using bottom-up approach
+            const cutSets = expandNode(topEvent);
+
+            // Reduce to minimal cut sets (remove supersets)
+            const minimal = reduceToMinimal(cutSets);
+
+            return minimal;
+        }
+
+        function expandNode(nodeName) {
+            const gate = faultTree.gates[nodeName];
+
+            // If it's a basic event, return it as a single-element cut set
+            if (!gate) {
+                return [[nodeName]];
+            }
+
+            // Recursively expand inputs
+            const inputCutSets = gate.inputs.map(input => expandNode(input));
+
+            if (gate.type === 'OR' || gate.type === 'TRANSFER') {
+                // OR gate: union of all input cut sets
+                return inputCutSets.flat();
+            } else if (gate.type === 'AND') {
+                // AND gate: Cartesian product of all input cut sets
+                return cartesianProduct(inputCutSets);
+            }
+
+            return [];
+        }
+
+        function cartesianProduct(arrays) {
+            if (arrays.length === 0) return [[]];
+            if (arrays.length === 1) return arrays[0];
+
+            const result = [];
+            const first = arrays[0];
+            const rest = cartesianProduct(arrays.slice(1));
+
+            for (const item1 of first) {
+                for (const item2 of rest) {
+                    const combined = [...item1, ...item2];
+                    // Sort to normalize
+                    combined.sort();
+                    result.push(combined);
+                }
+            }
+
+            return result;
+        }
+
+        function reduceToMinimal(cutSets) {
+            // Remove duplicates first
+            const uniqueSets = [];
+            const seen = new Set();
+
+            for (const cs of cutSets) {
+                const sorted = [...cs].sort();
+                const key = sorted.join(',');
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueSets.push(sorted);
+                }
+            }
+
+            // Remove supersets
+            const minimal = [];
+
+            for (let i = 0; i < uniqueSets.length; i++) {
+                let isMinimal = true;
+
+                for (let j = 0; j < uniqueSets.length; j++) {
+                    if (i === j) continue;
+
+                    // Check if uniqueSets[j] is a subset of uniqueSets[i]
+                    if (isSubset(uniqueSets[j], uniqueSets[i])) {
+                        isMinimal = false;
+                        break;
+                    }
+                }
+
+                if (isMinimal) {
+                    minimal.push(uniqueSets[i]);
+                }
+            }
+
+            // Sort by size, then alphabetically
+            minimal.sort((a, b) => {
+                if (a.length !== b.length) return a.length - b.length;
+                return a.join(',').localeCompare(b.join(','));
+            });
+
+            return minimal;
+        }
+
+        function isSubset(subset, superset) {
+            if (subset.length > superset.length) return false;
+            return subset.every(elem => superset.includes(elem));
+        }
+
+        function displayCutSets() {
+            const cutSetsView = document.getElementById('cutSetsView');
+            const cutSetsSection = document.getElementById('cutSetsSection');
+
+            if (minimalCutSets.length === 0) {
+                cutSetsView.innerHTML = '<p>No cut sets found</p>';
+                return;
+            }
+
+            let html = '';
+            minimalCutSets.forEach((cutSet, index) => {
+                html += `
+                    <div class="cut-set">
+                        <div class="cut-set-header">Cut Set ${index + 1} (Order ${cutSet.length})</div>
+                        <div class="cut-set-events">${cutSet.join(' AND ')}</div>
+                    </div>
+                `;
+            });
+
+            cutSetsView.innerHTML = html;
+            cutSetsSection.style.display = 'block';
+            document.getElementById('cutSetCount').textContent = minimalCutSets.length;
+        }
+
+        function exportResults() {
+            if (!faultTree || minimalCutSets.length === 0) {
+                showMessage('No results to export. Generate cut sets first.', 'error');
+                return;
+            }
+
+            let output = '=== SAPHIRE FTL MINIMAL CUT SET ANALYSIS ===\n\n';
+            output += `Fault Tree: ${faultTree.topEvent}\n`;
+            output += `Total Gates: ${Object.keys(faultTree.gates).length}\n`;
+            output += `Total Basic Events: ${faultTree.events.size}\n`;
+            output += `Total Minimal Cut Sets: ${minimalCutSets.length}\n\n`;
+
+            output += '=== MINIMAL CUT SETS ===\n\n';
+            minimalCutSets.forEach((cutSet, index) => {
+                output += `Cut Set ${index + 1} (Order ${cutSet.length}):\n`;
+                output += `  ${cutSet.join(' AND ')}\n\n`;
+            });
+
+            output += '=== CUT SET DISTRIBUTION ===\n';
+            const distribution = {};
+            minimalCutSets.forEach(cs => {
+                const order = cs.length;
+                distribution[order] = (distribution[order] || 0) + 1;
+            });
+
+            for (const order in distribution) {
+                output += `Order ${order}: ${distribution[order]} cut sets\n`;
+            }
+
+            // Download as text file
+            const blob = new Blob([output], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'minimal_cut_sets.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showMessage('Results exported successfully!', 'info');
+        }
+
+        function loadNewFile() {
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('cutSetsSection').style.display = 'none';
+            document.getElementById('statsSection').style.display = 'none';
+            document.getElementById('messageBox').innerHTML = '';
+            fileInput.value = '';
+            faultTree = null;
+            minimalCutSets = [];
+        }
+
+        function showMessage(message, type) {
+            const messageBox = document.getElementById('messageBox');
+            const className = type === 'error' ? 'error-box' : 'info-box';
+            messageBox.innerHTML = `<div class="${className}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
