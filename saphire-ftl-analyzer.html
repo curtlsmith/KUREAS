@@ -277,13 +277,31 @@
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <h3 style="margin: 15px 0;">Drop FTL file here or click to browse</h3>
-                    <input type="file" id="fileInput" accept=".ftl,.txt">
-                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
-                        Choose File
+                    <h3 style="margin: 15px 0;">Load Fault Tree Files</h3>
+
+                    <div style="margin: 20px 0;">
+                        <input type="file" id="ftlFileInput" accept=".ftl,.txt" style="display: none;">
+                        <button class="upload-btn" onclick="document.getElementById('ftlFileInput').click()">
+                            Choose FTL File (Required)
+                        </button>
+                        <div id="ftlFileName" style="margin-top: 10px; color: #28a745; font-weight: bold;"></div>
+                    </div>
+
+                    <div style="margin: 20px 0;">
+                        <input type="file" id="beiFileInput" accept=".bei,.csv,.txt" style="display: none;">
+                        <button class="upload-btn" onclick="document.getElementById('beiFileInput').click()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                            Choose BEI File (Optional)
+                        </button>
+                        <div id="beiFileName" style="margin-top: 10px; color: #28a745; font-weight: bold;"></div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="processFiles()" style="margin-top: 20px; padding: 12px 30px; font-size: 16px;">
+                        Load Files
                     </button>
+
                     <p style="margin-top: 15px; color: #666; font-size: 14px;">
-                        Supported formats: .ftl, .txt
+                        FTL: Fault Tree Logic (.ftl, .txt)<br>
+                        BEI: Basic Event Information (.bei, .csv, .txt)
                     </p>
                 </div>
             </div>
@@ -294,6 +312,17 @@
                     <button class="btn btn-secondary" onclick="exportResults()">Export Results</button>
                     <button class="btn btn-secondary" onclick="loadNewFile()">Load New File</button>
                     <button class="btn btn-success" onclick="loadExample()">Load Example</button>
+                </div>
+
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                    <label style="font-weight: bold; margin-right: 10px;">Show Probability:</label>
+                    <select id="probDisplay" onchange="displayTree()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                        <option value="none">Do Not Show</option>
+                        <option value="0">0 Digits (1.E-5)</option>
+                        <option value="1">1 Digit (1.2E-5)</option>
+                        <option value="2">2 Digits (1.23E-5)</option>
+                    </select>
+                    <span id="beiStatus" style="margin-left: 15px; color: #6c757d;"></span>
                 </div>
 
                 <div id="messageBox"></div>
@@ -339,6 +368,17 @@ PERSONAL         OR  OTHER SICK SICK-FAM
                     <strong>Format:</strong> Each section begins with "TREE_NAME, GATE_NAME =" followed by gate definitions.
                     Gates are defined as "GATE_NAME OR/AND INPUT1 INPUT2 ...". Sections end with ^EOS.
                 </p>
+
+                <h3 style="margin: 20px 0 10px 0;">Saphire BEI Format (Optional)</h3>
+                <p style="margin-bottom: 10px;">Comma-delimited file with probability data:</p>
+                <pre>Name,FdT,UdC,UdT,UdValue,Prob,Lambda,Tau,Mission,Init,PF,UdValue2,Calc_Prob,Freq,Model_Type,Phase_Type,Project
+ALM-FTS,1,,,0,0.001,,,,F,,,1.23E-3,,,
+ALM-SWT,1,,,0,0.002,,,,F,,,2.45E-3,,,
+ALM-BPF,1,,,0,0.0001,,,,F,,,1.00E-4,,,
+ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
+                <p style="margin-top: 10px; color: #666; font-size: 13px;">
+                    <strong>Key Field:</strong> Calc_Prob (column 13) - Calculated Probability displayed in the fault tree.
+                </p>
             </div>
         </div>
     </div>
@@ -346,56 +386,70 @@ PERSONAL         OR  OTHER SICK SICK-FAM
     <script>
         let faultTree = null;
         let minimalCutSets = [];
+        let basicEventData = {}; // BEI data
+        let ftlContent = null;
+        let beiContent = null;
 
-        // File upload handling
-        const uploadSection = document.getElementById('uploadSection');
-        const fileInput = document.getElementById('fileInput');
+        // File input handling
+        const ftlFileInput = document.getElementById('ftlFileInput');
+        const beiFileInput = document.getElementById('beiFileInput');
 
-        uploadSection.addEventListener('click', () => fileInput.click());
-
-        uploadSection.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadSection.classList.add('dragover');
-        });
-
-        uploadSection.addEventListener('dragleave', () => {
-            uploadSection.classList.remove('dragover');
-        });
-
-        uploadSection.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadSection.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
-        });
-
-        fileInput.addEventListener('change', (e) => {
+        ftlFileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    ftlContent = e.target.result;
+                    document.getElementById('ftlFileName').textContent = '✓ ' + file.name;
+                };
+                reader.readAsText(file);
             }
         });
 
-        function handleFile(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const content = e.target.result;
-                    parseFTL(content);
-                    displayTree();
-                    document.getElementById('uploadSection').classList.add('hidden');
-                    document.getElementById('resultsSection').classList.remove('hidden');
-                    showMessage('File loaded successfully!', 'info');
-                } catch (error) {
-                    showMessage('Error parsing file: ' + error.message, 'error');
+        beiFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    beiContent = e.target.result;
+                    document.getElementById('beiFileName').textContent = '✓ ' + file.name;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function processFiles() {
+            if (!ftlContent) {
+                showMessage('Please select an FTL file first!', 'error');
+                return;
+            }
+
+            try {
+                // Parse FTL file
+                parseFTL(ftlContent);
+
+                // Parse BEI file if provided
+                if (beiContent) {
+                    basicEventData = parseBEI(beiContent);
+                    document.getElementById('beiStatus').textContent = `✓ ${Object.keys(basicEventData).length} basic events loaded`;
+                    document.getElementById('beiStatus').style.color = '#28a745';
+                } else {
+                    basicEventData = {};
+                    document.getElementById('beiStatus').textContent = 'No BEI file loaded';
+                    document.getElementById('beiStatus').style.color = '#6c757d';
                 }
-            };
-            reader.readAsText(file);
+
+                displayTree();
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+                showMessage('Files loaded successfully!', 'info');
+            } catch (error) {
+                showMessage('Error parsing files: ' + error.message, 'error');
+            }
         }
 
         function loadExample() {
-            const example = `TIMELINESS, ALARM =
+            const exampleFTL = `TIMELINESS, ALARM =
 ALARM          OR  ALARM01 ALARM02 ALM-MECH
 ALARM01         OR  ALM-FTS ALM-SWT
 ALARM02         AND ALM-BPF ALM-CPF
@@ -410,8 +464,29 @@ TIMELINESS, TRNSPRT =
 TRNSPRT         AND PER-TRNS PUB-TRANS
 ^EOS`;
 
+            const exampleBEI = `Name,FdT,UdC,UdT,UdValue,Prob,Lambda,Tau,Mission,Init,PF,UdValue2,Calc_Prob,Freq,Model_Type,Phase_Type,Project
+ALM-FTS,1,,,0,0.001,,,,F,,,1.23E-3,,,
+ALM-SWT,1,,,0,0.002,,,,F,,,2.45E-3,,,
+ALM-BPF,1,,,0,0.0001,,,,F,,,1.00E-4,,,
+ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,
+ALM-MECH,1,,,0,0.005,,,,F,,,5.00E-3,,,
+OTHER,1,,,0,0.01,,,,F,,,1.00E-2,,,
+SICK,1,,,0,0.02,,,,F,,,2.00E-2,,,
+SICK-FAM,1,,,0,0.015,,,,F,,,1.50E-2,,,
+PER-TRNS,1,,,0,0.001,,,,F,,,1.00E-3,,,
+PUB-TRNS-LATE,1,,,0,0.05,,,,F,,,5.00E-2,,,
+PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
+
             try {
-                parseFTL(example);
+                ftlContent = exampleFTL;
+                beiContent = exampleBEI;
+
+                parseFTL(exampleFTL);
+                basicEventData = parseBEI(exampleBEI);
+
+                document.getElementById('beiStatus').textContent = `✓ ${Object.keys(basicEventData).length} basic events loaded`;
+                document.getElementById('beiStatus').style.color = '#28a745';
+
                 displayTree();
                 document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('resultsSection').classList.remove('hidden');
@@ -419,6 +494,81 @@ TRNSPRT         AND PER-TRNS PUB-TRANS
             } catch (error) {
                 showMessage('Error loading example: ' + error.message, 'error');
             }
+        }
+
+        function parseBEI(content) {
+            const eventData = {};
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+
+            if (lines.length === 0) return eventData;
+
+            // Skip header line
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                const fields = line.split(',');
+
+                if (fields.length >= 13) {
+                    const name = fields[0].trim();
+                    const calcProb = fields[12].trim();
+
+                    // Parse probability
+                    let probability = 0;
+                    if (calcProb && calcProb !== '') {
+                        // Handle scientific notation
+                        probability = parseFloat(calcProb);
+                        if (isNaN(probability)) {
+                            probability = 0;
+                        }
+                    }
+
+                    eventData[name] = {
+                        Name: name,
+                        FdT: fields[1],
+                        UdC: fields[2],
+                        UdT: fields[3],
+                        UdValue: fields[4],
+                        Prob: fields[5],
+                        Lambda: fields[6],
+                        Tau: fields[7],
+                        Mission: fields[8],
+                        Init: fields[9] === 'T',
+                        PF: fields[10],
+                        UdValue2: fields[11],
+                        Calc_Prob: probability,
+                        Freq: fields[13],
+                        Model_Type: fields[14],
+                        Phase_Type: fields[15],
+                        Project: fields[16]
+                    };
+                }
+            }
+
+            return eventData;
+        }
+
+        function formatProbability(prob, digits) {
+            if (prob === 0) {
+                return digits === '0' ? '0.E+0' : `0.${'0'.repeat(parseInt(digits))}E+0`;
+            }
+
+            // Convert to scientific notation
+            const exp = Math.floor(Math.log10(Math.abs(prob)));
+            const mantissa = prob / Math.pow(10, exp);
+
+            // Format exponent with sign
+            const expSign = exp >= 0 ? '+' : '';
+            const expStr = `${expSign}${exp}`;
+
+            // Format based on digits
+            let formatted;
+            if (digits === '0') {
+                formatted = `${Math.round(mantissa)}.E${expStr}`;
+            } else {
+                const d = parseInt(digits);
+                formatted = `${mantissa.toFixed(d)}E${expStr}`;
+            }
+
+            return formatted;
         }
 
         function parseFTL(content) {
@@ -526,10 +676,16 @@ TRNSPRT         AND PER-TRNS PUB-TRANS
         function renderNode(nodeName, level) {
             const indent = '  '.repeat(level);
             const gate = faultTree.gates[nodeName];
+            const probDisplay = document.getElementById('probDisplay')?.value || 'none';
 
             if (!gate) {
-                // It's a basic event
-                return `${indent}<div class="tree-node"><span class="event">${nodeName}</span></div>`;
+                // It's a basic event - show probability if available
+                let probText = '';
+                if (probDisplay !== 'none' && basicEventData[nodeName]) {
+                    const prob = basicEventData[nodeName].Calc_Prob;
+                    probText = ` <span style="color: #28a745;">[${formatProbability(prob, probDisplay)}]</span>`;
+                }
+                return `${indent}<div class="tree-node"><span class="event">${nodeName}</span>${probText}</div>`;
             }
 
             let html = `${indent}<div class="tree-node"><span class="gate">${nodeName}</span> [${gate.type}]</div>`;
@@ -733,9 +889,17 @@ TRNSPRT         AND PER-TRNS PUB-TRANS
             document.getElementById('cutSetsSection').style.display = 'none';
             document.getElementById('statsSection').style.display = 'none';
             document.getElementById('messageBox').innerHTML = '';
-            fileInput.value = '';
+            document.getElementById('ftlFileName').textContent = '';
+            document.getElementById('beiFileName').textContent = '';
+            document.getElementById('beiStatus').textContent = '';
+            document.getElementById('probDisplay').value = 'none';
+            ftlFileInput.value = '';
+            beiFileInput.value = '';
             faultTree = null;
             minimalCutSets = [];
+            basicEventData = {};
+            ftlContent = null;
+            beiContent = null;
         }
 
         function showMessage(message, type) {
