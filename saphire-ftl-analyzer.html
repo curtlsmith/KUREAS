@@ -279,29 +279,17 @@
                     </svg>
                     <h3 style="margin: 15px 0;">Load Fault Tree Files</h3>
 
-                    <div style="margin: 20px 0;">
-                        <input type="file" id="ftlFileInput" accept=".ftl,.txt" style="display: none;">
-                        <button class="upload-btn" onclick="document.getElementById('ftlFileInput').click()">
-                            Choose FTL File (Required)
-                        </button>
-                        <div id="ftlFileName" style="margin-top: 10px; color: #28a745; font-weight: bold;"></div>
-                    </div>
-
-                    <div style="margin: 20px 0;">
-                        <input type="file" id="beiFileInput" accept=".bei,.csv,.txt" style="display: none;">
-                        <button class="upload-btn" onclick="document.getElementById('beiFileInput').click()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
-                            Choose BEI File (Optional)
-                        </button>
-                        <div id="beiFileName" style="margin-top: 10px; color: #28a745; font-weight: bold;"></div>
-                    </div>
-
-                    <button class="btn btn-primary" onclick="processFiles()" style="margin-top: 20px; padding: 12px 30px; font-size: 16px;">
-                        Load Files
+                    <input type="file" id="fileInput" multiple accept=".ftl,.txt,.bei,.csv" style="display: none;">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                        Choose Files
                     </button>
 
+                    <div id="fileStatus" style="margin-top: 15px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;"></div>
+
                     <p style="margin-top: 15px; color: #666; font-size: 14px;">
-                        FTL: Fault Tree Logic (.ftl, .txt)<br>
-                        BEI: Basic Event Information (.bei, .csv, .txt)
+                        Select one or more files:<br>
+                        • FTL file (.ftl, .txt) - Required<br>
+                        • BEI file (.bei, .csv, .txt) - Optional
                     </p>
                 </div>
             </div>
@@ -315,14 +303,21 @@
                 </div>
 
                 <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-                    <label style="font-weight: bold; margin-right: 10px;">Show Probability:</label>
-                    <select id="probDisplay" onchange="displayTree()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-                        <option value="none">Do Not Show</option>
-                        <option value="0">0 Digits (1.E-5)</option>
-                        <option value="1">1 Digit (1.2E-5)</option>
-                        <option value="2">2 Digits (1.23E-5)</option>
-                    </select>
-                    <span id="beiStatus" style="margin-left: 15px; color: #6c757d;"></span>
+                    <div style="margin-bottom: 15px;" id="treeSelectDiv">
+                        <label style="font-weight: bold; margin-right: 10px;">Select Fault Tree:</label>
+                        <select id="treeSelect" onchange="onTreeSelected()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; min-width: 250px;">
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-weight: bold; margin-right: 10px;">Show Probability:</label>
+                        <select id="probDisplay" onchange="displayTree()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                            <option value="none">Do Not Show</option>
+                            <option value="0">0 Digits (1.E-5)</option>
+                            <option value="1">1 Digit (1.2E-5)</option>
+                            <option value="2">2 Digits (1.23E-5)</option>
+                        </select>
+                        <span id="beiStatus" style="margin-left: 15px; color: #6c757d;"></span>
+                    </div>
                 </div>
 
                 <div id="messageBox"></div>
@@ -384,53 +379,51 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
     </div>
 
     <script>
-        let faultTree = null;
+        let allFaultTrees = []; // Array of all parsed fault trees
+        let currentTreeIndex = 0;
         let minimalCutSets = [];
         let basicEventData = {}; // BEI data
-        let ftlContent = null;
-        let beiContent = null;
 
         // File input handling
-        const ftlFileInput = document.getElementById('ftlFileInput');
-        const beiFileInput = document.getElementById('beiFileInput');
+        const fileInput = document.getElementById('fileInput');
 
-        ftlFileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    ftlContent = e.target.result;
-                    document.getElementById('ftlFileName').textContent = '✓ ' + file.name;
-                };
-                reader.readAsText(file);
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+
+            const files = Array.from(e.target.files);
+            let ftlFile = null;
+            let beiFile = null;
+            const statusDiv = document.getElementById('fileStatus');
+            statusDiv.innerHTML = '';
+
+            // Identify file types
+            for (const file of files) {
+                const ext = file.name.toLowerCase();
+                if (ext.endsWith('.ftl') || (ext.endsWith('.txt') && !ftlFile)) {
+                    ftlFile = file;
+                } else if (ext.endsWith('.bei') || ext.endsWith('.csv') || ext.endsWith('.txt')) {
+                    beiFile = file;
+                }
             }
-        });
 
-        beiFileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    beiContent = e.target.result;
-                    document.getElementById('beiFileName').textContent = '✓ ' + file.name;
-                };
-                reader.readAsText(file);
-            }
-        });
-
-        function processFiles() {
-            if (!ftlContent) {
-                showMessage('Please select an FTL file first!', 'error');
+            if (!ftlFile) {
+                showMessage('Please select at least one FTL file!', 'error');
                 return;
             }
 
             try {
-                // Parse FTL file
-                parseFTL(ftlContent);
+                // Read FTL file
+                const ftlContent = await readFileAsync(ftlFile);
+                statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${ftlFile.name}</div>`;
 
-                // Parse BEI file if provided
-                if (beiContent) {
+                // Parse FTL file
+                parseAllFTL(ftlContent);
+
+                // Read BEI file if provided
+                if (beiFile) {
+                    const beiContent = await readFileAsync(beiFile);
                     basicEventData = parseBEI(beiContent);
+                    statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${beiFile.name} (${Object.keys(basicEventData).length} events)</div>`;
                     document.getElementById('beiStatus').textContent = `✓ ${Object.keys(basicEventData).length} basic events loaded`;
                     document.getElementById('beiStatus').style.color = '#28a745';
                 } else {
@@ -439,13 +432,53 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
                     document.getElementById('beiStatus').style.color = '#6c757d';
                 }
 
+                // Populate tree selector
+                populateTreeSelector();
+
+                // Display first tree
+                currentTreeIndex = 0;
                 displayTree();
+
                 document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('resultsSection').classList.remove('hidden');
-                showMessage('Files loaded successfully!', 'info');
+                showMessage(`Loaded ${allFaultTrees.length} fault tree(s) successfully!`, 'info');
             } catch (error) {
                 showMessage('Error parsing files: ' + error.message, 'error');
             }
+        });
+
+        function readFileAsync(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        function populateTreeSelector() {
+            const select = document.getElementById('treeSelect');
+            select.innerHTML = '';
+
+            allFaultTrees.forEach((tree, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${tree.treeName} - ${tree.topEvent}`;
+                select.appendChild(option);
+            });
+
+            // Show/hide selector based on number of trees
+            document.getElementById('treeSelectDiv').style.display =
+                allFaultTrees.length > 1 ? 'block' : 'none';
+        }
+
+        function onTreeSelected() {
+            currentTreeIndex = parseInt(document.getElementById('treeSelect').value);
+            displayTree();
+            // Clear previous cut sets
+            minimalCutSets = [];
+            document.getElementById('cutSetsSection').style.display = 'none';
+            document.getElementById('messageBox').innerHTML = '';
         }
 
         function loadExample() {
@@ -478,19 +511,19 @@ PUB-TRNS-LATE,1,,,0,0.05,,,,F,,,5.00E-2,,,
 PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
             try {
-                ftlContent = exampleFTL;
-                beiContent = exampleBEI;
-
-                parseFTL(exampleFTL);
+                parseAllFTL(exampleFTL);
                 basicEventData = parseBEI(exampleBEI);
 
                 document.getElementById('beiStatus').textContent = `✓ ${Object.keys(basicEventData).length} basic events loaded`;
                 document.getElementById('beiStatus').style.color = '#28a745';
 
+                populateTreeSelector();
+                currentTreeIndex = 0;
                 displayTree();
+
                 document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('resultsSection').classList.remove('hidden');
-                showMessage('Example loaded successfully!', 'info');
+                showMessage(`Loaded ${allFaultTrees.length} fault tree(s) successfully!`, 'info');
             } catch (error) {
                 showMessage('Error loading example: ' + error.message, 'error');
             }
@@ -571,14 +604,8 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             return formatted;
         }
 
-        function parseFTL(content) {
-            faultTree = {
-                topEvent: null,
-                gates: {},
-                events: new Set(),
-                sections: [],
-                treeName: null
-            };
+        function parseAllFTL(content) {
+            allFaultTrees = [];
 
             // Split by ^EOS to get sections
             const sections = content.split(/\^EOS/);
@@ -592,90 +619,85 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
                 // First line should be header: "TREE_NAME, GATE_NAME ="
                 const headerLine = lines[0];
-                let currentSection = {};
 
                 if (headerLine.includes(',') && headerLine.includes('=')) {
                     const parts = headerLine.split(',');
                     if (parts.length >= 2) {
                         const treeName = parts[0].trim();
-                        const gateName = parts[1].replace('=', '').trim();
+                        const topEvent = parts[1].replace('=', '').trim();
 
-                        if (!faultTree.treeName) {
-                            faultTree.treeName = treeName;
-                        }
-
-                        if (!faultTree.topEvent) {
-                            faultTree.topEvent = gateName;
-                        }
-
-                        currentSection = {
+                        // Create new tree object for this section
+                        const tree = {
                             treeName: treeName,
-                            topGate: gateName
+                            topEvent: topEvent,
+                            gates: {},
+                            events: new Set()
                         };
-                    }
 
-                    // Process remaining lines in section
-                    for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i];
+                        // Process remaining lines in section
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i];
 
-                        // Parse gate definition: "GATENAME  OR/AND  INPUT1 INPUT2 INPUT3..."
-                        const tokens = line.split(/\s+/).filter(t => t);
+                            // Parse gate definition: "GATENAME  OR/AND  INPUT1 INPUT2 INPUT3..."
+                            const tokens = line.split(/\s+/).filter(t => t);
 
-                        if (tokens.length >= 2) {
-                            const gateName = tokens[0];
-                            const operator = tokens[1].toUpperCase();
+                            if (tokens.length >= 2) {
+                                const gateName = tokens[0];
+                                const operator = tokens[1].toUpperCase();
 
-                            if (operator === 'OR' || operator === 'AND') {
-                                const inputs = tokens.slice(2);
+                                if (operator === 'OR' || operator === 'AND') {
+                                    const inputs = tokens.slice(2);
 
-                                faultTree.gates[gateName] = {
-                                    type: operator,
-                                    inputs: inputs
-                                };
+                                    tree.gates[gateName] = {
+                                        type: operator,
+                                        inputs: inputs
+                                    };
+                                }
                             }
                         }
+
+                        // Identify all basic events (nodes referenced but not defined as gates)
+                        const allReferencedNodes = new Set();
+                        for (const gate in tree.gates) {
+                            tree.gates[gate].inputs.forEach(input => allReferencedNodes.add(input));
+                        }
+
+                        allReferencedNodes.forEach(node => {
+                            if (!tree.gates[node]) {
+                                tree.events.add(node);
+                            }
+                        });
+
+                        allFaultTrees.push(tree);
                     }
-
-                    faultTree.sections.push(currentSection);
                 }
             }
 
-            // Identify all basic events (nodes referenced but not defined as gates)
-            const allReferencedNodes = new Set();
-            for (const gate in faultTree.gates) {
-                faultTree.gates[gate].inputs.forEach(input => allReferencedNodes.add(input));
-            }
-
-            allReferencedNodes.forEach(node => {
-                if (!faultTree.gates[node]) {
-                    faultTree.events.add(node);
-                }
-            });
-
-            return faultTree;
+            return allFaultTrees;
         }
 
         function displayTree() {
             const treeView = document.getElementById('treeView');
             treeView.innerHTML = '';
 
-            if (!faultTree || !faultTree.topEvent) {
+            if (!allFaultTrees || allFaultTrees.length === 0 || !allFaultTrees[currentTreeIndex]) {
                 treeView.innerHTML = '<p>No fault tree loaded</p>';
                 return;
             }
 
-            const treeHtml = renderNode(faultTree.topEvent, 0);
+            const currentTree = allFaultTrees[currentTreeIndex];
+            const treeHtml = renderNode(currentTree.topEvent, 0, currentTree);
             treeView.innerHTML = treeHtml;
 
             // Update stats
-            document.getElementById('gateCount').textContent = Object.keys(faultTree.gates).length;
-            document.getElementById('eventCount').textContent = faultTree.events.size;
+            document.getElementById('gateCount').textContent = Object.keys(currentTree.gates).length;
+            document.getElementById('eventCount').textContent = currentTree.events.size;
             document.getElementById('statsSection').style.display = 'grid';
         }
 
-        function renderNode(nodeName, level) {
+        function renderNode(nodeName, level, tree) {
             const indent = '  '.repeat(level);
-            const gate = faultTree.gates[nodeName];
+            const gate = tree.gates[nodeName];
             const probDisplay = document.getElementById('probDisplay')?.value || 'none';
 
             if (!gate) {
@@ -692,7 +714,7 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
             if (gate.inputs) {
                 gate.inputs.forEach(input => {
-                    html += renderNode(input, level + 1);
+                    html += renderNode(input, level + 1, tree);
                 });
             }
 
@@ -700,23 +722,25 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
         }
 
         function generateCutSets() {
-            if (!faultTree || !faultTree.topEvent) {
+            if (!allFaultTrees || allFaultTrees.length === 0 || !allFaultTrees[currentTreeIndex]) {
                 showMessage('No fault tree loaded', 'error');
                 return;
             }
 
+            const currentTree = allFaultTrees[currentTreeIndex];
+
             try {
-                minimalCutSets = computeMinimalCutSets(faultTree.topEvent);
+                minimalCutSets = computeMinimalCutSets(currentTree.topEvent, currentTree);
                 displayCutSets();
-                showMessage(`Generated ${minimalCutSets.length} minimal cut sets`, 'info');
+                showMessage(`Generated ${minimalCutSets.length} minimal cut sets for ${currentTree.treeName}`, 'info');
             } catch (error) {
                 showMessage('Error generating cut sets: ' + error.message, 'error');
             }
         }
 
-        function computeMinimalCutSets(topEvent) {
+        function computeMinimalCutSets(topEvent, tree) {
             // Compute all cut sets using bottom-up approach
-            const cutSets = expandNode(topEvent);
+            const cutSets = expandNode(topEvent, tree);
 
             // Reduce to minimal cut sets (remove supersets)
             const minimal = reduceToMinimal(cutSets);
@@ -724,8 +748,8 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             return minimal;
         }
 
-        function expandNode(nodeName) {
-            const gate = faultTree.gates[nodeName];
+        function expandNode(nodeName, tree) {
+            const gate = tree.gates[nodeName];
 
             // If it's a basic event, return it as a single-element cut set
             if (!gate) {
@@ -733,9 +757,9 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             }
 
             // Recursively expand inputs
-            const inputCutSets = gate.inputs.map(input => expandNode(input));
+            const inputCutSets = gate.inputs.map(input => expandNode(input, tree));
 
-            if (gate.type === 'OR' || gate.type === 'TRANSFER') {
+            if (gate.type === 'OR') {
                 // OR gate: union of all input cut sets
                 return inputCutSets.flat();
             } else if (gate.type === 'AND') {
@@ -840,18 +864,20 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
         }
 
         function exportResults() {
-            if (!faultTree || minimalCutSets.length === 0) {
+            if (!allFaultTrees || allFaultTrees.length === 0 || minimalCutSets.length === 0) {
                 showMessage('No results to export. Generate cut sets first.', 'error');
                 return;
             }
 
+            const currentTree = allFaultTrees[currentTreeIndex];
+
             let output = '=== SAPHIRE FTL MINIMAL CUT SET ANALYSIS ===\n\n';
-            if (faultTree.treeName) {
-                output += `Tree Name: ${faultTree.treeName}\n`;
+            if (currentTree.treeName) {
+                output += `Tree Name: ${currentTree.treeName}\n`;
             }
-            output += `Top Event: ${faultTree.topEvent}\n`;
-            output += `Total Gates: ${Object.keys(faultTree.gates).length}\n`;
-            output += `Total Basic Events: ${faultTree.events.size}\n`;
+            output += `Top Event: ${currentTree.topEvent}\n`;
+            output += `Total Gates: ${Object.keys(currentTree.gates).length}\n`;
+            output += `Total Basic Events: ${currentTree.events.size}\n`;
             output += `Total Minimal Cut Sets: ${minimalCutSets.length}\n\n`;
 
             output += '=== MINIMAL CUT SETS ===\n\n';
@@ -876,7 +902,7 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'minimal_cut_sets.txt';
+            a.download = `minimal_cut_sets_${currentTree.topEvent}.txt`;
             a.click();
             URL.revokeObjectURL(url);
 
@@ -889,17 +915,14 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             document.getElementById('cutSetsSection').style.display = 'none';
             document.getElementById('statsSection').style.display = 'none';
             document.getElementById('messageBox').innerHTML = '';
-            document.getElementById('ftlFileName').textContent = '';
-            document.getElementById('beiFileName').textContent = '';
+            document.getElementById('fileStatus').innerHTML = '';
             document.getElementById('beiStatus').textContent = '';
             document.getElementById('probDisplay').value = 'none';
-            ftlFileInput.value = '';
-            beiFileInput.value = '';
-            faultTree = null;
+            fileInput.value = '';
+            allFaultTrees = [];
+            currentTreeIndex = 0;
             minimalCutSets = [];
             basicEventData = {};
-            ftlContent = null;
-            beiContent = null;
         }
 
         function showMessage(message, type) {
