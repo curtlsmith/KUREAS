@@ -325,17 +325,20 @@
             </div>
 
             <div class="example-section">
-                <h3 style="margin-bottom: 10px;">Example FTL Format</h3>
+                <h3 style="margin-bottom: 10px;">Saphire FTL Format</h3>
                 <p style="margin-bottom: 10px;">Click "Load Example" to see a sample fault tree, or create your own file:</p>
-                <pre>* Fault Tree: System Failure
-TOP-EVENT := OR-1
-OR-1 := AND-1 | POWER-FAILURE
-AND-1 := PUMP-FAILS & BACKUP-PUMP-FAILS
-PUMP-FAILS := MECHANICAL-FAILURE | ELECTRICAL-FAILURE
-BACKUP-PUMP-FAILS := BASIC-EVENT
-POWER-FAILURE := BASIC-EVENT
-MECHANICAL-FAILURE := BASIC-EVENT
-ELECTRICAL-FAILURE := BASIC-EVENT</pre>
+                <pre>TIMELINESS, ALARM =
+ALARM          OR  ALARM01 ALARM02 ALM-MECH
+ALARM01         OR  ALM-FTS ALM-SWT
+ALARM02         AND ALM-BPF ALM-CPF
+^EOS
+TIMELINESS, PERSONAL =
+PERSONAL         OR  OTHER SICK SICK-FAM
+^EOS</pre>
+                <p style="margin-top: 10px; color: #666; font-size: 13px;">
+                    <strong>Format:</strong> Each section begins with "TREE_NAME, GATE_NAME =" followed by gate definitions.
+                    Gates are defined as "GATE_NAME OR/AND INPUT1 INPUT2 ...". Sections end with ^EOS.
+                </p>
             </div>
         </div>
     </div>
@@ -392,16 +395,20 @@ ELECTRICAL-FAILURE := BASIC-EVENT</pre>
         }
 
         function loadExample() {
-            const example = `* Fault Tree: System Failure Example
-* This is a sample fault tree for demonstration
-TOP-EVENT := OR-1
-OR-1 := AND-1 | POWER-FAILURE
-AND-1 := PUMP-FAILS & BACKUP-PUMP-FAILS
-PUMP-FAILS := MECHANICAL-FAILURE | ELECTRICAL-FAILURE
-BACKUP-PUMP-FAILS := BASIC-EVENT
-POWER-FAILURE := BASIC-EVENT
-MECHANICAL-FAILURE := BASIC-EVENT
-ELECTRICAL-FAILURE := BASIC-EVENT`;
+            const example = `TIMELINESS, ALARM =
+ALARM          OR  ALARM01 ALARM02 ALM-MECH
+ALARM01         OR  ALM-FTS ALM-SWT
+ALARM02         AND ALM-BPF ALM-CPF
+^EOS
+TIMELINESS, PERSONAL =
+PERSONAL         OR  OTHER SICK SICK-FAM
+^EOS
+TIMELINESS, TRNS-2 =
+TRNS-2          AND PER-TRNS PUB-TRNS-LATE
+^EOS
+TIMELINESS, TRNSPRT =
+TRNSPRT         AND PER-TRNS PUB-TRANS
+^EOS`;
 
             try {
                 parseFTL(example);
@@ -419,64 +426,78 @@ ELECTRICAL-FAILURE := BASIC-EVENT`;
                 topEvent: null,
                 gates: {},
                 events: new Set(),
-                comments: []
+                sections: [],
+                treeName: null
             };
 
-            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+            // Split by ^EOS to get sections
+            const sections = content.split(/\^EOS/);
 
-            for (const line of lines) {
-                // Skip comments
-                if (line.startsWith('*')) {
-                    faultTree.comments.push(line.substring(1).trim());
-                    continue;
-                }
+            for (const section of sections) {
+                const lines = section.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line && !line.startsWith('*'));
 
-                // Parse gate/event definitions
-                if (line.includes(':=')) {
-                    const [left, right] = line.split(':=').map(s => s.trim());
+                if (lines.length === 0) continue;
 
-                    if (!faultTree.topEvent) {
-                        faultTree.topEvent = left;
+                // First line should be header: "TREE_NAME, GATE_NAME ="
+                const headerLine = lines[0];
+                let currentSection = {};
+
+                if (headerLine.includes(',') && headerLine.includes('=')) {
+                    const parts = headerLine.split(',');
+                    if (parts.length >= 2) {
+                        const treeName = parts[0].trim();
+                        const gateName = parts[1].replace('=', '').trim();
+
+                        if (!faultTree.treeName) {
+                            faultTree.treeName = treeName;
+                        }
+
+                        if (!faultTree.topEvent) {
+                            faultTree.topEvent = gateName;
+                        }
+
+                        currentSection = {
+                            treeName: treeName,
+                            topGate: gateName
+                        };
                     }
 
-                    // Parse right side for operators
-                    if (right.includes('|')) {
-                        // OR gate
-                        const inputs = right.split('|').map(s => s.trim());
-                        faultTree.gates[left] = {
-                            type: 'OR',
-                            inputs: inputs
-                        };
-                    } else if (right.includes('&')) {
-                        // AND gate
-                        const inputs = right.split('&').map(s => s.trim());
-                        faultTree.gates[left] = {
-                            type: 'AND',
-                            inputs: inputs
-                        };
-                    } else {
-                        // Simple assignment or basic event
-                        if (right === 'BASIC-EVENT' || right === 'BASIC' || !faultTree.gates[right]) {
-                            faultTree.events.add(left);
-                        } else {
-                            // It's a reference to another gate
-                            faultTree.gates[left] = {
-                                type: 'TRANSFER',
-                                inputs: [right]
-                            };
+                    // Process remaining lines in section
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i];
+
+                        // Parse gate definition: "GATENAME  OR/AND  INPUT1 INPUT2 INPUT3..."
+                        const tokens = line.split(/\s+/).filter(t => t);
+
+                        if (tokens.length >= 2) {
+                            const gateName = tokens[0];
+                            const operator = tokens[1].toUpperCase();
+
+                            if (operator === 'OR' || operator === 'AND') {
+                                const inputs = tokens.slice(2);
+
+                                faultTree.gates[gateName] = {
+                                    type: operator,
+                                    inputs: inputs
+                                };
+                            }
                         }
                     }
+
+                    faultTree.sections.push(currentSection);
                 }
             }
 
-            // Identify all basic events
+            // Identify all basic events (nodes referenced but not defined as gates)
             const allReferencedNodes = new Set();
             for (const gate in faultTree.gates) {
                 faultTree.gates[gate].inputs.forEach(input => allReferencedNodes.add(input));
             }
 
             allReferencedNodes.forEach(node => {
-                if (!faultTree.gates[node] && !faultTree.events.has(node)) {
+                if (!faultTree.gates[node]) {
                     faultTree.events.add(node);
                 }
             });
@@ -669,7 +690,10 @@ ELECTRICAL-FAILURE := BASIC-EVENT`;
             }
 
             let output = '=== SAPHIRE FTL MINIMAL CUT SET ANALYSIS ===\n\n';
-            output += `Fault Tree: ${faultTree.topEvent}\n`;
+            if (faultTree.treeName) {
+                output += `Tree Name: ${faultTree.treeName}\n`;
+            }
+            output += `Top Event: ${faultTree.topEvent}\n`;
             output += `Total Gates: ${Object.keys(faultTree.gates).length}\n`;
             output += `Total Basic Events: ${faultTree.events.size}\n`;
             output += `Total Minimal Cut Sets: ${minimalCutSets.length}\n\n`;
