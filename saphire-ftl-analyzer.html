@@ -148,18 +148,55 @@
             padding: 20px;
             font-family: 'Courier New', monospace;
             font-size: 13px;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
         }
 
         .tree-node {
-            margin-left: 20px;
             margin-top: 5px;
+            position: relative;
+        }
+
+        .tree-node-content {
+            display: flex;
+            align-items: center;
+            padding: 3px 0;
+        }
+
+        .tree-expander {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-right: 5px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 12px;
+            line-height: 16px;
+            text-align: center;
+            color: #666;
+        }
+
+        .tree-expander:hover {
+            color: #000;
+        }
+
+        .tree-children {
+            margin-left: 20px;
+            display: none;
+        }
+
+        .tree-children.expanded {
+            display: block;
         }
 
         .gate {
             color: #dc3545;
             font-weight: bold;
+            cursor: pointer;
+        }
+
+        .gate:hover {
+            text-decoration: underline;
         }
 
         .event {
@@ -313,7 +350,7 @@
                         <select id="probDisplay" onchange="displayTree()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
                             <option value="none">Do Not Show</option>
                             <option value="0">0 Digits (1.E-5)</option>
-                            <option value="1">1 Digit (1.2E-5)</option>
+                            <option value="1" selected>1 Digit (1.2E-5)</option>
                             <option value="2">2 Digits (1.23E-5)</option>
                         </select>
                         <span id="beiStatus" style="margin-left: 15px; color: #6c757d;"></span>
@@ -334,6 +371,10 @@
                     <div class="stat-card">
                         <div class="stat-value" id="cutSetCount">0</div>
                         <div class="stat-label">Minimal Cut Sets</div>
+                    </div>
+                    <div class="stat-card" id="mcubCard" style="display: none;">
+                        <div class="stat-value" id="mcubValue">0.0E+0</div>
+                        <div class="stat-label">MCUB Probability</div>
                     </div>
                 </div>
 
@@ -478,6 +519,7 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
             // Clear previous cut sets
             minimalCutSets = [];
             document.getElementById('cutSetsSection').style.display = 'none';
+            document.getElementById('mcubCard').style.display = 'none';
             document.getElementById('messageBox').innerHTML = '';
         }
 
@@ -676,9 +718,12 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             return allFaultTrees;
         }
 
+        let nodeIdCounter = 0;
+
         function displayTree() {
             const treeView = document.getElementById('treeView');
             treeView.innerHTML = '';
+            nodeIdCounter = 0;
 
             if (!allFaultTrees || allFaultTrees.length === 0 || !allFaultTrees[currentTreeIndex]) {
                 treeView.innerHTML = '<p>No fault tree loaded</p>';
@@ -695,10 +740,24 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             document.getElementById('statsSection').style.display = 'grid';
         }
 
+        function toggleNode(nodeId) {
+            const childrenDiv = document.getElementById('children-' + nodeId);
+            const expander = document.getElementById('expander-' + nodeId);
+
+            if (childrenDiv) {
+                if (childrenDiv.classList.contains('expanded')) {
+                    childrenDiv.classList.remove('expanded');
+                    expander.textContent = '▶';
+                } else {
+                    childrenDiv.classList.add('expanded');
+                    expander.textContent = '▼';
+                }
+            }
+        }
+
         function renderNode(nodeName, level, tree) {
-            const indent = '  '.repeat(level);
             const gate = tree.gates[nodeName];
-            const probDisplay = document.getElementById('probDisplay')?.value || 'none';
+            const probDisplay = document.getElementById('probDisplay')?.value || '1';
 
             if (!gate) {
                 // It's a basic event - show probability if available
@@ -707,17 +766,32 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                     const prob = basicEventData[nodeName].Calc_Prob;
                     probText = ` <span style="color: #28a745;">[${formatProbability(prob, probDisplay)}]</span>`;
                 }
-                return `${indent}<div class="tree-node"><span class="event">${nodeName}</span>${probText}</div>`;
+                return `<div class="tree-node">
+                    <div class="tree-node-content">
+                        <span class="tree-expander"></span>
+                        <span class="event">${nodeName}</span>${probText}
+                    </div>
+                </div>`;
             }
 
-            let html = `${indent}<div class="tree-node"><span class="gate">${nodeName}</span> [${gate.type}]</div>`;
+            // Gate node - has children
+            const nodeId = ++nodeIdCounter;
+            let html = `<div class="tree-node">
+                <div class="tree-node-content">
+                    <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
+                    <span class="gate" onclick="toggleNode(${nodeId})">${nodeName}</span>
+                    <span style="color: #666; margin-left: 5px;">[${gate.type}]</span>
+                </div>`;
 
-            if (gate.inputs) {
+            if (gate.inputs && gate.inputs.length > 0) {
+                html += `<div class="tree-children expanded" id="children-${nodeId}">`;
                 gate.inputs.forEach(input => {
                     html += renderNode(input, level + 1, tree);
                 });
+                html += '</div>';
             }
 
+            html += '</div>';
             return html;
         }
 
@@ -839,6 +913,39 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             return subset.every(elem => superset.includes(elem));
         }
 
+        function calculateCutSetProbability(cutSet) {
+            // Cut set probability is the product of all event probabilities
+            // (all events must fail for the cut set to cause system failure)
+            let prob = 1.0;
+            let hasBEI = true;
+
+            for (const event of cutSet) {
+                if (basicEventData[event] && basicEventData[event].Calc_Prob !== undefined) {
+                    prob *= basicEventData[event].Calc_Prob;
+                } else {
+                    hasBEI = false;
+                    break;
+                }
+            }
+
+            return hasBEI ? prob : null;
+        }
+
+        function calculateMCUB(cutSetProbabilities) {
+            // MCUB = 1 - product((1 - P_i)) for all cut sets
+            // This is the minimal cut set upper bound
+            if (cutSetProbabilities.length === 0 || cutSetProbabilities.some(p => p === null)) {
+                return null;
+            }
+
+            let product = 1.0;
+            for (const prob of cutSetProbabilities) {
+                product *= (1.0 - prob);
+            }
+
+            return 1.0 - product;
+        }
+
         function displayCutSets() {
             const cutSetsView = document.getElementById('cutSetsView');
             const cutSetsSection = document.getElementById('cutSetsSection');
@@ -848,11 +955,24 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                 return;
             }
 
+            // Calculate probabilities for each cut set
+            const cutSetProbabilities = minimalCutSets.map(cs => calculateCutSetProbability(cs));
+            const mcub = calculateMCUB(cutSetProbabilities);
+
+            // Get probability display setting
+            const probDisplay = document.getElementById('probDisplay')?.value || '1';
+
             let html = '';
             minimalCutSets.forEach((cutSet, index) => {
+                const prob = cutSetProbabilities[index];
+                let probText = '';
+                if (prob !== null) {
+                    probText = ` <span style="color: #28a745; font-weight: bold;">[P = ${formatProbability(prob, probDisplay)}]</span>`;
+                }
+
                 html += `
                     <div class="cut-set">
-                        <div class="cut-set-header">Cut Set ${index + 1} (Order ${cutSet.length})</div>
+                        <div class="cut-set-header">Cut Set ${index + 1} (Order ${cutSet.length})${probText}</div>
                         <div class="cut-set-events">${cutSet.join(' AND ')}</div>
                     </div>
                 `;
@@ -861,6 +981,14 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             cutSetsView.innerHTML = html;
             cutSetsSection.style.display = 'block';
             document.getElementById('cutSetCount').textContent = minimalCutSets.length;
+
+            // Display MCUB if available
+            if (mcub !== null) {
+                document.getElementById('mcubValue').textContent = formatProbability(mcub, probDisplay);
+                document.getElementById('mcubCard').style.display = 'block';
+            } else {
+                document.getElementById('mcubCard').style.display = 'none';
+            }
         }
 
         function exportResults() {
@@ -870,6 +998,11 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             }
 
             const currentTree = allFaultTrees[currentTreeIndex];
+            const probDisplay = document.getElementById('probDisplay')?.value || '1';
+
+            // Calculate probabilities
+            const cutSetProbabilities = minimalCutSets.map(cs => calculateCutSetProbability(cs));
+            const mcub = calculateMCUB(cutSetProbabilities);
 
             let output = '=== SAPHIRE FTL MINIMAL CUT SET ANALYSIS ===\n\n';
             if (currentTree.treeName) {
@@ -878,12 +1011,22 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             output += `Top Event: ${currentTree.topEvent}\n`;
             output += `Total Gates: ${Object.keys(currentTree.gates).length}\n`;
             output += `Total Basic Events: ${currentTree.events.size}\n`;
-            output += `Total Minimal Cut Sets: ${minimalCutSets.length}\n\n`;
+            output += `Total Minimal Cut Sets: ${minimalCutSets.length}\n`;
+
+            if (mcub !== null) {
+                output += `MCUB (Minimal Cut Set Upper Bound): ${formatProbability(mcub, probDisplay)}\n`;
+            }
+            output += '\n';
 
             output += '=== MINIMAL CUT SETS ===\n\n';
             minimalCutSets.forEach((cutSet, index) => {
+                const prob = cutSetProbabilities[index];
                 output += `Cut Set ${index + 1} (Order ${cutSet.length}):\n`;
-                output += `  ${cutSet.join(' AND ')}\n\n`;
+                output += `  ${cutSet.join(' AND ')}\n`;
+                if (prob !== null) {
+                    output += `  Probability: ${formatProbability(prob, probDisplay)}\n`;
+                }
+                output += '\n';
             });
 
             output += '=== CUT SET DISTRIBUTION ===\n';
@@ -914,10 +1057,11 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             document.getElementById('resultsSection').classList.add('hidden');
             document.getElementById('cutSetsSection').style.display = 'none';
             document.getElementById('statsSection').style.display = 'none';
+            document.getElementById('mcubCard').style.display = 'none';
             document.getElementById('messageBox').innerHTML = '';
             document.getElementById('fileStatus').innerHTML = '';
             document.getElementById('beiStatus').textContent = '';
-            document.getElementById('probDisplay').value = 'none';
+            document.getElementById('probDisplay').value = '1';
             fileInput.value = '';
             allFaultTrees = [];
             currentTreeIndex = 0;
