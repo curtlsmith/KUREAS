@@ -153,14 +153,14 @@
         }
 
         .tree-node {
-            margin-top: 5px;
+            margin-top: 1px;
             position: relative;
         }
 
         .tree-node-content {
             display: flex;
             align-items: center;
-            padding: 3px 0;
+            padding: 1px 0;
         }
 
         .tree-expander {
@@ -380,6 +380,10 @@
 
                 <div class="section">
                     <h2>Fault Tree Structure</h2>
+                    <div style="margin-bottom: 10px;">
+                        <button class="btn btn-secondary" onclick="expandAll()">Expand All</button>
+                        <button class="btn btn-secondary" onclick="collapseAll()">Collapse All</button>
+                    </div>
                     <div class="tree-view" id="treeView"></div>
                 </div>
 
@@ -762,6 +766,36 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             }
         }
 
+        function expandAll() {
+            const allChildren = document.querySelectorAll('.tree-children');
+            const allExpanders = document.querySelectorAll('.tree-expander');
+
+            allChildren.forEach(child => {
+                child.classList.add('expanded');
+            });
+
+            allExpanders.forEach(expander => {
+                if (expander.textContent === '▶') {
+                    expander.textContent = '▼';
+                }
+            });
+        }
+
+        function collapseAll() {
+            const allChildren = document.querySelectorAll('.tree-children');
+            const allExpanders = document.querySelectorAll('.tree-expander');
+
+            allChildren.forEach(child => {
+                child.classList.remove('expanded');
+            });
+
+            allExpanders.forEach(expander => {
+                if (expander.textContent === '▼') {
+                    expander.textContent = '▶';
+                }
+            });
+        }
+
         function renderNode(nodeName, level, tree) {
             const gate = tree.gates[nodeName];
             const probDisplay = document.getElementById('probDisplay')?.value || '1';
@@ -785,40 +819,50 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             if (gate.type === 'TRAN') {
                 // If no explicit reference, use the gate's own name
                 const refGateName = gate.inputs[0] || nodeName;
-                const nodeId = ++nodeIdCounter;
 
-                // Find the referenced gate/tree
-                let refTree = tree;
-                let refGate = tree.gates[refGateName];
+                // Find the referenced tree
+                let refTree = null;
 
-                if (!refGate) {
-                    // Look for a tree whose topEvent matches
-                    for (const otherTree of allFaultTrees) {
-                        if (otherTree.topEvent === refGateName) {
-                            refTree = otherTree;
-                            refGate = otherTree.gates[refGateName];
-                            break;
-                        }
+                // Look for a tree whose topEvent matches the reference
+                for (const otherTree of allFaultTrees) {
+                    if (otherTree.topEvent === refGateName) {
+                        refTree = otherTree;
+                        break;
                     }
                 }
 
-                let html = `<div class="tree-node">
-                    <div class="tree-node-content">
-                        <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
-                        <span class="gate" onclick="toggleNode(${nodeId})">${nodeName}</span>
-                        <span style="color: #666; margin-left: 5px;">[TRAN → ${refGateName}]</span>
-                    </div>`;
-
-                if (refGate && refGate.inputs && refGate.inputs.length > 0) {
-                    html += `<div class="tree-children expanded" id="children-${nodeId}">`;
-                    refGate.inputs.forEach(input => {
-                        html += renderNode(input, level + 1, refTree);
-                    });
-                    html += '</div>';
+                // If not found by topEvent, check current tree's gates
+                if (!refTree && tree.gates[refGateName]) {
+                    refTree = tree;
                 }
 
-                html += '</div>';
-                return html;
+                // If we found the reference, expand it fully
+                if (refTree) {
+                    const nodeId = ++nodeIdCounter;
+                    let html = `<div class="tree-node">
+                        <div class="tree-node-content">
+                            <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
+                            <span class="gate" onclick="toggleNode(${nodeId})">${nodeName}</span>
+                            <span style="color: #666; margin-left: 5px;">[TRAN → ${refGateName}]</span>
+                        </div>`;
+
+                    html += `<div class="tree-children expanded" id="children-${nodeId}">`;
+                    // Recursively render the referenced gate/tree
+                    html += renderNode(refGateName, level + 1, refTree);
+                    html += '</div>';
+
+                    html += '</div>';
+                    return html;
+                } else {
+                    // Reference not found, show as basic event
+                    return `<div class="tree-node">
+                        <div class="tree-node-content">
+                            <span class="tree-expander"></span>
+                            <span class="event">${nodeName}</span>
+                            <span style="color: #666; margin-left: 5px;">[TRAN → ${refGateName} (not found)]</span>
+                        </div>
+                    </div>`;
+                }
             }
 
             // Regular gate node - has children
