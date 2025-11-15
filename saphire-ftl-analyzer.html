@@ -195,12 +195,54 @@
             cursor: pointer;
         }
 
+        .gate-and {
+            color: #ff8c00;  /* Dark orange */
+        }
+
         .gate:hover {
             text-decoration: underline;
         }
 
         .event {
             color: #007bff;
+            cursor: help;
+            position: relative;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            position: absolute;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            padding: 8px 12px;
+            border-radius: 6px;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: normal;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        .event:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
         }
 
         .cut-sets {
@@ -349,7 +391,7 @@
                     </svg>
                     <h3 style="margin: 15px 0;">Load Fault Tree Files</h3>
 
-                    <input type="file" id="fileInput" multiple accept=".ftl,.txt,.bei,.csv" style="display: none;">
+                    <input type="file" id="fileInput" multiple accept=".ftl,.txt,.bei,.csv,.bed,.ftd" style="display: none;">
                     <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
                         Choose Files
                     </button>
@@ -359,7 +401,9 @@
                     <p style="margin-top: 15px; color: #666; font-size: 14px;">
                         Select one or more files:<br>
                         • FTL file (.ftl, .txt) - Required<br>
-                        • BEI file (.bei, .csv, .txt) - Optional
+                        • BEI file (.bei, .csv, .txt) - Optional (probabilities)<br>
+                        • BED file (.bed, .txt) - Optional (descriptions)<br>
+                        • FTD file (.ftd, .txt) - Optional (fault tree descriptions)
                     </p>
                 </div>
             </div>
@@ -473,6 +517,8 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
         let currentTreeIndex = 0;
         let minimalCutSets = [];
         let basicEventData = {}; // BEI data
+        let basicEventDescriptions = {}; // BED data
+        let faultTreeDescriptions = {}; // FTD data
 
         // File input handling
         const fileInput = document.getElementById('fileInput');
@@ -483,16 +529,33 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
             const files = Array.from(e.target.files);
             let ftlFile = null;
             let beiFile = null;
+            let bedFile = null;
+            let ftdFile = null;
             const statusDiv = document.getElementById('fileStatus');
             statusDiv.innerHTML = '';
 
             // Identify file types
             for (const file of files) {
                 const ext = file.name.toLowerCase();
-                if (ext.endsWith('.ftl') || (ext.endsWith('.txt') && !ftlFile)) {
+                if (ext.endsWith('.ftl')) {
                     ftlFile = file;
-                } else if (ext.endsWith('.bei') || ext.endsWith('.csv') || ext.endsWith('.txt')) {
+                } else if (ext.endsWith('.bei')) {
                     beiFile = file;
+                } else if (ext.endsWith('.bed')) {
+                    bedFile = file;
+                } else if (ext.endsWith('.ftd')) {
+                    ftdFile = file;
+                } else if (ext.endsWith('.txt') || ext.endsWith('.csv')) {
+                    // Try to guess based on name
+                    if (file.name.toLowerCase().includes('bei')) {
+                        beiFile = file;
+                    } else if (file.name.toLowerCase().includes('bed')) {
+                        bedFile = file;
+                    } else if (file.name.toLowerCase().includes('ftd')) {
+                        ftdFile = file;
+                    } else if (!ftlFile) {
+                        ftlFile = file;
+                    }
                 }
             }
 
@@ -520,6 +583,24 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
                     basicEventData = {};
                     document.getElementById('beiStatus').textContent = 'No BEI file loaded';
                     document.getElementById('beiStatus').style.color = '#6c757d';
+                }
+
+                // Read BED file if provided
+                if (bedFile) {
+                    const bedContent = await readFileAsync(bedFile);
+                    basicEventDescriptions = parseBED(bedContent);
+                    statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${bedFile.name} (${Object.keys(basicEventDescriptions).length} descriptions)</div>`;
+                } else {
+                    basicEventDescriptions = {};
+                }
+
+                // Read FTD file if provided
+                if (ftdFile) {
+                    const ftdContent = await readFileAsync(ftdFile);
+                    faultTreeDescriptions = parseFTD(ftdContent);
+                    statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${ftdFile.name} (${Object.keys(faultTreeDescriptions).length} tree descriptions)</div>`;
+                } else {
+                    faultTreeDescriptions = {};
                 }
 
                 // Populate tree selector
@@ -566,10 +647,12 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
         function onTreeSelected() {
             currentTreeIndex = parseInt(document.getElementById('treeSelect').value);
             displayTree();
-            // Clear previous cut sets
+            // Clear previous cut sets and stats
             minimalCutSets = [];
             document.getElementById('cutSetsSection').style.display = 'none';
             document.getElementById('mcubCard').style.display = 'none';
+            document.getElementById('computeTimeCard').style.display = 'none';
+            document.getElementById('cutSetCount').textContent = '0';
             document.getElementById('messageBox').innerHTML = '';
         }
 
@@ -674,6 +757,50 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             }
 
             return eventData;
+        }
+
+        function parseBED(content) {
+            // Parse BED file: Basic_Event_Name, Basic Event Description, Project_Name
+            const descriptions = {};
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('*'));
+
+            for (const line of lines) {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const eventName = parts[0].trim();
+                    const description = parts[1].trim();
+                    if (eventName && description) {
+                        descriptions[eventName] = description;
+                    }
+                }
+            }
+
+            return descriptions;
+        }
+
+        function parseFTD(content) {
+            // Parse FTD file: Fault_Tree_Name, Fault Tree Description, Z, Alternative Description, Project Name
+            // Z = " " if main tree, "S" if sub tree
+            const descriptions = {};
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('*'));
+
+            for (const line of lines) {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const treeName = parts[0].trim();
+                    const description = parts[1].trim();
+                    const isSubTree = parts.length >= 3 && parts[2].trim().toUpperCase() === 'S';
+                    if (treeName && description) {
+                        descriptions[treeName] = {
+                            description: description,
+                            isSubTree: isSubTree,
+                            alternativeDesc: parts.length >= 4 ? parts[3].trim() : ''
+                        };
+                    }
+                }
+            }
+
+            return descriptions;
         }
 
         function formatProbability(prob, digits) {
@@ -803,10 +930,58 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             const treeHtml = renderNode(currentTree.topEvent, 0, currentTree);
             treeView.innerHTML = treeHtml;
 
-            // Update stats
-            document.getElementById('gateCount').textContent = Object.keys(currentTree.gates).length;
-            document.getElementById('eventCount').textContent = currentTree.events.size;
+            // Update stats - count only reachable gates and events
+            const reachable = getReachableNodes(currentTree.topEvent, currentTree);
+            document.getElementById('gateCount').textContent = reachable.gates.size;
+            document.getElementById('eventCount').textContent = reachable.events.size;
             document.getElementById('statsSection').style.display = 'grid';
+        }
+
+        function getReachableNodes(nodeName, tree) {
+            const reachableGates = new Set();
+            const reachableEvents = new Set();
+            const visited = new Set();
+
+            function traverse(node) {
+                if (visited.has(node)) return;
+                visited.add(node);
+
+                const gate = tree.gates[node];
+                if (!gate) {
+                    // It's a basic event
+                    reachableEvents.add(node);
+                    return;
+                }
+
+                // It's a gate
+                reachableGates.add(node);
+
+                // Handle TRAN gates
+                if (gate.type === 'TRAN') {
+                    const refGateName = gate.inputs[0] || node;
+                    // Look for referenced tree
+                    for (const otherTree of allFaultTrees) {
+                        if (otherTree.topEvent === refGateName) {
+                            traverse(otherTree.topEvent);
+                            return;
+                        }
+                    }
+                    if (tree.gates[refGateName]) {
+                        traverse(refGateName);
+                        return;
+                    }
+                    reachableEvents.add(refGateName);
+                    return;
+                }
+
+                // Traverse inputs
+                if (gate.inputs) {
+                    gate.inputs.forEach(input => traverse(input));
+                }
+            }
+
+            traverse(nodeName);
+            return { gates: reachableGates, events: reachableEvents };
         }
 
         function toggleNode(nodeId) {
@@ -867,10 +1042,16 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                         probText = ` <span style="color: #28a745;">[${formatProbability(prob, probDisplay)}]</span>`;
                     }
                 }
+
+                // Get base event name (remove complement prefix if present)
+                const baseEventName = nodeName.startsWith('/') ? nodeName.substring(1) : nodeName;
+                const description = basicEventDescriptions[baseEventName];
+                const tooltipHtml = description ? `<span class="tooltip">${description}</span>` : '';
+
                 return `<div class="tree-node">
                     <div class="tree-node-content">
                         <span class="tree-expander"></span>
-                        <span class="event">${nodeName}</span>${probText}
+                        <span class="event">${nodeName}${tooltipHtml}</span>${probText}
                     </div>
                 </div>`;
             }
@@ -944,13 +1125,18 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                             probText = ` <span style="color: #28a745; font-size: 11px;">[${formatProbability(prob, probDisplay)}]</span>`;
                         }
                     }
-                    return `<span class="event">${input}</span>${probText}`;
+                    // Add tooltip for inline events
+                    const baseEventName = input.startsWith('/') ? input.substring(1) : input;
+                    const description = basicEventDescriptions[baseEventName];
+                    const tooltipHtml = description ? `<span class="tooltip">${description}</span>` : '';
+                    return `<span class="event">${input}${tooltipHtml}</span>${probText}`;
                 }).join(' <span style="color: #666;">•</span> ');
 
+                const gateClass = gate.type === 'AND' ? 'gate gate-and' : 'gate';
                 let html = `<div class="tree-node">
                     <div class="tree-node-content">
                         <span class="tree-expander"></span>
-                        <span class="gate">${nodeName}</span>
+                        <span class="${gateClass}">${nodeName}</span>
                         <span style="color: #666; margin-left: 5px;">[${gateTypeDisplay}]</span>
                         <span style="margin-left: 10px; font-size: 13px;">${eventsHtml}</span>
                     </div>
@@ -959,10 +1145,11 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             }
 
             // Regular rendering with expandable children
+            const gateClass = gate.type === 'AND' ? 'gate gate-and' : 'gate';
             let html = `<div class="tree-node">
                 <div class="tree-node-content">
                     <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
-                    <span class="gate" onclick="toggleNode(${nodeId})">${nodeName}</span>
+                    <span class="${gateClass}" onclick="toggleNode(${nodeId})">${nodeName}</span>
                     <span style="color: #666; margin-left: 5px;">[${gateTypeDisplay}]</span>
                 </div>`;
 
@@ -1411,10 +1598,18 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                     probText = ` <span style="color: #28a745; font-weight: bold;">[P = ${formatProbability(prob, probDisplay)}]</span>`;
                 }
 
+                // Add tooltips to cut set events
+                const eventsWithTooltips = item.cutSet.map(eventName => {
+                    const baseEventName = eventName.startsWith('/') ? eventName.substring(1) : eventName;
+                    const description = basicEventDescriptions[baseEventName];
+                    const tooltipHtml = description ? `<span class="tooltip">${description}</span>` : '';
+                    return `<span class="event">${eventName}${tooltipHtml}</span>`;
+                }).join(' AND ');
+
                 html += `
                     <div class="cut-set">
                         <div class="cut-set-header">Cut Set ${i + 1}${probText}</div>
-                        <div class="cut-set-events">${item.cutSet.join(' AND ')}</div>
+                        <div class="cut-set-events">${eventsWithTooltips}</div>
                     </div>
                 `;
             }
