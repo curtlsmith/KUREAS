@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saphire FTL Minimal Cut Set Analyzer</title>
+    <title>SAPHIRE FTL Minimal Cut Set Analyzer</title>
     <style>
         * {
             margin: 0;
@@ -302,7 +302,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Saphire FTL Minimal Cut Set Analyzer</h1>
+            <h1>SAPHIRE FTL Minimal Cut Set Analyzer</h1>
             <p>Upload your fault tree logic file to generate minimal cut sets</p>
         </div>
 
@@ -390,7 +390,7 @@
             </div>
 
             <div class="example-section">
-                <h3 style="margin-bottom: 10px;">Saphire FTL Format</h3>
+                <h3 style="margin-bottom: 10px;">SAPHIRE FTL Format</h3>
                 <p style="margin-bottom: 10px;">Click "Load Example" to see a sample fault tree, or create your own file:</p>
                 <pre>TIMELINESS, ALARM =
 ALARM          OR  ALARM01 ALARM02 ALM-MECH
@@ -408,7 +408,7 @@ PERSONAL         OR  OTHER SICK SICK-FAM
                     Sections end with ^EOS.
                 </p>
 
-                <h3 style="margin: 20px 0 10px 0;">Saphire BEI Format (Optional)</h3>
+                <h3 style="margin: 20px 0 10px 0;">SAPHIRE BEI Format (Optional)</h3>
                 <p style="margin-bottom: 10px;">Comma-delimited file with probability data:</p>
                 <pre>Name,FdT,UdC,UdT,UdValue,Prob,Lambda,Tau,Mission,Init,PF,UdValue2,Calc_Prob,Freq,Model_Type,Phase_Type,Project
 ALM-FTS,1,,,0,0.001,,,,F,,,1.23E-3,,,
@@ -1040,7 +1040,7 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
                 html += `
                     <div class="cut-set">
-                        <div class="cut-set-header">Cut Set ${index + 1} (Order ${cutSet.length})${probText}</div>
+                        <div class="cut-set-header">Cut Set ${index + 1}${probText}</div>
                         <div class="cut-set-events">${cutSet.join(' AND ')}</div>
                     </div>
                 `;
@@ -1089,7 +1089,7 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             output += '=== MINIMAL CUT SETS ===\n\n';
             minimalCutSets.forEach((cutSet, index) => {
                 const prob = cutSetProbabilities[index];
-                output += `Cut Set ${index + 1} (Order ${cutSet.length}):\n`;
+                output += `Cut Set ${index + 1}:\n`;
                 output += `  ${cutSet.join(' AND ')}\n`;
                 if (prob !== null) {
                     output += `  Probability: ${formatProbability(prob, probDisplay)}\n`;
