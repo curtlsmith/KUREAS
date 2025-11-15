@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAPHIRE FTL Minimal Cut Set Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+        }
+
+        .upload-section.dragover {
+            background: #e8ebff;
+            border-color: #764ba2;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .tree-view {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .tree-node {
+            margin-top: 1px;
+            position: relative;
+        }
+
+        .tree-node-content {
+            display: flex;
+            align-items: center;
+            padding: 1px 0;
+        }
+
+        .tree-expander {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-right: 5px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 12px;
+            line-height: 16px;
+            text-align: center;
+            color: #666;
+        }
+
+        .tree-expander:hover {
+            color: #000;
+        }
+
+        .tree-children {
+            margin-left: 20px;
+            display: none;
+        }
+
+        .tree-children.expanded {
+            display: block;
+        }
+
+        .gate {
+            color: #dc3545;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .gate-and {
+            color: #ff8c00;  /* Dark orange */
+        }
+
+        .gate:hover {
+            text-decoration: underline;
+        }
+
+        .event {
+            color: #007bff;
+            cursor: help;
+            position: relative;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            position: absolute;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            padding: 8px 12px;
+            border-radius: 6px;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: normal;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        .event:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .cut-sets {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .cut-set {
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .cut-set-header {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .cut-set-events {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .error-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .progress-container {
+            background: #e9ecef;
+            border-radius: 6px;
+            height: 30px;
+            margin: 15px 0;
+            position: relative;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 30px;
+            color: #333;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .example-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SAPHIRE FTL Minimal Cut Set Analyzer</h1>
+            <p id="uploadPrompt">Upload your fault tree logic file to generate minimal cut sets</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-section" id="uploadSection">
+                <div>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <h3 style="margin: 15px 0;">Load Fault Tree Files</h3>
+
+                    <input type="file" id="fileInput" multiple accept=".ftl,.txt,.bei,.csv,.bed,.ftd" style="display: none;">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                        Choose Files
+                    </button>
+
+                    <div id="fileStatus" style="margin-top: 15px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;"></div>
+
+                    <p style="margin-top: 15px; color: #666; font-size: 14px;">
+                        Select one or more files:<br>
+                        • FTL file (.ftl, .txt) - Required<br>
+                        • BEI file (.bei, .csv, .txt) - Optional (probabilities)<br>
+                        • BED file (.bed, .txt) - Optional (descriptions)<br>
+                        • FTD file (.ftd, .txt) - Optional (fault tree descriptions)
+                    </p>
+                </div>
+            </div>
+
+            <div id="resultsSection" class="hidden">
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="generateCutSets()">Generate Cut Sets</button>
+                    <button class="btn btn-secondary" onclick="exportResults()">Export Results</button>
+                    <button class="btn btn-secondary" onclick="loadNewFile()">Load New File</button>
+                    <button class="btn btn-success" onclick="loadExample()">Load Example</button>
+                </div>
+
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div id="treeSelectDiv" style="display: flex; align-items: center;">
+                        <label style="font-weight: bold; margin-right: 10px;">Select Fault Tree:</label>
+                        <select id="treeSelect" onchange="onTreeSelected()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; min-width: 250px;">
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <label style="font-weight: bold; margin-right: 10px;">Show Probability:</label>
+                        <select id="probDisplay" onchange="displayTree()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                            <option value="none">Do Not Show</option>
+                            <option value="0">0 Digits (1.E-5)</option>
+                            <option value="1" selected>1 Digit (1.2E-5)</option>
+                            <option value="2">2 Digits (1.23E-5)</option>
+                        </select>
+                    </div>
+                    <span id="beiStatus" style="color: #6c757d;"></span>
+                </div>
+
+                <div id="messageBox"></div>
+
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar" id="progressBar"></div>
+                    <div class="progress-text" id="progressText">Calculating...</div>
+                </div>
+
+                <div class="stats" id="statsSection" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="gateCount">0</div>
+                        <div class="stat-label">Gates</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="eventCount">0</div>
+                        <div class="stat-label">Basic Events</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="cutSetCount">0</div>
+                        <div class="stat-label">Minimal Cut Sets</div>
+                    </div>
+                    <div class="stat-card" id="mcubCard" style="display: none;">
+                        <div class="stat-value" id="mcubValue">0.0E+0</div>
+                        <div class="stat-label">MCUB Probability</div>
+                    </div>
+                    <div class="stat-card" id="computeTimeCard" style="display: none;">
+                        <div class="stat-value" id="computeTimeValue">0.0s</div>
+                        <div class="stat-label">Computation Time</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Fault Tree Structure</h2>
+                    <div style="margin-bottom: 10px;">
+                        <button class="btn btn-secondary" onclick="expandAll()">Expand All</button>
+                        <button class="btn btn-secondary" onclick="collapseAll()">Collapse All</button>
+                    </div>
+                    <div class="tree-view" id="treeView"></div>
+                </div>
+
+                <div class="section" id="cutSetsSection" style="display: none;">
+                    <h2>Minimal Cut Sets</h2>
+                    <div class="cut-sets" id="cutSetsView"></div>
+                </div>
+            </div>
+
+            <div class="example-section">
+                <h3 style="margin-bottom: 10px;">SAPHIRE FTL Format</h3>
+                <p style="margin-bottom: 10px;">Click "Load Example" to see a sample fault tree, or create your own file:</p>
+                <pre>TIMELINESS, ALARM =
+ALARM          OR  ALARM01 ALARM02 ALM-MECH
+ALARM01         OR  ALM-FTS ALM-SWT
+ALARM02         AND ALM-BPF ALM-CPF
+^EOS
+TIMELINESS, PERSONAL =
+PERSONAL         OR  OTHER SICK SICK-FAM
+^EOS</pre>
+                <p style="margin-top: 10px; color: #666; font-size: 13px;">
+                    <strong>Format:</strong> Each section begins with "TREE_NAME, GATE_NAME =" followed by gate definitions.<br>
+                    Gates: "GATE_NAME OR/AND/TRAN INPUT1 INPUT2 ..."<br>
+                    • OR/AND gates combine inputs<br>
+                    • TRAN gates reference another gate's logic (transfer gates)<br>
+                    Sections end with ^EOS.
+                </p>
+
+                <h3 style="margin: 20px 0 10px 0;">SAPHIRE BEI Format (Optional)</h3>
+                <p style="margin-bottom: 10px;">Comma-delimited file with probability data:</p>
+                <pre>Name,FdT,UdC,UdT,UdValue,Prob,Lambda,Tau,Mission,Init,PF,UdValue2,Calc_Prob,Freq,Model_Type,Phase_Type,Project
+ALM-FTS,1,,,0,0.001,,,,F,,,1.23E-3,,,
+ALM-SWT,1,,,0,0.002,,,,F,,,2.45E-3,,,
+ALM-BPF,1,,,0,0.0001,,,,F,,,1.00E-4,,,
+ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
+                <p style="margin-top: 10px; color: #666; font-size: 13px;">
+                    <strong>Key Field:</strong> Calc_Prob (column 13) - Calculated Probability displayed in the fault tree.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allFaultTrees = []; // Array of all parsed fault trees
+        let currentTreeIndex = 0;
+        let minimalCutSets = [];
+        let basicEventData = {}; // BEI data
+        let basicEventDescriptions = {}; // BED data
+        let faultTreeDescriptions = {}; // FTD data
+
+        // File input handling
+        const fileInput = document.getElementById('fileInput');
+
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+
+            const files = Array.from(e.target.files);
+            let ftlFile = null;
+            let beiFile = null;
+            let bedFile = null;
+            let ftdFile = null;
+            const statusDiv = document.getElementById('fileStatus');
+            statusDiv.innerHTML = '';
+
+            // Identify file types
+            for (const file of files) {
+                const ext = file.name.toLowerCase();
+                if (ext.endsWith('.ftl')) {
+                    ftlFile = file;
+                } else if (ext.endsWith('.bei')) {
+                    beiFile = file;
+                } else if (ext.endsWith('.bed')) {
+                    bedFile = file;
+                } else if (ext.endsWith('.ftd')) {
+                    ftdFile = file;
+                } else if (ext.endsWith('.txt') || ext.endsWith('.csv')) {
+                    // Try to guess based on name
+                    if (file.name.toLowerCase().includes('bei')) {
+                        beiFile = file;
+                    } else if (file.name.toLowerCase().includes('bed')) {
+                        bedFile = file;
+                    } else if (file.name.toLowerCase().includes('ftd')) {
+                        ftdFile = file;
+                    } else if (!ftlFile) {
+                        ftlFile = file;
+                    }
+                }
+            }
+
+            if (!ftlFile) {
+                showMessage('Please select at least one FTL file!', 'error');
+                return;
+            }
+
+            try {
+                // Read FTL file
+                const ftlContent = await readFileAsync(ftlFile);
+                statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${ftlFile.name}</div>`;
+
+                // Parse FTL file
+                parseAllFTL(ftlContent);
+
+                // Read BEI file if provided
+                if (beiFile) {
+                    const beiContent = await readFileAsync(beiFile);
+                    basicEventData = parseBEI(beiContent);
+                    statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${beiFile.name} (${Object.keys(basicEventData).length} events)</div>`;
+                    document.getElementById('beiStatus').textContent = `✓ ${Object.keys(basicEventData).length} basic events loaded`;
+                    document.getElementById('beiStatus').style.color = '#28a745';
+                } else {
+                    basicEventData = {};
+                    document.getElementById('beiStatus').textContent = 'No BEI file loaded';
+                    document.getElementById('beiStatus').style.color = '#6c757d';
+                }
+
+                // Read BED file if provided
+                if (bedFile) {
+                    const bedContent = await readFileAsync(bedFile);
+                    basicEventDescriptions = parseBED(bedContent);
+                    statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${bedFile.name} (${Object.keys(basicEventDescriptions).length} descriptions)</div>`;
+                } else {
+                    basicEventDescriptions = {};
+                }
+
+                // Read FTD file if provided
+                if (ftdFile) {
+                    const ftdContent = await readFileAsync(ftdFile);
+                    faultTreeDescriptions = parseFTD(ftdContent);
+                    statusDiv.innerHTML += `<div style="color: #28a745;">✓ ${ftdFile.name} (${Object.keys(faultTreeDescriptions).length} tree descriptions)</div>`;
+                } else {
+                    faultTreeDescriptions = {};
+                }
+
+                // Populate tree selector
+                populateTreeSelector();
+
+                // Display first tree
+                currentTreeIndex = 0;
+                displayTree();
+
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+                document.getElementById('uploadPrompt').style.display = 'none';
+                showMessage(`Loaded ${allFaultTrees.length} fault tree(s) successfully!`, 'info');
+            } catch (error) {
+                showMessage('Error parsing files: ' + error.message, 'error');
+            }
+        });
+
+        function readFileAsync(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        function populateTreeSelector() {
+            const select = document.getElementById('treeSelect');
+            select.innerHTML = '';
+
+            allFaultTrees.forEach((tree, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${tree.treeName} - ${tree.topEvent}`;
+                select.appendChild(option);
+            });
+
+            // Show/hide selector based on number of trees
+            document.getElementById('treeSelectDiv').style.display =
+                allFaultTrees.length > 1 ? 'block' : 'none';
+        }
+
+        function onTreeSelected() {
+            currentTreeIndex = parseInt(document.getElementById('treeSelect').value);
+            displayTree();
+            // Clear previous cut sets and stats
+            minimalCutSets = [];
+            document.getElementById('cutSetsSection').style.display = 'none';
+            document.getElementById('mcubCard').style.display = 'none';
+            document.getElementById('computeTimeCard').style.display = 'none';
+            document.getElementById('cutSetCount').textContent = '0';
+            document.getElementById('messageBox').innerHTML = '';
+        }
+
+        function loadExample() {
+            const exampleFTL = `TIMELINESS, ALARM =
+ALARM          OR  ALARM01 ALARM02 ALM-MECH
+ALARM01         OR  ALM-FTS ALM-SWT
+ALARM02         AND ALM-BPF ALM-CPF
+^EOS
+TIMELINESS, PERSONAL =
+PERSONAL         OR  OTHER SICK SICK-FAM
+^EOS
+TIMELINESS, TRNS-2 =
+TRNS-2          AND PER-TRNS PUB-TRNS-LATE
+^EOS
+TIMELINESS, TRNSPRT =
+TRNSPRT         AND PER-TRNS PUB-TRANS
+^EOS
+TIMELINESS, COMBINED =
+COMBINED        OR  ALARM-REF PERSONAL
+ALARM-REF       TRAN ALARM
+^EOS`;
+
+            const exampleBEI = `Name,FdT,UdC,UdT,UdValue,Prob,Lambda,Tau,Mission,Init,PF,UdValue2,Calc_Prob,Freq,Model_Type,Phase_Type,Project
+ALM-FTS,1,,,0,0.001,,,,F,,,1.23E-3,,,
+ALM-SWT,1,,,0,0.002,,,,F,,,2.45E-3,,,
+ALM-BPF,1,,,0,0.0001,,,,F,,,1.00E-4,,,
+ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,
+ALM-MECH,1,,,0,0.005,,,,F,,,5.00E-3,,,
+OTHER,1,,,0,0.01,,,,F,,,1.00E-2,,,
+SICK,1,,,0,0.02,,,,F,,,2.00E-2,,,
+SICK-FAM,1,,,0,0.015,,,,F,,,1.50E-2,,,
+PER-TRNS,1,,,0,0.001,,,,F,,,1.00E-3,,,
+PUB-TRNS-LATE,1,,,0,0.05,,,,F,,,5.00E-2,,,
+PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
+
+            try {
+                parseAllFTL(exampleFTL);
+                basicEventData = parseBEI(exampleBEI);
+
+                document.getElementById('beiStatus').textContent = `✓ ${Object.keys(basicEventData).length} basic events loaded`;
+                document.getElementById('beiStatus').style.color = '#28a745';
+
+                populateTreeSelector();
+                currentTreeIndex = 0;
+                displayTree();
+
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+                document.getElementById('uploadPrompt').style.display = 'none';
+                showMessage(`Loaded ${allFaultTrees.length} fault tree(s) successfully!`, 'info');
+            } catch (error) {
+                showMessage('Error loading example: ' + error.message, 'error');
+            }
+        }
+
+        function parseBEI(content) {
+            const eventData = {};
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+
+            if (lines.length === 0) return eventData;
+
+            // Skip header line
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                const fields = line.split(',');
+
+                if (fields.length >= 13) {
+                    const name = fields[0].trim();
+                    const calcProb = fields[12].trim();
+
+                    // Parse probability
+                    let probability = 0;
+                    if (calcProb && calcProb !== '') {
+                        // Handle scientific notation
+                        probability = parseFloat(calcProb);
+                        if (isNaN(probability)) {
+                            probability = 0;
+                        }
+                    }
+
+                    eventData[name] = {
+                        Name: name,
+                        FdT: fields[1],
+                        UdC: fields[2],
+                        UdT: fields[3],
+                        UdValue: fields[4],
+                        Prob: fields[5],
+                        Lambda: fields[6],
+                        Tau: fields[7],
+                        Mission: fields[8],
+                        Init: fields[9] === 'T',
+                        PF: fields[10],
+                        UdValue2: fields[11],
+                        Calc_Prob: probability,
+                        Freq: fields[13],
+                        Model_Type: fields[14],
+                        Phase_Type: fields[15],
+                        Project: fields[16]
+                    };
+                }
+            }
+
+            return eventData;
+        }
+
+        function parseBED(content) {
+            // Parse BED file: Basic_Event_Name, Basic Event Description, Project_Name
+            const descriptions = {};
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('*'));
+
+            for (const line of lines) {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const eventName = parts[0].trim();
+                    const description = parts[1].trim();
+                    if (eventName && description) {
+                        descriptions[eventName] = description;
+                    }
+                }
+            }
+
+            return descriptions;
+        }
+
+        function parseFTD(content) {
+            // Parse FTD file: Fault_Tree_Name, Fault Tree Description, Z, Alternative Description, Project Name
+            // Z = " " if main tree, "S" if sub tree
+            const descriptions = {};
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('*'));
+
+            for (const line of lines) {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const treeName = parts[0].trim();
+                    const description = parts[1].trim();
+                    const isSubTree = parts.length >= 3 && parts[2].trim().toUpperCase() === 'S';
+                    if (treeName && description) {
+                        descriptions[treeName] = {
+                            description: description,
+                            isSubTree: isSubTree,
+                            alternativeDesc: parts.length >= 4 ? parts[3].trim() : ''
+                        };
+                    }
+                }
+            }
+
+            return descriptions;
+        }
+
+        function formatProbability(prob, digits) {
+            if (prob === 0) {
+                return digits === '0' ? '0.E+0' : `0.${'0'.repeat(parseInt(digits))}E+0`;
+            }
+
+            // Convert to scientific notation
+            const exp = Math.floor(Math.log10(Math.abs(prob)));
+            const mantissa = prob / Math.pow(10, exp);
+
+            // Format exponent with sign
+            const expSign = exp >= 0 ? '+' : '';
+            const expStr = `${expSign}${exp}`;
+
+            // Format based on digits
+            let formatted;
+            if (digits === '0') {
+                formatted = `${Math.round(mantissa)}.E${expStr}`;
+            } else {
+                const d = parseInt(digits);
+                formatted = `${mantissa.toFixed(d)}E${expStr}`;
+            }
+
+            return formatted;
+        }
+
+        function parseAllFTL(content) {
+            allFaultTrees = [];
+
+            // Split by ^EOS to get sections
+            const sections = content.split(/\^EOS/);
+
+            for (const section of sections) {
+                const lines = section.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line && !line.startsWith('*'));
+
+                if (lines.length === 0) continue;
+
+                // First line should be header: "TREE_NAME, GATE_NAME ="
+                const headerLine = lines[0];
+
+                if (headerLine.includes(',') && headerLine.includes('=')) {
+                    const parts = headerLine.split(',');
+                    if (parts.length >= 2) {
+                        const treeName = parts[0].trim();
+                        const topEvent = parts[1].replace('=', '').trim();
+
+                        // Create new tree object for this section
+                        const tree = {
+                            treeName: treeName,
+                            topEvent: topEvent,
+                            gates: {},
+                            events: new Set()
+                        };
+
+                        // Process remaining lines in section
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i];
+
+                            // Parse gate definition: "GATENAME  OR/AND/TRAN  INPUT1 INPUT2 INPUT3..."
+                            const tokens = line.split(/\s+/).filter(t => t);
+
+                            if (tokens.length >= 2) {
+                                const gateName = tokens[0];
+                                const operator = tokens[1].toUpperCase();
+
+                                // Check for N-of-M voting gate (e.g., "2/3")
+                                const nOfMMatch = operator.match(/^(\d+)\/(\d+)$/);
+
+                                if (nOfMMatch) {
+                                    const n = parseInt(nOfMMatch[1]);
+                                    const m = parseInt(nOfMMatch[2]);
+                                    const inputs = tokens.slice(2);
+
+                                    tree.gates[gateName] = {
+                                        type: 'VOTE',
+                                        n: n,
+                                        m: m,
+                                        inputs: inputs
+                                    };
+                                } else if (operator === 'OR' || operator === 'AND' || operator === 'TRAN') {
+                                    const inputs = tokens.slice(2);
+
+                                    tree.gates[gateName] = {
+                                        type: operator,
+                                        inputs: inputs
+                                    };
+                                }
+                            }
+                        }
+
+                        // Identify all basic events (nodes referenced but not defined as gates)
+                        const allReferencedNodes = new Set();
+                        for (const gate in tree.gates) {
+                            tree.gates[gate].inputs.forEach(input => allReferencedNodes.add(input));
+                        }
+
+                        allReferencedNodes.forEach(node => {
+                            if (!tree.gates[node]) {
+                                tree.events.add(node);
+                            }
+                        });
+
+                        allFaultTrees.push(tree);
+                    }
+                }
+            }
+
+            return allFaultTrees;
+        }
+
+        let nodeIdCounter = 0;
+
+        function displayTree() {
+            const treeView = document.getElementById('treeView');
+            treeView.innerHTML = '';
+            nodeIdCounter = 0;
+
+            if (!allFaultTrees || allFaultTrees.length === 0 || !allFaultTrees[currentTreeIndex]) {
+                treeView.innerHTML = '<p>No fault tree loaded</p>';
+                return;
+            }
+
+            const currentTree = allFaultTrees[currentTreeIndex];
+            const treeHtml = renderNode(currentTree.topEvent, 0, currentTree);
+            treeView.innerHTML = treeHtml;
+
+            // Update stats - count only reachable gates and events
+            const reachable = getReachableNodes(currentTree.topEvent, currentTree);
+            document.getElementById('gateCount').textContent = reachable.gates.size;
+            document.getElementById('eventCount').textContent = reachable.events.size;
+            document.getElementById('statsSection').style.display = 'grid';
+        }
+
+        function getReachableNodes(nodeName, tree) {
+            const reachableGates = new Set();
+            const reachableEvents = new Set();
+            const visited = new Set();
+
+            function traverse(node) {
+                if (visited.has(node)) return;
+                visited.add(node);
+
+                const gate = tree.gates[node];
+                if (!gate) {
+                    // It's a basic event
+                    reachableEvents.add(node);
+                    return;
+                }
+
+                // It's a gate
+                reachableGates.add(node);
+
+                // Handle TRAN gates
+                if (gate.type === 'TRAN') {
+                    const refGateName = gate.inputs[0] || node;
+                    // Look for referenced tree
+                    for (const otherTree of allFaultTrees) {
+                        if (otherTree.topEvent === refGateName) {
+                            traverse(otherTree.topEvent);
+                            return;
+                        }
+                    }
+                    if (tree.gates[refGateName]) {
+                        traverse(refGateName);
+                        return;
+                    }
+                    reachableEvents.add(refGateName);
+                    return;
+                }
+
+                // Traverse inputs
+                if (gate.inputs) {
+                    gate.inputs.forEach(input => traverse(input));
+                }
+            }
+
+            traverse(nodeName);
+            return { gates: reachableGates, events: reachableEvents };
+        }
+
+        function toggleNode(nodeId) {
+            const childrenDiv = document.getElementById('children-' + nodeId);
+            const expander = document.getElementById('expander-' + nodeId);
+
+            if (childrenDiv) {
+                if (childrenDiv.classList.contains('expanded')) {
+                    childrenDiv.classList.remove('expanded');
+                    expander.textContent = '▶';
+                } else {
+                    childrenDiv.classList.add('expanded');
+                    expander.textContent = '▼';
+                }
+            }
+        }
+
+        function expandAll() {
+            const allChildren = document.querySelectorAll('.tree-children');
+            const allExpanders = document.querySelectorAll('.tree-expander');
+
+            allChildren.forEach(child => {
+                child.classList.add('expanded');
+            });
+
+            allExpanders.forEach(expander => {
+                if (expander.textContent === '▶') {
+                    expander.textContent = '▼';
+                }
+            });
+        }
+
+        function collapseAll() {
+            const allChildren = document.querySelectorAll('.tree-children');
+            const allExpanders = document.querySelectorAll('.tree-expander');
+
+            allChildren.forEach(child => {
+                child.classList.remove('expanded');
+            });
+
+            allExpanders.forEach(expander => {
+                if (expander.textContent === '▼') {
+                    expander.textContent = '▶';
+                }
+            });
+        }
+
+        function renderNode(nodeName, level, tree) {
+            const gate = tree.gates[nodeName];
+            const probDisplay = document.getElementById('probDisplay')?.value || '1';
+
+            if (!gate) {
+                // It's a basic event - show probability if available
+                let probText = '';
+                if (probDisplay !== 'none') {
+                    const prob = getEventProbability(nodeName);
+                    if (prob !== null) {
+                        probText = ` <span style="color: #28a745;">[${formatProbability(prob, probDisplay)}]</span>`;
+                    }
+                }
+
+                // Get base event name (remove complement prefix if present)
+                const baseEventName = nodeName.startsWith('/') ? nodeName.substring(1) : nodeName;
+                const description = basicEventDescriptions[baseEventName];
+                const tooltipHtml = description ? `<span class="tooltip">${description}</span>` : '';
+
+                return `<div class="tree-node">
+                    <div class="tree-node-content">
+                        <span class="tree-expander"></span>
+                        <span class="event">${nodeName}${tooltipHtml}</span>${probText}
+                    </div>
+                </div>`;
+            }
+
+            // Handle TRAN (transfer) gates - expand the referenced gate
+            if (gate.type === 'TRAN') {
+                // If no explicit reference, use the gate's own name
+                const refGateName = gate.inputs[0] || nodeName;
+
+                // Find the referenced tree
+                let refTree = null;
+
+                // Look for a tree whose topEvent matches the reference
+                for (const otherTree of allFaultTrees) {
+                    if (otherTree.topEvent === refGateName) {
+                        refTree = otherTree;
+                        break;
+                    }
+                }
+
+                // If not found by topEvent, check current tree's gates
+                if (!refTree && tree.gates[refGateName]) {
+                    refTree = tree;
+                }
+
+                // If we found the reference, expand it fully
+                if (refTree) {
+                    const nodeId = ++nodeIdCounter;
+                    let html = `<div class="tree-node">
+                        <div class="tree-node-content">
+                            <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
+                            <span class="gate" onclick="toggleNode(${nodeId})">${nodeName}</span>
+                            <span style="color: #666; margin-left: 5px;">[TRAN → ${refGateName}]</span>
+                        </div>`;
+
+                    html += `<div class="tree-children expanded" id="children-${nodeId}">`;
+                    // Recursively render the referenced gate/tree
+                    html += renderNode(refGateName, level + 1, refTree);
+                    html += '</div>';
+
+                    html += '</div>';
+                    return html;
+                } else {
+                    // Reference not found, show as basic event
+                    return `<div class="tree-node">
+                        <div class="tree-node-content">
+                            <span class="tree-expander"></span>
+                            <span class="event">${nodeName}</span>
+                            <span style="color: #666; margin-left: 5px;">[TRAN → ${refGateName} (not found)]</span>
+                        </div>
+                    </div>`;
+                }
+            }
+
+            // Regular gate node - has children
+            const nodeId = ++nodeIdCounter;
+            const gateTypeDisplay = gate.type === 'VOTE' ? `${gate.n}/${gate.m}` : gate.type;
+
+            // Check if all inputs are basic events (not gates)
+            const allInputsAreBasicEvents = gate.inputs && gate.inputs.length > 0 &&
+                gate.inputs.every(input => !tree.gates[input]);
+
+            if (allInputsAreBasicEvents) {
+                // Render basic events inline to the right of the gate
+                const probDisplay = document.getElementById('probDisplay')?.value || '1';
+                let eventsHtml = gate.inputs.map(input => {
+                    let probText = '';
+                    if (probDisplay !== 'none') {
+                        const prob = getEventProbability(input);
+                        if (prob !== null) {
+                            probText = ` <span style="color: #28a745; font-size: 11px;">[${formatProbability(prob, probDisplay)}]</span>`;
+                        }
+                    }
+                    // Add tooltip for inline events
+                    const baseEventName = input.startsWith('/') ? input.substring(1) : input;
+                    const description = basicEventDescriptions[baseEventName];
+                    const tooltipHtml = description ? `<span class="tooltip">${description}</span>` : '';
+                    return `<span class="event">${input}${tooltipHtml}</span>${probText}`;
+                }).join(' <span style="color: #666;">•</span> ');
+
+                const gateClass = gate.type === 'AND' ? 'gate gate-and' : 'gate';
+                let html = `<div class="tree-node">
+                    <div class="tree-node-content">
+                        <span class="tree-expander"></span>
+                        <span class="${gateClass}">${nodeName}</span>
+                        <span style="color: #666; margin-left: 5px;">[${gateTypeDisplay}]</span>
+                        <span style="margin-left: 10px; font-size: 13px;">${eventsHtml}</span>
+                    </div>
+                </div>`;
+                return html;
+            }
+
+            // Regular rendering with expandable children
+            const gateClass = gate.type === 'AND' ? 'gate gate-and' : 'gate';
+            let html = `<div class="tree-node">
+                <div class="tree-node-content">
+                    <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
+                    <span class="${gateClass}" onclick="toggleNode(${nodeId})">${nodeName}</span>
+                    <span style="color: #666; margin-left: 5px;">[${gateTypeDisplay}]</span>
+                </div>`;
+
+            if (gate.inputs && gate.inputs.length > 0) {
+                html += `<div class="tree-children expanded" id="children-${nodeId}">`;
+                gate.inputs.forEach(input => {
+                    html += renderNode(input, level + 1, tree);
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        async function generateCutSets() {
+            if (!allFaultTrees || allFaultTrees.length === 0 || !allFaultTrees[currentTreeIndex]) {
+                showMessage('No fault tree loaded', 'error');
+                return;
+            }
+
+            const currentTree = allFaultTrees[currentTreeIndex];
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+
+            // Show progress bar
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressText.textContent = 'Starting...';
+
+            const startTime = performance.now();
+
+            try {
+                // Update progress
+                progressBar.style.width = '20%';
+                progressText.textContent = 'Expanding fault tree...';
+                await sleep(10);
+
+                minimalCutSets = await computeMinimalCutSets(currentTree.topEvent, currentTree, progressBar, progressText);
+
+                const endTime = performance.now();
+                const elapsedSeconds = ((endTime - startTime) / 1000).toFixed(2);
+
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Complete!';
+
+                await sleep(300);
+                progressContainer.style.display = 'none';
+
+                displayCutSets();
+
+                // Display computation time
+                document.getElementById('computeTimeValue').textContent = elapsedSeconds + 's';
+                document.getElementById('computeTimeCard').style.display = 'block';
+
+                showMessage(`Generated ${minimalCutSets.length} minimal cut sets in ${elapsedSeconds}s`, 'info');
+            } catch (error) {
+                progressContainer.style.display = 'none';
+                showMessage('Error generating cut sets: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function computeMinimalCutSets(topEvent, tree, progressBar, progressText) {
+            // Compute all cut sets using bottom-up approach
+            progressText.textContent = 'Expanding fault tree...';
+            await sleep(1);
+
+            const cutSets = expandNodeOptimized(topEvent, tree);
+
+            progressBar.style.width = '60%';
+            progressText.textContent = `Reducing ${cutSets.length} cut sets...`;
+            await sleep(1);
+
+            // Reduce to minimal cut sets (remove supersets)
+            const minimal = await reduceToMinimalOptimized(cutSets, progressBar, progressText);
+
+            return minimal;
+        }
+
+        // Memory-optimized version with early deduplication
+        const MAX_CUTSETS_PER_GATE = 50000; // Limit to prevent memory explosion
+
+        // Generate combinations: choose k items from array
+        function getCombinations(array, k) {
+            if (k === 0) return [[]];
+            if (k > array.length) return [];
+            if (k === array.length) return [array];
+
+            const result = [];
+
+            // Include first element
+            const withFirst = getCombinations(array.slice(1), k - 1).map(combo => [array[0], ...combo]);
+            result.push(...withFirst);
+
+            // Exclude first element
+            const withoutFirst = getCombinations(array.slice(1), k);
+            result.push(...withoutFirst);
+
+            return result;
+        }
+
+        function expandNodeOptimized(nodeName, tree) {
+            const gate = tree.gates[nodeName];
+
+            // If it's a basic event, return it as a single-element cut set
+            if (!gate) {
+                return [[nodeName]];
+            }
+
+            // Handle TRAN (transfer) gates
+            if (gate.type === 'TRAN') {
+                // TRAN gate references another fault tree's top gate
+                // If no explicit reference, use the gate's own name
+                const refGateName = gate.inputs[0] || nodeName;
+
+                // Look for a tree whose topEvent matches the reference
+                for (const otherTree of allFaultTrees) {
+                    if (otherTree.topEvent === refGateName) {
+                        // Found the tree - expand its top event using that tree's context
+                        return expandNodeOptimized(otherTree.topEvent, otherTree);
+                    }
+                }
+
+                // If not found in any tree's topEvent, check current tree's gates
+                if (tree.gates[refGateName]) {
+                    return expandNodeOptimized(refGateName, tree);
+                }
+
+                // If not found anywhere, treat as basic event
+                return [[refGateName]];
+            }
+
+            // Handle VOTE (N-of-M) gates
+            if (gate.type === 'VOTE') {
+                // N-of-M gate: expand to OR of all combinations of N inputs from M total
+                // Example: 2/3 A B C -> (A AND B) OR (A AND C) OR (B AND C)
+                const n = gate.n;
+                const m = gate.m;
+                const inputs = gate.inputs;
+
+                // Get all combinations of n inputs from the m total inputs
+                const combinations = getCombinations(inputs, n);
+
+                // For each combination, expand as an AND gate
+                let allCutSets = [];
+                for (const combo of combinations) {
+                    // Expand each input in the combination
+                    const comboCutSets = combo.map(input => expandNodeOptimized(input, tree));
+                    // AND them together (Cartesian product)
+                    const andResult = cartesianProductOptimized(comboCutSets);
+                    allCutSets = allCutSets.concat(andResult);
+                }
+
+                // OR all combinations together (union with deduplication)
+                return deduplicateCutSets(allCutSets);
+            }
+
+            // Recursively expand inputs
+            const inputCutSets = gate.inputs.map(input => expandNodeOptimized(input, tree));
+
+            if (gate.type === 'OR') {
+                // OR gate: union of all input cut sets with early deduplication
+                const combined = inputCutSets.flat();
+                return deduplicateCutSets(combined);
+            } else if (gate.type === 'AND') {
+                // AND gate: Cartesian product with optimization
+                return cartesianProductOptimized(inputCutSets);
+            }
+
+            return [];
+        }
+
+        function deduplicateCutSets(cutSets) {
+            const seen = new Set();
+            const unique = [];
+
+            for (const cs of cutSets) {
+                const sorted = [...cs].sort();
+                const key = sorted.join(',');
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    unique.push(sorted);
+                }
+            }
+
+            return unique;
+        }
+
+        function cartesianProductOptimized(arrays) {
+            if (arrays.length === 0) return [[]];
+            if (arrays.length === 1) return arrays[0];
+
+            // Sort by size to process smaller arrays first
+            const sortedArrays = [...arrays].sort((a, b) => a.length - b.length);
+
+            let result = sortedArrays[0];
+
+            for (let i = 1; i < sortedArrays.length; i++) {
+                const newResult = [];
+                const seen = new Set();
+
+                for (const item1 of result) {
+                    for (const item2 of sortedArrays[i]) {
+                        const combined = [...item1, ...item2];
+                        combined.sort();
+                        const key = combined.join(',');
+
+                        // Deduplicate during expansion
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            newResult.push(combined);
+
+                            // Safety limit to prevent memory explosion
+                            if (newResult.length >= MAX_CUTSETS_PER_GATE) {
+                                console.warn(`Cut set limit reached (${MAX_CUTSETS_PER_GATE}), truncating...`);
+                                return newResult;
+                            }
+                        }
+                    }
+                }
+
+                result = newResult;
+            }
+
+            return result;
+        }
+
+        function expandNode(nodeName, tree) {
+            // Keep old function for backward compatibility
+            return expandNodeOptimized(nodeName, tree);
+        }
+
+        function cartesianProduct(arrays) {
+            if (arrays.length === 0) return [[]];
+            if (arrays.length === 1) return arrays[0];
+
+            const result = [];
+            const first = arrays[0];
+            const rest = cartesianProduct(arrays.slice(1));
+
+            for (const item1 of first) {
+                for (const item2 of rest) {
+                    const combined = [...item1, ...item2];
+                    // Sort to normalize
+                    combined.sort();
+                    result.push(combined);
+                }
+            }
+
+            return result;
+        }
+
+        async function reduceToMinimalOptimized(cutSets, progressBar, progressText) {
+            // Already deduplicated in expandNodeOptimized, but double check
+            const uniqueSets = deduplicateCutSets(cutSets);
+
+            progressBar.style.width = '70%';
+            progressText.textContent = `Removing supersets from ${uniqueSets.length} cut sets...`;
+            await sleep(1);
+
+            // Sort by length first (smaller sets first) for efficiency
+            uniqueSets.sort((a, b) => a.length - b.length);
+
+            const minimal = [];
+            const totalSets = uniqueSets.length;
+            let lastProgressUpdate = 0;
+
+            for (let i = 0; i < uniqueSets.length; i++) {
+                // Update progress periodically
+                if (i - lastProgressUpdate > 1000) {
+                    const progress = 70 + (i / totalSets) * 25;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = `Processing ${i}/${totalSets} cut sets...`;
+                    await sleep(1);
+                    lastProgressUpdate = i;
+                }
+
+                let isMinimal = true;
+
+                // Only check against smaller or equal size sets (more efficient)
+                for (let j = 0; j < i; j++) {
+                    // If j is longer than i, no need to check further
+                    if (uniqueSets[j].length > uniqueSets[i].length) break;
+
+                    // Check if uniqueSets[j] is a subset of uniqueSets[i]
+                    if (isSubset(uniqueSets[j], uniqueSets[i])) {
+                        isMinimal = false;
+                        break;
+                    }
+                }
+
+                if (isMinimal) {
+                    minimal.push(uniqueSets[i]);
+                }
+            }
+
+            // Sort by size, then alphabetically
+            minimal.sort((a, b) => {
+                if (a.length !== b.length) return a.length - b.length;
+                return a.join(',').localeCompare(b.join(','));
+            });
+
+            return minimal;
+        }
+
+        function reduceToMinimal(cutSets) {
+            // Keep synchronous version for backward compatibility
+            const uniqueSets = deduplicateCutSets(cutSets);
+            uniqueSets.sort((a, b) => a.length - b.length);
+
+            const minimal = [];
+
+            for (let i = 0; i < uniqueSets.length; i++) {
+                let isMinimal = true;
+
+                for (let j = 0; j < i; j++) {
+                    if (uniqueSets[j].length > uniqueSets[i].length) break;
+                    if (isSubset(uniqueSets[j], uniqueSets[i])) {
+                        isMinimal = false;
+                        break;
+                    }
+                }
+
+                if (isMinimal) {
+                    minimal.push(uniqueSets[i]);
+                }
+            }
+
+            minimal.sort((a, b) => {
+                if (a.length !== b.length) return a.length - b.length;
+                return a.join(',').localeCompare(b.join(','));
+            });
+
+            return minimal;
+        }
+
+        function isSubset(subset, superset) {
+            if (subset.length > superset.length) return false;
+            return subset.every(elem => superset.includes(elem));
+        }
+
+        function getEventProbability(eventName) {
+            // Check if event is complemented (starts with "/")
+            const isComplemented = eventName.startsWith('/');
+            const baseName = isComplemented ? eventName.substring(1) : eventName;
+
+            if (basicEventData[baseName] && basicEventData[baseName].Calc_Prob !== undefined) {
+                const baseProb = basicEventData[baseName].Calc_Prob;
+                return isComplemented ? (1.0 - baseProb) : baseProb;
+            }
+
+            return null;
+        }
+
+        function calculateCutSetProbability(cutSet) {
+            // Cut set probability is the product of all event probabilities
+            // (all events must fail for the cut set to cause system failure)
+            let prob = 1.0;
+            let hasBEI = true;
+
+            for (const event of cutSet) {
+                const eventProb = getEventProbability(event);
+                if (eventProb !== null) {
+                    prob *= eventProb;
+                } else {
+                    hasBEI = false;
+                    break;
+                }
+            }
+
+            return hasBEI ? prob : null;
+        }
+
+        function calculateMCUB(cutSetProbabilities) {
+            // MCUB = 1 - product((1 - P_i)) for all cut sets
+            // This is the minimal cut set upper bound
+            if (cutSetProbabilities.length === 0 || cutSetProbabilities.some(p => p === null)) {
+                return null;
+            }
+
+            let product = 1.0;
+            for (const prob of cutSetProbabilities) {
+                product *= (1.0 - prob);
+            }
+
+            return 1.0 - product;
+        }
+
+        function displayCutSets() {
+            const cutSetsView = document.getElementById('cutSetsView');
+            const cutSetsSection = document.getElementById('cutSetsSection');
+
+            if (minimalCutSets.length === 0) {
+                cutSetsView.innerHTML = '<p>No cut sets found</p>';
+                return;
+            }
+
+            // Calculate probabilities for each cut set
+            const cutSetProbabilities = minimalCutSets.map(cs => calculateCutSetProbability(cs));
+            const mcub = calculateMCUB(cutSetProbabilities);
+
+            // Create array of {cutSet, probability, originalIndex} for sorting
+            const cutSetsWithProb = minimalCutSets.map((cs, idx) => ({
+                cutSet: cs,
+                probability: cutSetProbabilities[idx],
+                originalIndex: idx
+            }));
+
+            // Sort by probability (highest to lowest), then by size (smallest first)
+            cutSetsWithProb.sort((a, b) => {
+                // If both have probabilities, sort by probability (descending)
+                if (a.probability !== null && b.probability !== null) {
+                    if (Math.abs(a.probability - b.probability) > 1e-15) {
+                        return b.probability - a.probability; // Descending
+                    }
+                }
+                // If probabilities are equal or unavailable, sort by size
+                return a.cutSet.length - b.cutSet.length;
+            });
+
+            // Get probability display setting
+            const probDisplay = document.getElementById('probDisplay')?.value || '1';
+
+            // Display only first 100 cut sets
+            const displayLimit = 100;
+            const displayCount = Math.min(cutSetsWithProb.length, displayLimit);
+
+            let html = '';
+            if (cutSetsWithProb.length > displayLimit) {
+                html += `<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin-bottom: 10px; border-radius: 4px; color: #856404;">
+                    Showing top ${displayLimit} of ${cutSetsWithProb.length} cut sets (sorted by probability, highest first)
+                </div>`;
+            }
+
+            for (let i = 0; i < displayCount; i++) {
+                const item = cutSetsWithProb[i];
+                const prob = item.probability;
+                let probText = '';
+                if (prob !== null) {
+                    probText = ` <span style="color: #28a745; font-weight: bold;">[P = ${formatProbability(prob, probDisplay)}]</span>`;
+                }
+
+                // Add tooltips to cut set events
+                const eventsWithTooltips = item.cutSet.map(eventName => {
+                    const baseEventName = eventName.startsWith('/') ? eventName.substring(1) : eventName;
+                    const description = basicEventDescriptions[baseEventName];
+                    const tooltipHtml = description ? `<span class="tooltip">${description}</span>` : '';
+                    return `<span class="event">${eventName}${tooltipHtml}</span>`;
+                }).join(' AND ');
+
+                html += `
+                    <div class="cut-set">
+                        <div class="cut-set-header">Cut Set ${i + 1}${probText}</div>
+                        <div class="cut-set-events">${eventsWithTooltips}</div>
+                    </div>
+                `;
+            }
+
+            cutSetsView.innerHTML = html;
+            cutSetsSection.style.display = 'block';
+            document.getElementById('cutSetCount').textContent = minimalCutSets.length;
+
+            // Display MCUB if available
+            if (mcub !== null) {
+                document.getElementById('mcubValue').textContent = formatProbability(mcub, probDisplay);
+                document.getElementById('mcubCard').style.display = 'block';
+            } else {
+                document.getElementById('mcubCard').style.display = 'none';
+            }
+        }
+
+        function exportResults() {
+            if (!allFaultTrees || allFaultTrees.length === 0 || minimalCutSets.length === 0) {
+                showMessage('No results to export. Generate cut sets first.', 'error');
+                return;
+            }
+
+            const currentTree = allFaultTrees[currentTreeIndex];
+            const probDisplay = document.getElementById('probDisplay')?.value || '1';
+
+            // Calculate probabilities
+            const cutSetProbabilities = minimalCutSets.map(cs => calculateCutSetProbability(cs));
+            const mcub = calculateMCUB(cutSetProbabilities);
+
+            let output = '=== SAPHIRE FTL MINIMAL CUT SET ANALYSIS ===\n\n';
+            if (currentTree.treeName) {
+                output += `Tree Name: ${currentTree.treeName}\n`;
+            }
+            output += `Top Event: ${currentTree.topEvent}\n`;
+            output += `Total Gates: ${Object.keys(currentTree.gates).length}\n`;
+            output += `Total Basic Events: ${currentTree.events.size}\n`;
+            output += `Total Minimal Cut Sets: ${minimalCutSets.length}\n`;
+
+            if (mcub !== null) {
+                output += `MCUB (Minimal Cut Set Upper Bound): ${formatProbability(mcub, probDisplay)}\n`;
+            }
+            output += '\n';
+
+            output += '=== MINIMAL CUT SETS ===\n\n';
+            minimalCutSets.forEach((cutSet, index) => {
+                const prob = cutSetProbabilities[index];
+                output += `Cut Set ${index + 1}:\n`;
+                output += `  ${cutSet.join(' AND ')}\n`;
+                if (prob !== null) {
+                    output += `  Probability: ${formatProbability(prob, probDisplay)}\n`;
+                }
+                output += '\n';
+            });
+
+            output += '=== CUT SET DISTRIBUTION ===\n';
+            const distribution = {};
+            minimalCutSets.forEach(cs => {
+                const order = cs.length;
+                distribution[order] = (distribution[order] || 0) + 1;
+            });
+
+            for (const order in distribution) {
+                output += `Order ${order}: ${distribution[order]} cut sets\n`;
+            }
+
+            // Download as text file
+            const blob = new Blob([output], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `minimal_cut_sets_${currentTree.topEvent}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showMessage('Results exported successfully!', 'info');
+        }
+
+        function loadNewFile() {
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('cutSetsSection').style.display = 'none';
+            document.getElementById('statsSection').style.display = 'none';
+            document.getElementById('mcubCard').style.display = 'none';
+            document.getElementById('messageBox').innerHTML = '';
+            document.getElementById('fileStatus').innerHTML = '';
+            document.getElementById('beiStatus').textContent = '';
+            document.getElementById('probDisplay').value = '1';
+            fileInput.value = '';
+            allFaultTrees = [];
+            currentTreeIndex = 0;
+            minimalCutSets = [];
+            basicEventData = {};
+        }
+
+        function showMessage(message, type) {
+            const messageBox = document.getElementById('messageBox');
+            const className = type === 'error' ? 'error-box' : 'info-box';
+            messageBox.innerHTML = `<div class="${className}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
