@@ -783,7 +783,8 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
             // Handle TRAN (transfer) gates - expand the referenced gate
             if (gate.type === 'TRAN') {
-                const refGateName = gate.inputs[0];
+                // If no explicit reference, use the gate's own name
+                const refGateName = gate.inputs[0] || nodeName;
                 const nodeId = ++nodeIdCounter;
 
                 // Find the referenced gate/tree
@@ -879,7 +880,8 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             // Handle TRAN (transfer) gates
             if (gate.type === 'TRAN') {
                 // TRAN gate references another fault tree's top gate
-                const refGateName = gate.inputs[0];
+                // If no explicit reference, use the gate's own name
+                const refGateName = gate.inputs[0] || nodeName;
 
                 // Look for a tree whose topEvent matches the reference
                 for (const otherTree of allFaultTrees) {
