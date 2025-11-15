@@ -401,8 +401,11 @@ TIMELINESS, PERSONAL =
 PERSONAL         OR  OTHER SICK SICK-FAM
 ^EOS</pre>
                 <p style="margin-top: 10px; color: #666; font-size: 13px;">
-                    <strong>Format:</strong> Each section begins with "TREE_NAME, GATE_NAME =" followed by gate definitions.
-                    Gates are defined as "GATE_NAME OR/AND INPUT1 INPUT2 ...". Sections end with ^EOS.
+                    <strong>Format:</strong> Each section begins with "TREE_NAME, GATE_NAME =" followed by gate definitions.<br>
+                    Gates: "GATE_NAME OR/AND/TRAN INPUT1 INPUT2 ..."<br>
+                    • OR/AND gates combine inputs<br>
+                    • TRAN gates reference another gate's logic (transfer gates)<br>
+                    Sections end with ^EOS.
                 </p>
 
                 <h3 style="margin: 20px 0 10px 0;">Saphire BEI Format (Optional)</h3>
@@ -537,6 +540,10 @@ TRNS-2          AND PER-TRNS PUB-TRNS-LATE
 ^EOS
 TIMELINESS, TRNSPRT =
 TRNSPRT         AND PER-TRNS PUB-TRANS
+^EOS
+TIMELINESS, COMBINED =
+COMBINED        OR  ALARM-REF PERSONAL
+ALARM-REF       TRAN ALARM
 ^EOS`;
 
             const exampleBEI = `Name,FdT,UdC,UdT,UdValue,Prob,Lambda,Tau,Mission,Init,PF,UdValue2,Calc_Prob,Freq,Model_Type,Phase_Type,Project
@@ -680,14 +687,14 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                         for (let i = 1; i < lines.length; i++) {
                             const line = lines[i];
 
-                            // Parse gate definition: "GATENAME  OR/AND  INPUT1 INPUT2 INPUT3..."
+                            // Parse gate definition: "GATENAME  OR/AND/TRAN  INPUT1 INPUT2 INPUT3..."
                             const tokens = line.split(/\s+/).filter(t => t);
 
                             if (tokens.length >= 2) {
                                 const gateName = tokens[0];
                                 const operator = tokens[1].toUpperCase();
 
-                                if (operator === 'OR' || operator === 'AND') {
+                                if (operator === 'OR' || operator === 'AND' || operator === 'TRAN') {
                                     const inputs = tokens.slice(2);
 
                                     tree.gates[gateName] = {
@@ -774,7 +781,46 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                 </div>`;
             }
 
-            // Gate node - has children
+            // Handle TRAN (transfer) gates - expand the referenced gate
+            if (gate.type === 'TRAN') {
+                const refGateName = gate.inputs[0];
+                const nodeId = ++nodeIdCounter;
+
+                // Find the referenced gate/tree
+                let refTree = tree;
+                let refGate = tree.gates[refGateName];
+
+                if (!refGate) {
+                    // Look for a tree whose topEvent matches
+                    for (const otherTree of allFaultTrees) {
+                        if (otherTree.topEvent === refGateName) {
+                            refTree = otherTree;
+                            refGate = otherTree.gates[refGateName];
+                            break;
+                        }
+                    }
+                }
+
+                let html = `<div class="tree-node">
+                    <div class="tree-node-content">
+                        <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
+                        <span class="gate" onclick="toggleNode(${nodeId})">${nodeName}</span>
+                        <span style="color: #666; margin-left: 5px;">[TRAN → ${refGateName}]</span>
+                    </div>`;
+
+                if (refGate && refGate.inputs && refGate.inputs.length > 0) {
+                    html += `<div class="tree-children expanded" id="children-${nodeId}">`;
+                    refGate.inputs.forEach(input => {
+                        html += renderNode(input, level + 1, refTree);
+                    });
+                    html += '</div>';
+                }
+
+                html += '</div>';
+                return html;
+            }
+
+            // Regular gate node - has children
             const nodeId = ++nodeIdCounter;
             let html = `<div class="tree-node">
                 <div class="tree-node-content">
@@ -828,6 +874,27 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             // If it's a basic event, return it as a single-element cut set
             if (!gate) {
                 return [[nodeName]];
+            }
+
+            // Handle TRAN (transfer) gates
+            if (gate.type === 'TRAN') {
+                // TRAN gate references another gate - find and expand it
+                const refGateName = gate.inputs[0];
+
+                // First check if the referenced gate is in the current tree
+                if (tree.gates[refGateName]) {
+                    return expandNode(refGateName, tree);
+                }
+
+                // Otherwise, look for a tree whose topEvent matches
+                for (const otherTree of allFaultTrees) {
+                    if (otherTree.topEvent === refGateName) {
+                        return expandNode(refGateName, otherTree);
+                    }
+                }
+
+                // If not found anywhere, treat as basic event
+                return [[refGateName]];
             }
 
             // Recursively expand inputs
