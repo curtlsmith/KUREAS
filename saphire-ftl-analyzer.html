@@ -243,19 +243,19 @@
         .stat-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 12px 15px;
+            border-radius: 6px;
             text-align: center;
         }
 
         .stat-value {
-            font-size: 32px;
+            font-size: 24px;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
 
         .stat-label {
-            font-size: 14px;
+            font-size: 12px;
             opacity: 0.9;
         }
 
@@ -336,7 +336,7 @@
     <div class="container">
         <div class="header">
             <h1>SAPHIRE FTL Minimal Cut Set Analyzer</h1>
-            <p>Upload your fault tree logic file to generate minimal cut sets</p>
+            <p id="uploadPrompt">Upload your fault tree logic file to generate minimal cut sets</p>
         </div>
 
         <div class="content">
@@ -372,13 +372,13 @@
                     <button class="btn btn-success" onclick="loadExample()">Load Example</button>
                 </div>
 
-                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-                    <div style="margin-bottom: 15px;" id="treeSelectDiv">
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div id="treeSelectDiv" style="display: flex; align-items: center;">
                         <label style="font-weight: bold; margin-right: 10px;">Select Fault Tree:</label>
                         <select id="treeSelect" onchange="onTreeSelected()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; min-width: 250px;">
                         </select>
                     </div>
-                    <div>
+                    <div style="display: flex; align-items: center;">
                         <label style="font-weight: bold; margin-right: 10px;">Show Probability:</label>
                         <select id="probDisplay" onchange="displayTree()" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
                             <option value="none">Do Not Show</option>
@@ -386,8 +386,8 @@
                             <option value="1" selected>1 Digit (1.2E-5)</option>
                             <option value="2">2 Digits (1.23E-5)</option>
                         </select>
-                        <span id="beiStatus" style="margin-left: 15px; color: #6c757d;"></span>
                     </div>
+                    <span id="beiStatus" style="color: #6c757d;"></span>
                 </div>
 
                 <div id="messageBox"></div>
@@ -531,6 +531,7 @@ ALM-CPF,1,,,0,0.0002,,,,F,,,2.00E-4,,,</pre>
 
                 document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('resultsSection').classList.remove('hidden');
+                document.getElementById('uploadPrompt').style.display = 'none';
                 showMessage(`Loaded ${allFaultTrees.length} fault tree(s) successfully!`, 'info');
             } catch (error) {
                 showMessage('Error parsing files: ' + error.message, 'error');
@@ -618,6 +619,7 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
                 document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('resultsSection').classList.remove('hidden');
+                document.getElementById('uploadPrompt').style.display = 'none';
                 showMessage(`Loaded ${allFaultTrees.length} fault tree(s) successfully!`, 'info');
             } catch (error) {
                 showMessage('Error loading example: ' + error.message, 'error');
@@ -926,6 +928,37 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             // Regular gate node - has children
             const nodeId = ++nodeIdCounter;
             const gateTypeDisplay = gate.type === 'VOTE' ? `${gate.n}/${gate.m}` : gate.type;
+
+            // Check if all inputs are basic events (not gates)
+            const allInputsAreBasicEvents = gate.inputs && gate.inputs.length > 0 &&
+                gate.inputs.every(input => !tree.gates[input]);
+
+            if (allInputsAreBasicEvents) {
+                // Render basic events inline to the right of the gate
+                const probDisplay = document.getElementById('probDisplay')?.value || '1';
+                let eventsHtml = gate.inputs.map(input => {
+                    let probText = '';
+                    if (probDisplay !== 'none') {
+                        const prob = getEventProbability(input);
+                        if (prob !== null) {
+                            probText = ` <span style="color: #28a745; font-size: 11px;">[${formatProbability(prob, probDisplay)}]</span>`;
+                        }
+                    }
+                    return `<span class="event">${input}</span>${probText}`;
+                }).join(' <span style="color: #666;">•</span> ');
+
+                let html = `<div class="tree-node">
+                    <div class="tree-node-content">
+                        <span class="tree-expander"></span>
+                        <span class="gate">${nodeName}</span>
+                        <span style="color: #666; margin-left: 5px;">[${gateTypeDisplay}]</span>
+                        <span style="margin-left: 10px; font-size: 13px;">${eventsHtml}</span>
+                    </div>
+                </div>`;
+                return html;
+            }
+
+            // Regular rendering with expandable children
             let html = `<div class="tree-node">
                 <div class="tree-node-content">
                     <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
@@ -1337,12 +1370,42 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             const cutSetProbabilities = minimalCutSets.map(cs => calculateCutSetProbability(cs));
             const mcub = calculateMCUB(cutSetProbabilities);
 
+            // Create array of {cutSet, probability, originalIndex} for sorting
+            const cutSetsWithProb = minimalCutSets.map((cs, idx) => ({
+                cutSet: cs,
+                probability: cutSetProbabilities[idx],
+                originalIndex: idx
+            }));
+
+            // Sort by probability (highest to lowest), then by size (smallest first)
+            cutSetsWithProb.sort((a, b) => {
+                // If both have probabilities, sort by probability (descending)
+                if (a.probability !== null && b.probability !== null) {
+                    if (Math.abs(a.probability - b.probability) > 1e-15) {
+                        return b.probability - a.probability; // Descending
+                    }
+                }
+                // If probabilities are equal or unavailable, sort by size
+                return a.cutSet.length - b.cutSet.length;
+            });
+
             // Get probability display setting
             const probDisplay = document.getElementById('probDisplay')?.value || '1';
 
+            // Display only first 100 cut sets
+            const displayLimit = 100;
+            const displayCount = Math.min(cutSetsWithProb.length, displayLimit);
+
             let html = '';
-            minimalCutSets.forEach((cutSet, index) => {
-                const prob = cutSetProbabilities[index];
+            if (cutSetsWithProb.length > displayLimit) {
+                html += `<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin-bottom: 10px; border-radius: 4px; color: #856404;">
+                    Showing top ${displayLimit} of ${cutSetsWithProb.length} cut sets (sorted by probability, highest first)
+                </div>`;
+            }
+
+            for (let i = 0; i < displayCount; i++) {
+                const item = cutSetsWithProb[i];
+                const prob = item.probability;
                 let probText = '';
                 if (prob !== null) {
                     probText = ` <span style="color: #28a745; font-weight: bold;">[P = ${formatProbability(prob, probDisplay)}]</span>`;
@@ -1350,11 +1413,11 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
                 html += `
                     <div class="cut-set">
-                        <div class="cut-set-header">Cut Set ${index + 1}${probText}</div>
-                        <div class="cut-set-events">${cutSet.join(' AND ')}</div>
+                        <div class="cut-set-header">Cut Set ${i + 1}${probText}</div>
+                        <div class="cut-set-events">${item.cutSet.join(' AND ')}</div>
                     </div>
                 `;
-            });
+            }
 
             cutSetsView.innerHTML = html;
             cutSetsSection.style.display = 'block';
