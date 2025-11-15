@@ -277,6 +277,39 @@
             margin-bottom: 20px;
         }
 
+        .progress-container {
+            background: #e9ecef;
+            border-radius: 6px;
+            height: 30px;
+            margin: 15px 0;
+            position: relative;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 30px;
+            color: #333;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
         .example-section {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
@@ -359,6 +392,11 @@
 
                 <div id="messageBox"></div>
 
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar" id="progressBar"></div>
+                    <div class="progress-text" id="progressText">Calculating...</div>
+                </div>
+
                 <div class="stats" id="statsSection" style="display: none;">
                     <div class="stat-card">
                         <div class="stat-value" id="gateCount">0</div>
@@ -375,6 +413,10 @@
                     <div class="stat-card" id="mcubCard" style="display: none;">
                         <div class="stat-value" id="mcubValue">0.0E+0</div>
                         <div class="stat-label">MCUB Probability</div>
+                    </div>
+                    <div class="stat-card" id="computeTimeCard" style="display: none;">
+                        <div class="stat-value" id="computeTimeValue">0.0s</div>
+                        <div class="stat-label">Computation Time</div>
                     </div>
                 </div>
 
@@ -886,34 +928,80 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             return html;
         }
 
-        function generateCutSets() {
+        async function generateCutSets() {
             if (!allFaultTrees || allFaultTrees.length === 0 || !allFaultTrees[currentTreeIndex]) {
                 showMessage('No fault tree loaded', 'error');
                 return;
             }
 
             const currentTree = allFaultTrees[currentTreeIndex];
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+
+            // Show progress bar
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressText.textContent = 'Starting...';
+
+            const startTime = performance.now();
 
             try {
-                minimalCutSets = computeMinimalCutSets(currentTree.topEvent, currentTree);
+                // Update progress
+                progressBar.style.width = '20%';
+                progressText.textContent = 'Expanding fault tree...';
+                await sleep(10);
+
+                minimalCutSets = await computeMinimalCutSets(currentTree.topEvent, currentTree, progressBar, progressText);
+
+                const endTime = performance.now();
+                const elapsedSeconds = ((endTime - startTime) / 1000).toFixed(2);
+
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Complete!';
+
+                await sleep(300);
+                progressContainer.style.display = 'none';
+
                 displayCutSets();
-                showMessage(`Generated ${minimalCutSets.length} minimal cut sets for ${currentTree.treeName}`, 'info');
+
+                // Display computation time
+                document.getElementById('computeTimeValue').textContent = elapsedSeconds + 's';
+                document.getElementById('computeTimeCard').style.display = 'block';
+
+                showMessage(`Generated ${minimalCutSets.length} minimal cut sets in ${elapsedSeconds}s`, 'info');
             } catch (error) {
+                progressContainer.style.display = 'none';
                 showMessage('Error generating cut sets: ' + error.message, 'error');
+                console.error(error);
             }
         }
 
-        function computeMinimalCutSets(topEvent, tree) {
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function computeMinimalCutSets(topEvent, tree, progressBar, progressText) {
             // Compute all cut sets using bottom-up approach
-            const cutSets = expandNode(topEvent, tree);
+            progressText.textContent = 'Expanding fault tree...';
+            await sleep(1);
+
+            const cutSets = expandNodeOptimized(topEvent, tree);
+
+            progressBar.style.width = '60%';
+            progressText.textContent = `Reducing ${cutSets.length} cut sets...`;
+            await sleep(1);
 
             // Reduce to minimal cut sets (remove supersets)
-            const minimal = reduceToMinimal(cutSets);
+            const minimal = await reduceToMinimalOptimized(cutSets, progressBar, progressText);
 
             return minimal;
         }
 
-        function expandNode(nodeName, tree) {
+        // Memory-optimized version with early deduplication
+        const MAX_CUTSETS_PER_GATE = 50000; // Limit to prevent memory explosion
+
+        function expandNodeOptimized(nodeName, tree) {
             const gate = tree.gates[nodeName];
 
             // If it's a basic event, return it as a single-element cut set
@@ -931,13 +1019,13 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                 for (const otherTree of allFaultTrees) {
                     if (otherTree.topEvent === refGateName) {
                         // Found the tree - expand its top event using that tree's context
-                        return expandNode(otherTree.topEvent, otherTree);
+                        return expandNodeOptimized(otherTree.topEvent, otherTree);
                     }
                 }
 
                 // If not found in any tree's topEvent, check current tree's gates
                 if (tree.gates[refGateName]) {
-                    return expandNode(refGateName, tree);
+                    return expandNodeOptimized(refGateName, tree);
                 }
 
                 // If not found anywhere, treat as basic event
@@ -945,17 +1033,78 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             }
 
             // Recursively expand inputs
-            const inputCutSets = gate.inputs.map(input => expandNode(input, tree));
+            const inputCutSets = gate.inputs.map(input => expandNodeOptimized(input, tree));
 
             if (gate.type === 'OR') {
-                // OR gate: union of all input cut sets
-                return inputCutSets.flat();
+                // OR gate: union of all input cut sets with early deduplication
+                const combined = inputCutSets.flat();
+                return deduplicateCutSets(combined);
             } else if (gate.type === 'AND') {
-                // AND gate: Cartesian product of all input cut sets
-                return cartesianProduct(inputCutSets);
+                // AND gate: Cartesian product with optimization
+                return cartesianProductOptimized(inputCutSets);
             }
 
             return [];
+        }
+
+        function deduplicateCutSets(cutSets) {
+            const seen = new Set();
+            const unique = [];
+
+            for (const cs of cutSets) {
+                const sorted = [...cs].sort();
+                const key = sorted.join(',');
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    unique.push(sorted);
+                }
+            }
+
+            return unique;
+        }
+
+        function cartesianProductOptimized(arrays) {
+            if (arrays.length === 0) return [[]];
+            if (arrays.length === 1) return arrays[0];
+
+            // Sort by size to process smaller arrays first
+            const sortedArrays = [...arrays].sort((a, b) => a.length - b.length);
+
+            let result = sortedArrays[0];
+
+            for (let i = 1; i < sortedArrays.length; i++) {
+                const newResult = [];
+                const seen = new Set();
+
+                for (const item1 of result) {
+                    for (const item2 of sortedArrays[i]) {
+                        const combined = [...item1, ...item2];
+                        combined.sort();
+                        const key = combined.join(',');
+
+                        // Deduplicate during expansion
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            newResult.push(combined);
+
+                            // Safety limit to prevent memory explosion
+                            if (newResult.length >= MAX_CUTSETS_PER_GATE) {
+                                console.warn(`Cut set limit reached (${MAX_CUTSETS_PER_GATE}), truncating...`);
+                                return newResult;
+                            }
+                        }
+                    }
+                }
+
+                result = newResult;
+            }
+
+            return result;
+        }
+
+        function expandNode(nodeName, tree) {
+            // Keep old function for backward compatibility
+            return expandNodeOptimized(nodeName, tree);
         }
 
         function cartesianProduct(arrays) {
@@ -978,28 +1127,37 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             return result;
         }
 
-        function reduceToMinimal(cutSets) {
-            // Remove duplicates first
-            const uniqueSets = [];
-            const seen = new Set();
+        async function reduceToMinimalOptimized(cutSets, progressBar, progressText) {
+            // Already deduplicated in expandNodeOptimized, but double check
+            const uniqueSets = deduplicateCutSets(cutSets);
 
-            for (const cs of cutSets) {
-                const sorted = [...cs].sort();
-                const key = sorted.join(',');
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    uniqueSets.push(sorted);
-                }
-            }
+            progressBar.style.width = '70%';
+            progressText.textContent = `Removing supersets from ${uniqueSets.length} cut sets...`;
+            await sleep(1);
 
-            // Remove supersets
+            // Sort by length first (smaller sets first) for efficiency
+            uniqueSets.sort((a, b) => a.length - b.length);
+
             const minimal = [];
+            const totalSets = uniqueSets.length;
+            let lastProgressUpdate = 0;
 
             for (let i = 0; i < uniqueSets.length; i++) {
+                // Update progress periodically
+                if (i - lastProgressUpdate > 1000) {
+                    const progress = 70 + (i / totalSets) * 25;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = `Processing ${i}/${totalSets} cut sets...`;
+                    await sleep(1);
+                    lastProgressUpdate = i;
+                }
+
                 let isMinimal = true;
 
-                for (let j = 0; j < uniqueSets.length; j++) {
-                    if (i === j) continue;
+                // Only check against smaller or equal size sets (more efficient)
+                for (let j = 0; j < i; j++) {
+                    // If j is longer than i, no need to check further
+                    if (uniqueSets[j].length > uniqueSets[i].length) break;
 
                     // Check if uniqueSets[j] is a subset of uniqueSets[i]
                     if (isSubset(uniqueSets[j], uniqueSets[i])) {
@@ -1014,6 +1172,37 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             }
 
             // Sort by size, then alphabetically
+            minimal.sort((a, b) => {
+                if (a.length !== b.length) return a.length - b.length;
+                return a.join(',').localeCompare(b.join(','));
+            });
+
+            return minimal;
+        }
+
+        function reduceToMinimal(cutSets) {
+            // Keep synchronous version for backward compatibility
+            const uniqueSets = deduplicateCutSets(cutSets);
+            uniqueSets.sort((a, b) => a.length - b.length);
+
+            const minimal = [];
+
+            for (let i = 0; i < uniqueSets.length; i++) {
+                let isMinimal = true;
+
+                for (let j = 0; j < i; j++) {
+                    if (uniqueSets[j].length > uniqueSets[i].length) break;
+                    if (isSubset(uniqueSets[j], uniqueSets[i])) {
+                        isMinimal = false;
+                        break;
+                    }
+                }
+
+                if (isMinimal) {
+                    minimal.push(uniqueSets[i]);
+                }
+            }
+
             minimal.sort((a, b) => {
                 if (a.length !== b.length) return a.length - b.length;
                 return a.join(',').localeCompare(b.join(','));
