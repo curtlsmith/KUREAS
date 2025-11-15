@@ -740,7 +740,21 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
                                 const gateName = tokens[0];
                                 const operator = tokens[1].toUpperCase();
 
-                                if (operator === 'OR' || operator === 'AND' || operator === 'TRAN') {
+                                // Check for N-of-M voting gate (e.g., "2/3")
+                                const nOfMMatch = operator.match(/^(\d+)\/(\d+)$/);
+
+                                if (nOfMMatch) {
+                                    const n = parseInt(nOfMMatch[1]);
+                                    const m = parseInt(nOfMMatch[2]);
+                                    const inputs = tokens.slice(2);
+
+                                    tree.gates[gateName] = {
+                                        type: 'VOTE',
+                                        n: n,
+                                        m: m,
+                                        inputs: inputs
+                                    };
+                                } else if (operator === 'OR' || operator === 'AND' || operator === 'TRAN') {
                                     const inputs = tokens.slice(2);
 
                                     tree.gates[gateName] = {
@@ -845,9 +859,11 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             if (!gate) {
                 // It's a basic event - show probability if available
                 let probText = '';
-                if (probDisplay !== 'none' && basicEventData[nodeName]) {
-                    const prob = basicEventData[nodeName].Calc_Prob;
-                    probText = ` <span style="color: #28a745;">[${formatProbability(prob, probDisplay)}]</span>`;
+                if (probDisplay !== 'none') {
+                    const prob = getEventProbability(nodeName);
+                    if (prob !== null) {
+                        probText = ` <span style="color: #28a745;">[${formatProbability(prob, probDisplay)}]</span>`;
+                    }
                 }
                 return `<div class="tree-node">
                     <div class="tree-node-content">
@@ -909,11 +925,12 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
             // Regular gate node - has children
             const nodeId = ++nodeIdCounter;
+            const gateTypeDisplay = gate.type === 'VOTE' ? `${gate.n}/${gate.m}` : gate.type;
             let html = `<div class="tree-node">
                 <div class="tree-node-content">
                     <span class="tree-expander" id="expander-${nodeId}" onclick="toggleNode(${nodeId})">▼</span>
                     <span class="gate" onclick="toggleNode(${nodeId})">${nodeName}</span>
-                    <span style="color: #666; margin-left: 5px;">[${gate.type}]</span>
+                    <span style="color: #666; margin-left: 5px;">[${gateTypeDisplay}]</span>
                 </div>`;
 
             if (gate.inputs && gate.inputs.length > 0) {
@@ -1001,6 +1018,25 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
         // Memory-optimized version with early deduplication
         const MAX_CUTSETS_PER_GATE = 50000; // Limit to prevent memory explosion
 
+        // Generate combinations: choose k items from array
+        function getCombinations(array, k) {
+            if (k === 0) return [[]];
+            if (k > array.length) return [];
+            if (k === array.length) return [array];
+
+            const result = [];
+
+            // Include first element
+            const withFirst = getCombinations(array.slice(1), k - 1).map(combo => [array[0], ...combo]);
+            result.push(...withFirst);
+
+            // Exclude first element
+            const withoutFirst = getCombinations(array.slice(1), k);
+            result.push(...withoutFirst);
+
+            return result;
+        }
+
         function expandNodeOptimized(nodeName, tree) {
             const gate = tree.gates[nodeName];
 
@@ -1030,6 +1066,31 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
                 // If not found anywhere, treat as basic event
                 return [[refGateName]];
+            }
+
+            // Handle VOTE (N-of-M) gates
+            if (gate.type === 'VOTE') {
+                // N-of-M gate: expand to OR of all combinations of N inputs from M total
+                // Example: 2/3 A B C -> (A AND B) OR (A AND C) OR (B AND C)
+                const n = gate.n;
+                const m = gate.m;
+                const inputs = gate.inputs;
+
+                // Get all combinations of n inputs from the m total inputs
+                const combinations = getCombinations(inputs, n);
+
+                // For each combination, expand as an AND gate
+                let allCutSets = [];
+                for (const combo of combinations) {
+                    // Expand each input in the combination
+                    const comboCutSets = combo.map(input => expandNodeOptimized(input, tree));
+                    // AND them together (Cartesian product)
+                    const andResult = cartesianProductOptimized(comboCutSets);
+                    allCutSets = allCutSets.concat(andResult);
+                }
+
+                // OR all combinations together (union with deduplication)
+                return deduplicateCutSets(allCutSets);
             }
 
             // Recursively expand inputs
@@ -1216,6 +1277,19 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             return subset.every(elem => superset.includes(elem));
         }
 
+        function getEventProbability(eventName) {
+            // Check if event is complemented (starts with "/")
+            const isComplemented = eventName.startsWith('/');
+            const baseName = isComplemented ? eventName.substring(1) : eventName;
+
+            if (basicEventData[baseName] && basicEventData[baseName].Calc_Prob !== undefined) {
+                const baseProb = basicEventData[baseName].Calc_Prob;
+                return isComplemented ? (1.0 - baseProb) : baseProb;
+            }
+
+            return null;
+        }
+
         function calculateCutSetProbability(cutSet) {
             // Cut set probability is the product of all event probabilities
             // (all events must fail for the cut set to cause system failure)
@@ -1223,8 +1297,9 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
             let hasBEI = true;
 
             for (const event of cutSet) {
-                if (basicEventData[event] && basicEventData[event].Calc_Prob !== undefined) {
-                    prob *= basicEventData[event].Calc_Prob;
+                const eventProb = getEventProbability(event);
+                if (eventProb !== null) {
+                    prob *= eventProb;
                 } else {
                     hasBEI = false;
                     break;
