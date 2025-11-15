@@ -878,19 +878,20 @@ PUB-TRANS,1,,,0,0.03,,,,F,,,3.00E-2,,,`;
 
             // Handle TRAN (transfer) gates
             if (gate.type === 'TRAN') {
-                // TRAN gate references another gate - find and expand it
+                // TRAN gate references another fault tree's top gate
                 const refGateName = gate.inputs[0];
 
-                // First check if the referenced gate is in the current tree
-                if (tree.gates[refGateName]) {
-                    return expandNode(refGateName, tree);
-                }
-
-                // Otherwise, look for a tree whose topEvent matches
+                // Look for a tree whose topEvent matches the reference
                 for (const otherTree of allFaultTrees) {
                     if (otherTree.topEvent === refGateName) {
-                        return expandNode(refGateName, otherTree);
+                        // Found the tree - expand its top event using that tree's context
+                        return expandNode(otherTree.topEvent, otherTree);
                     }
+                }
+
+                // If not found in any tree's topEvent, check current tree's gates
+                if (tree.gates[refGateName]) {
+                    return expandNode(refGateName, tree);
                 }
 
                 // If not found anywhere, treat as basic event
