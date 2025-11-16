@@ -2151,11 +2151,49 @@
 
         // Report Modal Component
         function ReportModal({ savedProjects, currentProject, cutSets, onClose }) {
-            const [fileFormat, setFileFormat] = useState('markdown');
+            // Load saved report preferences from localStorage
+            const loadReportPreferences = () => {
+                try {
+                    const saved = localStorage.getItem('reportPreferences');
+                    if (saved) {
+                        return JSON.parse(saved);
+                    }
+                } catch (error) {
+                    console.error('Error loading report preferences:', error);
+                }
+                return {
+                    fileFormat: 'markdown',
+                    contentType: 'graphics',
+                    cutSetLimit: 100,
+                    includeHeader: true,
+                    includeProject: true,
+                    includeDate: true
+                };
+            };
+
+            const prefs = loadReportPreferences();
+
+            const [fileFormat, setFileFormat] = useState(prefs.fileFormat);
             const [fileName, setFileName] = useState('fault_tree_report');
-            const [contentType, setContentType] = useState('graphics');
-            const [cutSetLimit, setCutSetLimit] = useState(100);
+            const [contentType, setContentType] = useState(prefs.contentType);
+            const [cutSetLimit, setCutSetLimit] = useState(prefs.cutSetLimit);
             const [selectedTrees, setSelectedTrees] = useState(new Set(['all']));
+            const [includeHeader, setIncludeHeader] = useState(prefs.includeHeader);
+            const [includeProject, setIncludeProject] = useState(prefs.includeProject);
+            const [includeDate, setIncludeDate] = useState(prefs.includeDate);
+
+            // Save report preferences to localStorage whenever they change
+            useEffect(() => {
+                const preferences = {
+                    fileFormat,
+                    contentType,
+                    cutSetLimit,
+                    includeHeader,
+                    includeProject,
+                    includeDate
+                };
+                localStorage.setItem('reportPreferences', JSON.stringify(preferences));
+            }, [fileFormat, contentType, cutSetLimit, includeHeader, includeProject, includeDate]);
 
             const availableTrees = currentProject?.faultTrees || [];
 
@@ -2185,6 +2223,7 @@
                     try {
                         const tree = availableTrees[treeIndex];
                         if (!tree || !tree.rootNode) {
+                            console.log(`No tree or root node for index ${treeIndex}`);
                             resolve(null);
                             return;
                         }
@@ -2245,6 +2284,7 @@
 
                         // Convert to base64
                         const imageData = canvas.toDataURL('image/png');
+                        console.log(`Captured image for tree ${treeIndex}, data length: ${imageData?.length || 0}`);
                         resolve(imageData);
                     } catch (error) {
                         console.error('Error capturing tree image:', error);
@@ -2268,25 +2308,39 @@
                     const includeGraphics = contentType === 'graphics' || contentType === 'both';
                     const includeCutSetsData = contentType === 'cutsets' || contentType === 'both';
 
+                    console.log('Report generation - Include graphics:', includeGraphics);
+                    console.log('Report generation - Include cut sets:', includeCutSetsData);
+                    console.log('Report generation - Trees to include:', treesToInclude);
+
                     // Capture tree images if graphics are needed
                     const treeImages = {};
                     if (includeGraphics) {
+                        console.log('Capturing tree images...');
                         for (const idx of treesToInclude) {
                             const imageData = await captureFaultTreeImage(idx);
                             if (imageData) {
                                 treeImages[idx] = imageData;
+                                console.log(`Added image for tree ${idx} to treeImages object`);
                             }
                         }
+                        console.log('Final treeImages object keys:', Object.keys(treeImages));
                     }
+
+                    // Prepare header options
+                    const headerOptions = {
+                        includeHeader,
+                        includeProject,
+                        includeDate
+                    };
 
                     // Generate report content based on format
                     if (fileFormat === 'markdown') {
-                        const content = generateMarkdownReport(treesToInclude, treeImages, includeCutSetsData);
+                        const content = generateMarkdownReport(treesToInclude, treeImages, includeCutSetsData, headerOptions);
                         downloadReport(content, fileName, 'markdown');
                     } else if (fileFormat === 'word') {
-                        await generateWordReport(treesToInclude, treeImages, includeCutSetsData);
+                        await generateWordReport(treesToInclude, treeImages, includeCutSetsData, headerOptions);
                     } else if (fileFormat === 'pdf') {
-                        await generatePDFReport(treesToInclude, treeImages, includeCutSetsData);
+                        await generatePDFReport(treesToInclude, treeImages, includeCutSetsData, headerOptions);
                     }
 
                     onClose();
@@ -2295,11 +2349,26 @@
                 }
             };
 
-            const generateMarkdownReport = (treeIndices, treeImages, includeCutSetsData) => {
-                let md = `# Fault Tree Analysis Report\n\n`;
-                md += `**Project:** ${currentProject?.projectName || 'Unnamed Project'}\n`;
-                md += `**Generated:** ${new Date().toLocaleString()}\n\n`;
-                md += `---\n\n`;
+            const generateMarkdownReport = (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
+                let md = '';
+
+                // Title (optional)
+                if (headerOptions.includeHeader !== false) {
+                    md += `# Fault Tree Analysis Report\n\n`;
+                }
+
+                // Project info (optional)
+                if (headerOptions.includeProject !== false) {
+                    md += `**Project:** ${currentProject?.projectName || 'Unnamed Project'}\n`;
+                }
+                if (headerOptions.includeDate !== false) {
+                    md += `**Generated:** ${new Date().toLocaleString()}\n`;
+                }
+
+                // Add separator if any header elements were included
+                if (headerOptions.includeHeader !== false || headerOptions.includeProject !== false || headerOptions.includeDate !== false) {
+                    md += `\n---\n\n`;
+                }
 
                 treeIndices.forEach(idx => {
                     const tree = availableTrees[idx];
@@ -2340,38 +2409,44 @@
                 return md;
             };
 
-            const generateWordReport = async (treeIndices, treeImages, includeCutSetsData) => {
+            const generateWordReport = async (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
                 const { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, WidthType } = docx;
 
                 const children = [];
 
-                // Title
-                children.push(
-                    new Paragraph({
-                        text: "Fault Tree Analysis Report",
-                        heading: HeadingLevel.TITLE,
-                        alignment: AlignmentType.CENTER
-                    })
-                );
+                // Title (optional)
+                if (headerOptions.includeHeader !== false) {
+                    children.push(
+                        new Paragraph({
+                            text: "Fault Tree Analysis Report",
+                            heading: HeadingLevel.TITLE,
+                            alignment: AlignmentType.CENTER
+                        })
+                    );
+                }
 
-                // Project info
-                children.push(
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: "Project: ", bold: true }),
-                            new TextRun({ text: currentProject?.projectName || 'Unnamed Project' })
-                        ]
-                    })
-                );
+                // Project info (optional)
+                if (headerOptions.includeProject !== false) {
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "Project: ", bold: true }),
+                                new TextRun({ text: currentProject?.projectName || 'Unnamed Project' })
+                            ]
+                        })
+                    );
+                }
 
-                children.push(
-                    new Paragraph({
-                        children: [
-                            new TextRun({ text: "Generated: ", bold: true }),
-                            new TextRun({ text: new Date().toLocaleString() })
-                        ]
-                    })
-                );
+                if (headerOptions.includeDate !== false) {
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "Generated: ", bold: true }),
+                                new TextRun({ text: new Date().toLocaleString() })
+                            ]
+                        })
+                    );
+                }
 
                 children.push(new Paragraph({ text: "" }));
 
@@ -2490,27 +2565,47 @@
                 URL.revokeObjectURL(url);
             };
 
-            const generatePDFReport = async (treeIndices, treeImages, includeCutSetsData) => {
+            const generatePDFReport = async (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
+                console.log('PDF generation started');
+                console.log('Tree indices:', treeIndices);
+                console.log('Tree images keys:', Object.keys(treeImages));
+                console.log('Include cut sets:', includeCutSetsData);
+                console.log('Header options:', headerOptions);
+
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 let y = 20;
 
-                // Title
-                doc.setFontSize(20);
-                doc.text("Fault Tree Analysis Report", 105, y, { align: 'center' });
-                y += 15;
+                // Title (optional)
+                if (headerOptions.includeHeader !== false) {
+                    doc.setFontSize(20);
+                    doc.text("Fault Tree Analysis Report", 105, y, { align: 'center' });
+                    y += 15;
+                }
 
-                // Project info
+                // Project info (optional)
                 doc.setFontSize(12);
-                doc.text(`Project: ${currentProject?.projectName || 'Unnamed Project'}`, 20, y);
-                y += 7;
-                doc.text(`Generated: ${new Date().toLocaleString()}`, 20, y);
-                y += 15;
+                if (headerOptions.includeProject !== false) {
+                    doc.text(`Project: ${currentProject?.projectName || 'Unnamed Project'}`, 20, y);
+                    y += 7;
+                }
+                if (headerOptions.includeDate !== false) {
+                    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, y);
+                    y += 7;
+                }
+
+                // Add some space after header if any header elements were included
+                if (headerOptions.includeHeader !== false || headerOptions.includeProject !== false || headerOptions.includeDate !== false) {
+                    y += 8;
+                }
 
                 // Add trees
                 for (const idx of treeIndices) {
                     const tree = availableTrees[idx];
-                    if (!tree) continue;
+                    if (!tree) {
+                        console.log(`Tree at index ${idx} not found`);
+                        continue;
+                    }
 
                     // Check if need new page
                     if (y > 250) {
@@ -2524,21 +2619,29 @@
                     y += 10;
 
                     // Add image if available
+                    console.log(`Checking image for tree ${idx}, exists: ${!!treeImages[idx]}`);
                     if (treeImages[idx]) {
                         try {
+                            console.log(`Adding image to PDF for tree ${idx}`);
                             doc.addImage(treeImages[idx], 'PNG', 20, y, 170, 113);
                             y += 120;
+                            console.log(`Image added successfully for tree ${idx}`);
                         } catch (err) {
                             console.error('Error adding image to PDF:', err);
                         }
+                    } else {
+                        console.log(`No image data for tree ${idx}`);
                     }
 
                     // Add cut sets if requested
                     if (includeCutSetsData && cutSets) {
                         const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
+                        console.log(`Looking for cut sets with key: "${treeKey}"`);
+                        console.log('Available cut set keys:', Object.keys(cutSets));
                         const cutSetData = cutSets[treeKey];
 
                         if (cutSetData && cutSetData.cutSets) {
+                            console.log(`Found ${cutSetData.cutSets.length} cut sets for tree ${idx}`);
                             if (y > 250) {
                                 doc.addPage();
                                 y = 20;
@@ -2568,6 +2671,8 @@
                                 doc.text(`${i + 1}. ${cutSetText}`, 25, y);
                                 y += 5;
                             });
+                        } else {
+                            console.log(`No cut set data found for tree ${idx}, key: "${treeKey}"`);
                         }
                     }
 
@@ -2575,6 +2680,7 @@
                 }
 
                 // Save PDF
+                console.log('Saving PDF');
                 doc.save(`${fileName}.pdf`);
             };
 
@@ -2718,6 +2824,40 @@
                                             />
                                         </div>
                                     )}
+
+                                    {/* Report Header Options */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-2">Report Header Options</label>
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={includeHeader}
+                                                    onChange={(e) => setIncludeHeader(e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700">Include "Fault Tree Analysis Report" header</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={includeProject}
+                                                    onChange={(e) => setIncludeProject(e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700">Include project name</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={includeDate}
+                                                    onChange={(e) => setIncludeDate(e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700">Include date generated</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
