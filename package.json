@@ -1,12 +1,31 @@
 {
   "name": "kureas-fta",
-  "private": true,
   "version": "1.0.0",
+  "description": "KUREAS-FTA: Browser-based Fault Tree Analysis tool for comprehensive systems engineering risk analysis",
   "type": "module",
+  "private": true,
+  "keywords": [
+    "fault-tree-analysis",
+    "FTA",
+    "systems-engineering",
+    "risk-analysis",
+    "reliability",
+    "safety-analysis",
+    "KUREAS",
+    "minimal-cut-sets",
+    "MCUB"
+  ],
+  "author": "Curtis",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/curtlsmith/KUREAS.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.3.1",
