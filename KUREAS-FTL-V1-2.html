@@ -628,7 +628,18 @@
             const nodeWidth = 160 * nodeMultiplier;
             const nodeHeight = 80 * nodeMultiplier;
             const levelHeight = 150 * nodeMultiplier;
-            const siblingGap = 5 * nodeMultiplier;
+            const eventGap = 8 * nodeMultiplier;  // Gap between two events
+            const gateGap = 3 * nodeMultiplier;    // Gap between gates or gate-event pairs
+
+            // Function to determine gap between two siblings
+            function getSiblingGap(leftChild, rightChild) {
+                // If both are events, use larger gap
+                if (leftChild.type === 'EVENT' && rightChild.type === 'EVENT') {
+                    return eventGap;
+                }
+                // Otherwise use smaller gap (gate-gate or gate-event)
+                return gateGap;
+            }
 
             function calculatePositions(node, depth = 0) {
                 node.depth = depth;
@@ -639,7 +650,14 @@
                 }
 
                 node.children.forEach(child => calculatePositions(child, depth + 1));
-                node.width = node.children.reduce((sum, child) => sum + child.width, 0);
+
+                // Calculate total width considering dynamic gaps
+                let totalWidth = node.children[0].width;
+                for (let i = 1; i < node.children.length; i++) {
+                    const gap = getSiblingGap(node.children[i - 1], node.children[i]);
+                    totalWidth += node.children[i].width + gap / (nodeWidth + gateGap);
+                }
+                node.width = totalWidth;
             }
 
             function assignPositions(node, x = 0, y = 0) {
@@ -650,12 +668,25 @@
                     return;
                 }
 
-                let currentX = x - (node.width * (nodeWidth + siblingGap)) / 2 + (nodeWidth + siblingGap) / 2;
+                // Calculate starting position based on total width with dynamic gaps
+                let totalWidth = node.children[0].width * (nodeWidth + gateGap);
+                for (let i = 1; i < node.children.length; i++) {
+                    const gap = getSiblingGap(node.children[i - 1], node.children[i]);
+                    totalWidth += node.children[i].width * (nodeWidth + gateGap) + gap;
+                }
 
-                node.children.forEach(child => {
-                    const childX = currentX + (child.width * (nodeWidth + siblingGap)) / 2 - (nodeWidth + siblingGap) / 2;
+                let currentX = x - totalWidth / 2 + (nodeWidth + gateGap) / 2;
+
+                node.children.forEach((child, i) => {
+                    const childWidth = child.width * (nodeWidth + gateGap);
+                    const childX = currentX + childWidth / 2 - (nodeWidth + gateGap) / 2;
                     assignPositions(child, childX, y + levelHeight);
-                    currentX += child.width * (nodeWidth + siblingGap);
+                    currentX += childWidth;
+
+                    // Add gap before next child
+                    if (i < node.children.length - 1) {
+                        currentX += getSiblingGap(child, node.children[i + 1]);
+                    }
                 });
             }
 
