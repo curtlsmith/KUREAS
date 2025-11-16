@@ -190,7 +190,7 @@
         // Get tree spacing multiplier based on setting
         function getTreeSpacingMultiplier(setting) {
             switch(setting) {
-                case 'small': return 0.7;
+                case 'small': return 0.85;
                 case 'large': return 1.5;
                 default: return 1.0; // medium
             }
@@ -2177,18 +2177,182 @@
             };
 
             const handleGenerate = () => {
-                // TODO: Implement report generation
-                alert(`Report generation not yet implemented.\nFormat: ${fileFormat}\nFile: ${fileName}\nContent: ${contentType}\nCut Set Limit: ${cutSetLimit}\nTrees: ${selectedTrees.has('all') ? 'All' : selectedTrees.size}`);
-                onClose();
+                try {
+                    // Determine which trees to include
+                    const treesToInclude = selectedTrees.has('all')
+                        ? availableTrees.map((_, idx) => idx)
+                        : Array.from(selectedTrees).filter(id => id !== 'all');
+
+                    if (treesToInclude.length === 0) {
+                        alert('Please select at least one fault tree to generate a report.');
+                        return;
+                    }
+
+                    // Generate report content based on format
+                    let content = '';
+                    const includeGraphics = contentType === 'graphics' || contentType === 'both';
+                    const includeCutSetsData = contentType === 'cutsets' || contentType === 'both';
+
+                    if (fileFormat === 'markdown') {
+                        content = generateMarkdownReport(treesToInclude, includeGraphics, includeCutSetsData);
+                    } else if (fileFormat === 'word') {
+                        content = generateWordReport(treesToInclude, includeGraphics, includeCutSetsData);
+                    } else if (fileFormat === 'pdf') {
+                        alert('PDF generation requires additional libraries. Using Markdown format instead.');
+                        content = generateMarkdownReport(treesToInclude, includeGraphics, includeCutSetsData);
+                    }
+
+                    // Download the file
+                    downloadReport(content, fileName, fileFormat);
+                    onClose();
+                } catch (error) {
+                    alert(`Error generating report: ${error.message}`);
+                }
+            };
+
+            const generateMarkdownReport = (treeIndices, includeGraphics, includeCutSetsData) => {
+                let md = `# Fault Tree Analysis Report\n\n`;
+                md += `**Project:** ${currentProject?.project_name || 'Unnamed Project'}\n`;
+                md += `**Generated:** ${new Date().toLocaleString()}\n\n`;
+                md += `---\n\n`;
+
+                treeIndices.forEach(idx => {
+                    const tree = availableTrees[idx];
+                    if (!tree) return;
+
+                    md += `## ${tree.tree_name || `Fault Tree ${idx + 1}`}\n\n`;
+
+                    if (includeGraphics) {
+                        md += `### Fault Tree Diagram\n\n`;
+                        md += `![${tree.tree_name}](data:image/png;base64,PLACEHOLDER_FOR_IMAGE)\n\n`;
+                        md += `*Note: Image capture not yet implemented in this version*\n\n`;
+                    }
+
+                    if (includeCutSetsData && cutSets) {
+                        const treeKey = `${currentProject.project_name}_${tree.tree_name}_${tree.model_phase || ''}`.trim();
+                        const cutSetData = cutSets[treeKey];
+
+                        if (cutSetData && cutSetData.cutSets) {
+                            md += `### Cut Sets\n\n`;
+                            const limit = Math.min(cutSetData.cutSets.length, cutSetLimit);
+                            md += `Showing ${limit} of ${cutSetData.cutSets.length} cut sets\n\n`;
+
+                            cutSetData.cutSets.slice(0, limit).forEach((cutSet, i) => {
+                                md += `${i + 1}. `;
+                                md += cutSet.map(event => {
+                                    const isComplemented = event.startsWith('/');
+                                    const eventName = isComplemented ? event.substring(1) : event;
+                                    return isComplemented ? `NOT(${eventName})` : eventName;
+                                }).join(' AND ');
+                                md += `\n`;
+                            });
+                            md += `\n`;
+                        }
+                    }
+
+                    md += `---\n\n`;
+                });
+
+                return md;
+            };
+
+            const generateWordReport = (treeIndices, includeGraphics, includeCutSetsData) => {
+                // Simple HTML format that can be opened in Word
+                let html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Fault Tree Analysis Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #2c3e50; }
+        h2 { color: #34495e; margin-top: 30px; }
+        h3 { color: #7f8c8d; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .meta { color: #7f8c8d; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Fault Tree Analysis Report</h1>
+    <p class="meta"><strong>Project:</strong> ${currentProject?.project_name || 'Unnamed Project'}</p>
+    <p class="meta"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+    <hr>
+`;
+
+                treeIndices.forEach(idx => {
+                    const tree = availableTrees[idx];
+                    if (!tree) return;
+
+                    html += `<h2>${tree.tree_name || `Fault Tree ${idx + 1}`}</h2>`;
+
+                    if (includeGraphics) {
+                        html += `<h3>Fault Tree Diagram</h3>`;
+                        html += `<p><em>Note: Image capture not yet implemented in this version</em></p>`;
+                    }
+
+                    if (includeCutSetsData && cutSets) {
+                        const treeKey = `${currentProject.project_name}_${tree.tree_name}_${tree.model_phase || ''}`.trim();
+                        const cutSetData = cutSets[treeKey];
+
+                        if (cutSetData && cutSetData.cutSets) {
+                            html += `<h3>Cut Sets</h3>`;
+                            const limit = Math.min(cutSetData.cutSets.length, cutSetLimit);
+                            html += `<p>Showing ${limit} of ${cutSetData.cutSets.length} cut sets</p>`;
+                            html += `<table><thead><tr><th>#</th><th>Cut Set</th></tr></thead><tbody>`;
+
+                            cutSetData.cutSets.slice(0, limit).forEach((cutSet, i) => {
+                                const cutSetText = cutSet.map(event => {
+                                    const isComplemented = event.startsWith('/');
+                                    const eventName = isComplemented ? event.substring(1) : event;
+                                    return isComplemented ? `NOT(${eventName})` : eventName;
+                                }).join(' AND ');
+                                html += `<tr><td>${i + 1}</td><td>${cutSetText}</td></tr>`;
+                            });
+
+                            html += `</tbody></table>`;
+                        }
+                    }
+
+                    html += `<hr>`;
+                });
+
+                html += `</body></html>`;
+                return html;
+            };
+
+            const downloadReport = (content, filename, format) => {
+                let blob, extension, mimeType;
+
+                if (format === 'markdown' || format === 'pdf') {
+                    extension = 'md';
+                    mimeType = 'text/markdown';
+                    blob = new Blob([content], { type: mimeType });
+                } else if (format === 'word') {
+                    extension = 'html';
+                    mimeType = 'application/msword';
+                    blob = new Blob([content], { type: mimeType });
+                }
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${filename}.${extension}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             };
 
             const includeCutSets = contentType === 'cutsets' || contentType === 'both';
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full m-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-4">
-                            <div className="flex items-center justify-between mb-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full m-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="p-4 border-b border-gray-200">
+                            <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-bold text-gray-800">Generate Report</h2>
                                 <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2197,116 +2361,124 @@
                                     </svg>
                                 </button>
                             </div>
+                        </div>
 
-                            <div className="space-y-4">
-                                {/* File Format */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">File Format</label>
-                                    <div className="flex gap-2">
-                                        {[
-                                            { value: 'word', label: 'Word' },
-                                            { value: 'markdown', label: 'Markdown' },
-                                            { value: 'pdf', label: 'PDF' }
-                                        ].map(format => (
-                                            <button
-                                                key={format.value}
-                                                onClick={() => setFileFormat(format.value)}
-                                                className={`flex-1 px-4 py-2 rounded ${
-                                                    fileFormat === format.value
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                }`}
-                                            >
-                                                {format.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* File Name */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">File Name</label>
-                                    <input
-                                        type="text"
-                                        value={fileName}
-                                        onChange={(e) => setFileName(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter file name"
-                                    />
-                                </div>
-
-                                {/* Content Type */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Content Type</label>
-                                    <div className="flex gap-2">
-                                        {[
-                                            { value: 'graphics', label: 'Fault Tree Graphics' },
-                                            { value: 'cutsets', label: 'Fault Tree Cut Sets' },
-                                            { value: 'both', label: 'Graphics + Cut Sets' }
-                                        ].map(type => (
-                                            <button
-                                                key={type.value}
-                                                onClick={() => setContentType(type.value)}
-                                                className={`flex-1 px-4 py-2 rounded ${
-                                                    contentType === type.value
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                }`}
-                                            >
-                                                {type.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Limit Cut Sets */}
-                                {includeCutSets && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Limit Cut Sets to</label>
+                        {/* Two-column layout */}
+                        <div className="flex-1 flex overflow-hidden">
+                            {/* Left column - Fault Trees */}
+                            <div className="w-1/3 border-r border-gray-200 p-4 overflow-y-auto">
+                                <h3 className="text-sm font-semibold text-gray-700 mb-3">Fault Trees</h3>
+                                <div className="space-y-1">
+                                    {/* All Trees Option */}
+                                    <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
                                         <input
-                                            type="number"
-                                            value={cutSetLimit}
-                                            onChange={(e) => setCutSetLimit(parseInt(e.target.value) || 100)}
-                                            min="1"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            type="checkbox"
+                                            checked={selectedTrees.has('all')}
+                                            onChange={() => handleTreeToggle('all')}
+                                            className="w-4 h-4"
                                         />
-                                    </div>
-                                )}
+                                        <span className="text-sm font-medium">All Trees</span>
+                                    </label>
 
-                                {/* Select Fault Trees */}
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-2">Select Fault Trees to Output</label>
-                                    <div className="border border-gray-300 rounded max-h-48 overflow-y-auto p-2">
-                                        {/* All Fault Trees Option */}
-                                        <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                    {/* Individual Trees */}
+                                    {availableTrees.map((tree, idx) => (
+                                        <label key={idx} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
                                             <input
                                                 type="checkbox"
-                                                checked={selectedTrees.has('all')}
-                                                onChange={() => handleTreeToggle('all')}
+                                                checked={selectedTrees.has(idx) || selectedTrees.has('all')}
+                                                onChange={() => handleTreeToggle(idx)}
+                                                disabled={selectedTrees.has('all')}
                                                 className="w-4 h-4"
                                             />
-                                            <span className="font-medium">All Fault Trees</span>
+                                            <span className="text-sm">{tree.tree_name || `Tree ${idx + 1}`}</span>
                                         </label>
-
-                                        {/* Individual Trees */}
-                                        {availableTrees.map((tree, idx) => (
-                                            <label key={idx} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedTrees.has(idx) || selectedTrees.has('all')}
-                                                    onChange={() => handleTreeToggle(idx)}
-                                                    disabled={selectedTrees.has('all')}
-                                                    className="w-4 h-4"
-                                                />
-                                                <span>{tree.tree_name || `Tree ${idx + 1}`}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
 
-                            {/* Action Buttons */}
-                            <div className="flex justify-end gap-2 mt-4">
+                            {/* Right column - Options */}
+                            <div className="w-2/3 p-4 overflow-y-auto">
+                                <div className="space-y-4">
+                                    {/* File Format */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">File Format</label>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { value: 'word', label: 'Word' },
+                                                { value: 'markdown', label: 'Markdown' },
+                                                { value: 'pdf', label: 'PDF' }
+                                            ].map(format => (
+                                                <button
+                                                    key={format.value}
+                                                    onClick={() => setFileFormat(format.value)}
+                                                    className={`flex-1 px-4 py-2 rounded text-sm ${
+                                                        fileFormat === format.value
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {format.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* File Name */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">File Name</label>
+                                        <input
+                                            type="text"
+                                            value={fileName}
+                                            onChange={(e) => setFileName(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Enter file name"
+                                        />
+                                    </div>
+
+                                    {/* Content Type */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Content Type</label>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { value: 'graphics', label: 'Fault Tree Graphics' },
+                                                { value: 'cutsets', label: 'Fault Tree Cut Sets' },
+                                                { value: 'both', label: 'Graphics + Cut Sets' }
+                                            ].map(type => (
+                                                <button
+                                                    key={type.value}
+                                                    onClick={() => setContentType(type.value)}
+                                                    className={`flex-1 px-3 py-2 rounded text-xs ${
+                                                        contentType === type.value
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {type.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Limit Cut Sets */}
+                                    {includeCutSets && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Limit Cut Sets to</label>
+                                            <input
+                                                type="number"
+                                                value={cutSetLimit}
+                                                onChange={(e) => setCutSetLimit(parseInt(e.target.value) || 100)}
+                                                min="1"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer - Action Buttons */}
+                        <div className="p-4 border-t border-gray-200">
+                            <div className="flex justify-end gap-2">
                                 <button
                                     onClick={onClose}
                                     className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
