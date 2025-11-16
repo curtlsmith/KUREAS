@@ -2167,7 +2167,8 @@
                     cutSetLimit: 100,
                     includeHeader: true,
                     includeProject: true,
-                    includeDate: true
+                    includeDate: true,
+                    selectedTreeIndices: []
                 };
             };
 
@@ -2177,7 +2178,13 @@
             const [fileName, setFileName] = useState('fault_tree_report');
             const [contentType, setContentType] = useState(prefs.contentType);
             const [cutSetLimit, setCutSetLimit] = useState(prefs.cutSetLimit);
-            const [selectedTrees, setSelectedTrees] = useState(new Set(['all']));
+            const [selectedTrees, setSelectedTrees] = useState(() => {
+                // Restore previous selection if available
+                if (prefs.selectedTreeIndices && prefs.selectedTreeIndices.length > 0) {
+                    return new Set(prefs.selectedTreeIndices);
+                }
+                return new Set(['all']);
+            });
             const [includeHeader, setIncludeHeader] = useState(prefs.includeHeader);
             const [includeProject, setIncludeProject] = useState(prefs.includeProject);
             const [includeDate, setIncludeDate] = useState(prefs.includeDate);
@@ -2190,10 +2197,11 @@
                     cutSetLimit,
                     includeHeader,
                     includeProject,
-                    includeDate
+                    includeDate,
+                    selectedTreeIndices: Array.from(selectedTrees)
                 };
                 localStorage.setItem('reportPreferences', JSON.stringify(preferences));
-            }, [fileFormat, contentType, cutSetLimit, includeHeader, includeProject, includeDate]);
+            }, [fileFormat, contentType, cutSetLimit, includeHeader, includeProject, includeDate, selectedTrees]);
 
             const availableTrees = currentProject?.faultTrees || [];
 
@@ -2345,7 +2353,8 @@
 
                     onClose();
                 } catch (error) {
-                    alert(`Error generating report: ${error.message}`);
+                    console.error('Error in handleGenerate:', error);
+                    alert(`Error generating report: ${error.message}\n\nCheck browser console for details.`);
                 }
             };
 
@@ -2410,9 +2419,16 @@
             };
 
             const generateWordReport = async (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
-                const { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, WidthType } = docx;
+                console.log('Word generation started');
+                console.log('Tree indices:', treeIndices);
+                console.log('Tree images keys:', Object.keys(treeImages));
+                console.log('Include cut sets:', includeCutSetsData);
+                console.log('Header options:', headerOptions);
 
-                const children = [];
+                try {
+                    const { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, WidthType } = docx;
+
+                    const children = [];
 
                 // Title (optional)
                 if (headerOptions.includeHeader !== false) {
@@ -2464,8 +2480,10 @@
                     );
 
                     // Add image if available
+                    console.log(`Checking image for tree ${idx}, exists: ${!!treeImages[idx]}`);
                     if (treeImages[idx]) {
                         try {
+                            console.log(`Adding image to Word for tree ${idx}`);
                             const base64Data = treeImages[idx].split(',')[1];
                             children.push(
                                 new Paragraph({
@@ -2480,9 +2498,12 @@
                                     ]
                                 })
                             );
+                            console.log(`Image added successfully to Word for tree ${idx}`);
                         } catch (err) {
-                            console.error('Error adding image:', err);
+                            console.error('Error adding image to Word:', err);
                         }
+                    } else {
+                        console.log(`No image data for tree ${idx}`);
                     }
 
                     children.push(new Paragraph({ text: "" }));
@@ -2490,9 +2511,12 @@
                     // Add cut sets if requested
                     if (includeCutSetsData && cutSets) {
                         const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
+                        console.log(`Looking for cut sets with key: "${treeKey}"`);
+                        console.log('Available cut set keys:', Object.keys(cutSets));
                         const cutSetData = cutSets[treeKey];
 
                         if (cutSetData && cutSetData.cutSets) {
+                            console.log(`Found ${cutSetData.cutSets.length} cut sets for tree ${idx}`);
                             children.push(
                                 new Paragraph({
                                     text: "Cut Sets",
@@ -2546,23 +2570,32 @@
                     children.push(new Paragraph({ text: "" }));
                 }
 
-                // Create document
-                const doc = new Document({
-                    sections: [{
-                        children: children
-                    }]
-                });
+                    console.log(`Creating Word document with ${children.length} elements`);
 
-                // Generate and download
-                const blob = await Packer.toBlob(doc);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${fileName}.docx`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                    // Create document
+                    const doc = new Document({
+                        sections: [{
+                            children: children
+                        }]
+                    });
+
+                    // Generate and download
+                    console.log('Generating Word blob...');
+                    const blob = await Packer.toBlob(doc);
+                    console.log('Word blob created, size:', blob.size);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${fileName}.docx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    console.log('Word document download triggered');
+                } catch (error) {
+                    console.error('Error generating Word report:', error);
+                    alert(`Error generating Word report: ${error.message}`);
+                }
             };
 
             const generatePDFReport = async (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
