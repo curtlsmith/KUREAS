@@ -114,7 +114,8 @@
             background: 'light',       // dark, light, grid, engineering
             lineStyle: 'curved',       // straight, curved
             showProbability: '0',      // hide, 0, 1, 2 (digits after decimal) - changed from 'hide' to '0'
-            defaultViewStyle: 'fit'    // fit, 100
+            defaultViewStyle: 'fit',   // fit, 100
+            boxType: 'circle'          // box-only, circle, gate-symbol
         };
 
         class SettingsManager {
@@ -978,32 +979,68 @@
                         ctx.closePath();
                         ctx.fill();
                         ctx.stroke();
-								// *** Draw circle with operator symbol below OR/AND gates ***
+								// *** Draw symbol below OR/AND gates based on boxType setting ***
                         if (node.type === 'OR' || node.type === 'AND') {
-                            const circleRadius = 11 * nodeMultiplier;
-                            const circleY = y + nodeHeight + circleRadius; // Position below gate box
-                            
-                            // Draw circle
-                            ctx.beginPath();
-                            ctx.arc(node.x, circleY, circleRadius, 0, 2 * Math.PI);
-                            ctx.fillStyle = 'white';
-                            ctx.fill();
-                            ctx.strokeStyle = colors.stroke;
-                            ctx.lineWidth = 2;
-                            ctx.stroke();
-                            
-                            // Draw operator symbol
-                            ctx.fillStyle = 'black';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            const symbolSize = 17 * fontMultiplier;
-                            ctx.font = `bold ${symbolSize}px ${fontFamily}`;
-                            
-                            if (node.type === 'OR') {
-                                ctx.fillText('+', node.x, circleY);
-                            } else if (node.type === 'AND') {
-                                ctx.fillText('×', node.x, circleY);
+                            const boxType = settings?.boxType || 'circle';
+
+                            if (boxType === 'circle') {
+                                // Option 2: Circle with +/- (current default behavior)
+                                const circleRadius = 11 * nodeMultiplier;
+                                const circleY = y + nodeHeight + circleRadius;
+
+                                // Draw circle
+                                ctx.beginPath();
+                                ctx.arc(node.x, circleY, circleRadius, 0, 2 * Math.PI);
+                                ctx.fillStyle = 'white';
+                                ctx.fill();
+                                ctx.strokeStyle = colors.stroke;
+                                ctx.lineWidth = 2;
+                                ctx.stroke();
+
+                                // Draw operator symbol
+                                ctx.fillStyle = 'black';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                const symbolSize = 17 * fontMultiplier;
+                                ctx.font = `bold ${symbolSize}px ${fontFamily}`;
+
+                                if (node.type === 'OR') {
+                                    ctx.fillText('+', node.x, circleY);
+                                } else if (node.type === 'AND') {
+                                    ctx.fillText('×', node.x, circleY);
+                                }
+                            } else if (boxType === 'gate-symbol') {
+                                // Option 3: Fault tree gate symbols
+                                const gateWidth = 30 * nodeMultiplier;
+                                const gateHeight = 20 * nodeMultiplier;
+                                const gateY = y + nodeHeight + 2;
+
+                                ctx.fillStyle = colors.fill;
+                                ctx.strokeStyle = colors.stroke;
+                                ctx.lineWidth = 2;
+
+                                if (node.type === 'OR') {
+                                    // Draw OR gate symbol (pointed arch)
+                                    ctx.beginPath();
+                                    ctx.moveTo(node.x - gateWidth / 2, gateY);
+                                    ctx.quadraticCurveTo(node.x - gateWidth / 4, gateY + gateHeight / 2, node.x, gateY + gateHeight);
+                                    ctx.quadraticCurveTo(node.x + gateWidth / 4, gateY + gateHeight / 2, node.x + gateWidth / 2, gateY);
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY);
+                                    ctx.fill();
+                                    ctx.stroke();
+                                } else if (node.type === 'AND') {
+                                    // Draw AND gate symbol (flat top with curved bottom)
+                                    ctx.beginPath();
+                                    ctx.moveTo(node.x - gateWidth / 2, gateY);
+                                    ctx.lineTo(node.x + gateWidth / 2, gateY);
+                                    ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight / 2);
+                                    ctx.arc(node.x, gateY + gateHeight / 2, gateWidth / 2, 0, Math.PI);
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY);
+                                    ctx.fill();
+                                    ctx.stroke();
+                                }
                             }
+                            // Option 1: box-only - don't draw anything (no else clause needed)
                         }
                     }
 
@@ -2289,6 +2326,30 @@
                                                 }`}
                                             >
                                                 {style.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Box Type */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Box Type</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'box-only', label: 'Just the Box' },
+                                            { value: 'circle', label: 'Circle Below Box' },
+                                            { value: 'gate-symbol', label: 'Fault Tree Symbol' }
+                                        ].map(type => (
+                                            <button
+                                                key={type.value}
+                                                onClick={() => handleChange('boxType', type.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.boxType === type.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {type.label}
                                             </button>
                                         ))}
                                     </div>
