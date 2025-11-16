@@ -103,6 +103,16 @@
             </svg>
         );
 
+        const ReportIcon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+        );
+
         // Settings Management
         const DEFAULT_SETTINGS = {
             fontSize: 'small',         // small, medium, large
@@ -115,7 +125,8 @@
             lineStyle: 'curved',       // straight, curved
             showProbability: '0',      // hide, 0, 1, 2 (digits after decimal) - changed from 'hide' to '0'
             defaultViewStyle: 'fit',   // fit, 100
-            boxType: 'circle'          // box-only, circle, gate-symbol
+            boxType: 'circle',         // box-only, circle, gate-symbol
+            treeSpacing: 'medium'      // small, medium, large
         };
 
         class SettingsManager {
@@ -173,6 +184,15 @@
                 return 'Courier New, monospace';
             } else {
                 return 'Arial, sans-serif';
+            }
+        }
+
+        // Get tree spacing multiplier based on setting
+        function getTreeSpacingMultiplier(setting) {
+            switch(setting) {
+                case 'small': return 0.7;
+                case 'large': return 1.5;
+                default: return 1.0; // medium
             }
         }
 
@@ -624,12 +644,12 @@
         }
 
         // Compact Layout Algorithm - considers subtree widths to prevent overlaps
-        function calculateLayout(node, nodeMultiplier = 1) {
+        function calculateLayout(node, nodeMultiplier = 1, spacingMultiplier = 1) {
             const nodeWidth = 160 * nodeMultiplier;
             const nodeHeight = 80 * nodeMultiplier;
-            const levelHeight = 150 * nodeMultiplier;
-            const eventGap = 8 * nodeMultiplier;  // Gap between two events
-            const gateGap = 3 * nodeMultiplier;    // Gap between gates or gate-event pairs
+            const levelHeight = 150 * nodeMultiplier * spacingMultiplier;
+            const eventGap = 8 * nodeMultiplier * spacingMultiplier;  // Gap between two events
+            const gateGap = 3 * nodeMultiplier * spacingMultiplier;    // Gap between gates or gate-event pairs
 
             // Function to determine gap between two siblings
             function getSiblingGap(leftChild, rightChild) {
@@ -753,6 +773,7 @@
             // Get multipliers and styles from settings
             const fontMultiplier = getFontSizeMultiplier(settings.fontSize);
             const nodeMultiplier = getNodeSizeMultiplier(settings.nodeSize);
+            const spacingMultiplier = getTreeSpacingMultiplier(settings.treeSpacing);
             const fontFamily = getFontFamily(settings.fontFamily);
             const backgroundStyle = getBackgroundStyle(settings.background);
             
@@ -778,8 +799,8 @@
                 const processedTree = processTreeForExpansion(tree.rootNode);
                 processedTreeRef.current = processedTree;
 
-                // Calculate layout with node size multiplier
-                calculateLayout(processedTree, nodeMultiplier);
+                // Calculate layout with node size and spacing multipliers
+                calculateLayout(processedTree, nodeMultiplier, spacingMultiplier);
 
                 // Auto-fit tree on first load based on settings
                 if (!isInitialized) {
@@ -2125,6 +2146,186 @@
             );
         }
 
+        // Report Modal Component
+        function ReportModal({ savedProjects, currentProject, cutSets, onClose }) {
+            const [fileFormat, setFileFormat] = useState('markdown');
+            const [fileName, setFileName] = useState('fault_tree_report');
+            const [contentType, setContentType] = useState('graphics');
+            const [cutSetLimit, setCutSetLimit] = useState(100);
+            const [selectedTrees, setSelectedTrees] = useState(new Set(['all']));
+
+            const availableTrees = currentProject?.fault_trees || [];
+
+            const handleTreeToggle = (treeId) => {
+                const newSelected = new Set(selectedTrees);
+                if (treeId === 'all') {
+                    if (selectedTrees.has('all')) {
+                        newSelected.clear();
+                    } else {
+                        newSelected.clear();
+                        newSelected.add('all');
+                    }
+                } else {
+                    newSelected.delete('all');
+                    if (selectedTrees.has(treeId)) {
+                        newSelected.delete(treeId);
+                    } else {
+                        newSelected.add(treeId);
+                    }
+                }
+                setSelectedTrees(newSelected);
+            };
+
+            const handleGenerate = () => {
+                // TODO: Implement report generation
+                alert(`Report generation not yet implemented.\nFormat: ${fileFormat}\nFile: ${fileName}\nContent: ${contentType}\nCut Set Limit: ${cutSetLimit}\nTrees: ${selectedTrees.has('all') ? 'All' : selectedTrees.size}`);
+                onClose();
+            };
+
+            const includeCutSets = contentType === 'cutsets' || contentType === 'both';
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full m-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-gray-800">Generate Report</h2>
+                                <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                {/* File Format */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">File Format</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'word', label: 'Word' },
+                                            { value: 'markdown', label: 'Markdown' },
+                                            { value: 'pdf', label: 'PDF' }
+                                        ].map(format => (
+                                            <button
+                                                key={format.value}
+                                                onClick={() => setFileFormat(format.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    fileFormat === format.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {format.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* File Name */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">File Name</label>
+                                    <input
+                                        type="text"
+                                        value={fileName}
+                                        onChange={(e) => setFileName(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter file name"
+                                    />
+                                </div>
+
+                                {/* Content Type */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Content Type</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'graphics', label: 'Fault Tree Graphics' },
+                                            { value: 'cutsets', label: 'Fault Tree Cut Sets' },
+                                            { value: 'both', label: 'Graphics + Cut Sets' }
+                                        ].map(type => (
+                                            <button
+                                                key={type.value}
+                                                onClick={() => setContentType(type.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    contentType === type.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {type.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Limit Cut Sets */}
+                                {includeCutSets && (
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Limit Cut Sets to</label>
+                                        <input
+                                            type="number"
+                                            value={cutSetLimit}
+                                            onChange={(e) => setCutSetLimit(parseInt(e.target.value) || 100)}
+                                            min="1"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Select Fault Trees */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-2">Select Fault Trees to Output</label>
+                                    <div className="border border-gray-300 rounded max-h-48 overflow-y-auto p-2">
+                                        {/* All Fault Trees Option */}
+                                        <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTrees.has('all')}
+                                                onChange={() => handleTreeToggle('all')}
+                                                className="w-4 h-4"
+                                            />
+                                            <span className="font-medium">All Fault Trees</span>
+                                        </label>
+
+                                        {/* Individual Trees */}
+                                        {availableTrees.map((tree, idx) => (
+                                            <label key={idx} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedTrees.has(idx) || selectedTrees.has('all')}
+                                                    onChange={() => handleTreeToggle(idx)}
+                                                    disabled={selectedTrees.has('all')}
+                                                    className="w-4 h-4"
+                                                />
+                                                <span>{tree.tree_name || `Tree ${idx + 1}`}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button
+                                    onClick={onClose}
+                                    className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleGenerate}
+                                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function SettingsModal({ settings, onSave, onClose }) {
             const [localSettings, setLocalSettings] = useState({ ...settings });
 
@@ -2418,6 +2619,30 @@
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Tree Spacing */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Tree Spacing</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'small', label: 'Small' },
+                                            { value: 'medium', label: 'Medium' },
+                                            { value: 'large', label: 'Large' }
+                                        ].map(spacing => (
+                                            <button
+                                                key={spacing.value}
+                                                onClick={() => handleChange('treeSpacing', spacing.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.treeSpacing === spacing.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {spacing.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Action Buttons */}
@@ -2467,6 +2692,7 @@
             const [autoLoadFTC, setAutoLoadFTC] = useState(true);
             const [settings, setSettings] = useState(() => SettingsManager.load());
             const [showSettings, setShowSettings] = useState(false);
+            const [showReport, setShowReport] = useState(false);
             const [workingDirectory, setWorkingDirectory] = useState('');
             
             // Cut sets floating window state
@@ -2896,14 +3122,24 @@
                                     <span>Open New FTL</span>
                                 </button>
                                 {view === 'visualize' && (
-                                    <button
-                                        onClick={() => setShowSettings(true)}
-                                        className="px-3 py-1 rounded flex items-center gap-2 bg-blue-500 hover:bg-blue-700 text-white text-sm"
-                                        title="Settings"
-                                    >
-                                        <SettingsIcon />
-                                        <span>Settings</span>
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => setShowReport(true)}
+                                            className="px-3 py-1 rounded flex items-center gap-2 bg-blue-500 hover:bg-blue-700 text-white text-sm"
+                                            title="Generate Report"
+                                        >
+                                            <ReportIcon />
+                                            <span>Report</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setShowSettings(true)}
+                                            className="px-3 py-1 rounded flex items-center gap-2 bg-blue-500 hover:bg-blue-700 text-white text-sm"
+                                            title="Settings"
+                                        >
+                                            <SettingsIcon />
+                                            <span>Settings</span>
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -3058,6 +3294,16 @@
                             </div>
                         )}
                     </main>
+
+                    {/* Report Modal */}
+                    {showReport && (
+                        <ReportModal
+                            savedProjects={savedProjects}
+                            currentProject={currentProject}
+                            cutSets={cutSets}
+                            onClose={() => setShowReport(false)}
+                        />
+                    )}
 
                     {/* Settings Modal */}
                     {showSettings && (
