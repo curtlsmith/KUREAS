@@ -1036,17 +1036,17 @@
                                     ctx.fill();
                                     ctx.stroke();
                                 } else if (node.type === 'AND') {
-                                    // Draw AND gate symbol (rounded top, square bottom)
+                                    // Draw AND gate symbol (box with rounded half-circle on top)
                                     ctx.beginPath();
-                                    // Start at bottom left
+                                    // Start at bottom left of the box
                                     ctx.moveTo(node.x - gateWidth / 2, gateY + gateHeight);
-                                    // Bottom flat edge
+                                    // Left side going up to where semicircle starts
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY + gateHeight / 2);
+                                    // Top semicircle (arc from left to right, counterclockwise)
+                                    ctx.arc(node.x, gateY + gateHeight / 2, gateWidth / 2, Math.PI, 0, false);
+                                    // Right side going down
                                     ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight);
-                                    // Right side going up
-                                    ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight / 2);
-                                    // Rounded top (arc from right to left)
-                                    ctx.arc(node.x, gateY + gateHeight / 2, gateWidth / 2, 0, Math.PI, false);
-                                    // Left side going down (completes the path)
+                                    // Bottom edge
                                     ctx.lineTo(node.x - gateWidth / 2, gateY + gateHeight);
                                     ctx.fill();
                                     ctx.stroke();
@@ -1154,17 +1154,26 @@
                 // Calculate start and end points based on node types
                 const isParentTrans = parent.type === 'TRAN' || parent.transferTo;
                 const isChildTrans = child.type === 'TRAN' || child.transferTo;
-                
+
                 // Check if parent is expanded (pointing up) or collapsed (pointing down)
                 const isParentExpanded = parent.isExpanded || (expandedTransNodes && parent.transferTo && expandedTransNodes.has(`${parent.name}_${parent.transferTo}`));
                 const isChildExpanded = child.isExpanded || (expandedTransNodes && child.transferTo && expandedTransNodes.has(`${child.name}_${child.transferTo}`));
-                
+
                 // Apply node size multiplier to offsets
                 const rectOffset = 40 * nodeMultiplier;
                 const tranOffset = 30 * nodeMultiplier;
-                
+                const nodeHeight = 80 * nodeMultiplier;
+
                 let startY = parent.y + (isParentTrans ? tranOffset : rectOffset);
                 let endY = child.y - (isChildTrans ? tranOffset : rectOffset);
+
+                // Adjust startY if parent is OR/AND gate with gate-symbol boxType
+                const boxType = settings?.boxType || 'circle';
+                if (boxType === 'gate-symbol' && (parent.type === 'OR' || parent.type === 'AND')) {
+                    const gateHeight = 20 * nodeMultiplier;
+                    // Connect to bottom of gate symbol: nodeHeight/2 (to bottom of box) + 2 (gap) + gateHeight
+                    startY = parent.y + nodeHeight / 2 + 2 + gateHeight;
+                }
 
                 // Set line style
                 ctx.strokeStyle = '#6b7280'; // Darker gray
