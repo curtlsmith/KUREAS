@@ -623,7 +623,7 @@
             return cutSetsByTree;
         }
 
-        // Compact Layout Algorithm - positions siblings based on node width, not subtree width
+        // Compact Layout Algorithm - considers subtree widths to prevent overlaps
         function calculateLayout(node, nodeMultiplier = 1) {
             const nodeWidth = 160 * nodeMultiplier;
             const nodeHeight = 80 * nodeMultiplier;
@@ -641,7 +641,32 @@
                 return gateGap;
             }
 
-            // Assign positions to nodes - siblings positioned compactly
+            // Calculate subtree widths (bottom-up)
+            function calculateWidths(node) {
+                if (!node.children || node.children.length === 0) {
+                    // Leaf node
+                    node.subtreeWidth = nodeWidth;
+                    return;
+                }
+
+                // Recursively calculate children widths first
+                node.children.forEach(child => calculateWidths(child));
+
+                // Calculate this node's subtree width
+                // It's the sum of all children's subtree widths plus gaps
+                let totalWidth = 0;
+                node.children.forEach((child, i) => {
+                    totalWidth += child.subtreeWidth;
+                    if (i < node.children.length - 1) {
+                        totalWidth += getSiblingGap(child, node.children[i + 1]);
+                    }
+                });
+
+                // The subtree width is at least the sum of children, or the node's own width
+                node.subtreeWidth = Math.max(totalWidth, nodeWidth);
+            }
+
+            // Assign positions to nodes based on subtree widths
             function assignPositions(node, x = 0, y = 0) {
                 node.x = x;
                 node.y = y;
@@ -650,26 +675,34 @@
                     return;
                 }
 
-                // Calculate total width needed for all children based on node widths and gaps
-                let totalWidth = nodeWidth * node.children.length;
-                for (let i = 0; i < node.children.length - 1; i++) {
-                    totalWidth += getSiblingGap(node.children[i], node.children[i + 1]);
-                }
+                // Calculate total width of all children's subtrees with gaps
+                let totalChildrenWidth = 0;
+                node.children.forEach((child, i) => {
+                    totalChildrenWidth += child.subtreeWidth;
+                    if (i < node.children.length - 1) {
+                        totalChildrenWidth += getSiblingGap(child, node.children[i + 1]);
+                    }
+                });
 
-                // Start position for first child
-                let currentX = x - totalWidth / 2 + nodeWidth / 2;
+                // Start position for first child (left edge of children area)
+                let currentX = x - totalChildrenWidth / 2;
 
                 // Position each child
                 node.children.forEach((child, i) => {
-                    assignPositions(child, currentX, y + levelHeight);
+                    // Center the child within its subtree width
+                    const childX = currentX + child.subtreeWidth / 2;
+                    assignPositions(child, childX, y + levelHeight);
 
                     // Move to next position
+                    currentX += child.subtreeWidth;
                     if (i < node.children.length - 1) {
-                        currentX += nodeWidth + getSiblingGap(child, node.children[i + 1]);
+                        currentX += getSiblingGap(child, node.children[i + 1]);
                     }
                 });
             }
 
+            // Calculate widths first, then assign positions
+            calculateWidths(node);
             assignPositions(node, 0, 0);
         }
 
