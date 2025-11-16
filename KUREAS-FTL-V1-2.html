@@ -8,6 +8,9 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Libraries for report generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -2176,7 +2179,81 @@
                 setSelectedTrees(newSelected);
             };
 
-            const handleGenerate = () => {
+            // Capture fault tree image from canvas
+            const captureFaultTreeImage = async (treeIndex) => {
+                return new Promise((resolve) => {
+                    try {
+                        const tree = availableTrees[treeIndex];
+                        if (!tree || !tree.rootNode) {
+                            resolve(null);
+                            return;
+                        }
+
+                        // Create offscreen canvas
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1200;
+                        canvas.height = 800;
+                        const ctx = canvas.getContext('2d');
+
+                        // Set white background
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // Get settings for rendering
+                        const fontMultiplier = getFontSizeMultiplier('small');
+                        const nodeMultiplier = getNodeSizeMultiplier('medium');
+                        const spacingMultiplier = getTreeSpacingMultiplier('medium');
+                        const fontFamily = getFontFamily('sans-serif');
+                        const renderSettings = {
+                            fontSize: 'small',
+                            nodeSize: 'medium',
+                            colorMode: 'color',
+                            fontFamily: 'sans-serif',
+                            arrows: 'arrows',
+                            background: 'light',
+                            lineStyle: 'curved',
+                            showProbability: '0',
+                            boxType: 'circle',
+                            treeSpacing: 'medium'
+                        };
+
+                        // Process tree
+                        const processedTree = processTreeForExpansion(tree.rootNode);
+                        calculateLayout(processedTree, nodeMultiplier, spacingMultiplier);
+
+                        // Get tree bounds for centering
+                        const bounds = getTreeBounds(processedTree, nodeMultiplier);
+                        const padding = 50;
+                        const scaleX = (canvas.width - padding * 2) / bounds.width;
+                        const scaleY = (canvas.height - padding * 2) / bounds.height;
+                        const scale = Math.min(scaleX, scaleY, 1);
+
+                        // Center and scale
+                        ctx.save();
+                        ctx.translate(canvas.width / 2, padding);
+                        ctx.scale(scale, scale);
+
+                        // Draw tree
+                        const descriptions = {
+                            events: currentProject?.eventDescriptions || {},
+                            gates: currentProject?.gateDescriptions || {},
+                            eventInfo: currentProject?.eventInfo || {}
+                        };
+                        drawTree(ctx, processedTree, descriptions, currentProject, new Set(), renderSettings, fontMultiplier, nodeMultiplier, fontFamily);
+
+                        ctx.restore();
+
+                        // Convert to base64
+                        const imageData = canvas.toDataURL('image/png');
+                        resolve(imageData);
+                    } catch (error) {
+                        console.error('Error capturing tree image:', error);
+                        resolve(null);
+                    }
+                });
+            };
+
+            const handleGenerate = async () => {
                 try {
                     // Determine which trees to include
                     const treesToInclude = selectedTrees.has('all')
@@ -2188,29 +2265,37 @@
                         return;
                     }
 
-                    // Generate report content based on format
-                    let content = '';
                     const includeGraphics = contentType === 'graphics' || contentType === 'both';
                     const includeCutSetsData = contentType === 'cutsets' || contentType === 'both';
 
-                    if (fileFormat === 'markdown') {
-                        content = generateMarkdownReport(treesToInclude, includeGraphics, includeCutSetsData);
-                    } else if (fileFormat === 'word') {
-                        content = generateWordReport(treesToInclude, includeGraphics, includeCutSetsData);
-                    } else if (fileFormat === 'pdf') {
-                        alert('PDF generation requires additional libraries. Using Markdown format instead.');
-                        content = generateMarkdownReport(treesToInclude, includeGraphics, includeCutSetsData);
+                    // Capture tree images if graphics are needed
+                    const treeImages = {};
+                    if (includeGraphics) {
+                        for (const idx of treesToInclude) {
+                            const imageData = await captureFaultTreeImage(idx);
+                            if (imageData) {
+                                treeImages[idx] = imageData;
+                            }
+                        }
                     }
 
-                    // Download the file
-                    downloadReport(content, fileName, fileFormat);
+                    // Generate report content based on format
+                    if (fileFormat === 'markdown') {
+                        const content = generateMarkdownReport(treesToInclude, treeImages, includeCutSetsData);
+                        downloadReport(content, fileName, 'markdown');
+                    } else if (fileFormat === 'word') {
+                        await generateWordReport(treesToInclude, treeImages, includeCutSetsData);
+                    } else if (fileFormat === 'pdf') {
+                        await generatePDFReport(treesToInclude, treeImages, includeCutSetsData);
+                    }
+
                     onClose();
                 } catch (error) {
                     alert(`Error generating report: ${error.message}`);
                 }
             };
 
-            const generateMarkdownReport = (treeIndices, includeGraphics, includeCutSetsData) => {
+            const generateMarkdownReport = (treeIndices, treeImages, includeCutSetsData) => {
                 let md = `# Fault Tree Analysis Report\n\n`;
                 md += `**Project:** ${currentProject?.projectName || 'Unnamed Project'}\n`;
                 md += `**Generated:** ${new Date().toLocaleString()}\n\n`;
@@ -2222,10 +2307,9 @@
 
                     md += `## ${tree.treeName || `Fault Tree ${idx + 1}`}\n\n`;
 
-                    if (includeGraphics) {
+                    if (treeImages[idx]) {
                         md += `### Fault Tree Diagram\n\n`;
-                        md += `![${tree.treeName}](data:image/png;base64,PLACEHOLDER_FOR_IMAGE)\n\n`;
-                        md += `*Note: Image capture not yet implemented in this version*\n\n`;
+                        md += `![${tree.treeName}](${treeImages[idx]})\n\n`;
                     }
 
                     if (includeCutSetsData && cutSets) {
@@ -2256,51 +2340,107 @@
                 return md;
             };
 
-            const generateWordReport = (treeIndices, includeGraphics, includeCutSetsData) => {
-                // Simple HTML format that can be opened in Word
-                let html = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Fault Tree Analysis Report</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        h1 { color: #2c3e50; }
-        h2 { color: #34495e; margin-top: 30px; }
-        h3 { color: #7f8c8d; }
-        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .meta { color: #7f8c8d; font-style: italic; }
-    </style>
-</head>
-<body>
-    <h1>Fault Tree Analysis Report</h1>
-    <p class="meta"><strong>Project:</strong> ${currentProject?.projectName || 'Unnamed Project'}</p>
-    <p class="meta"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-    <hr>
-`;
+            const generateWordReport = async (treeIndices, treeImages, includeCutSetsData) => {
+                const { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, WidthType } = docx;
 
-                treeIndices.forEach(idx => {
+                const children = [];
+
+                // Title
+                children.push(
+                    new Paragraph({
+                        text: "Fault Tree Analysis Report",
+                        heading: HeadingLevel.TITLE,
+                        alignment: AlignmentType.CENTER
+                    })
+                );
+
+                // Project info
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "Project: ", bold: true }),
+                            new TextRun({ text: currentProject?.projectName || 'Unnamed Project' })
+                        ]
+                    })
+                );
+
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: "Generated: ", bold: true }),
+                            new TextRun({ text: new Date().toLocaleString() })
+                        ]
+                    })
+                );
+
+                children.push(new Paragraph({ text: "" }));
+
+                // Add trees
+                for (const idx of treeIndices) {
                     const tree = availableTrees[idx];
-                    if (!tree) return;
+                    if (!tree) continue;
 
-                    html += `<h2>${tree.treeName || `Fault Tree ${idx + 1}`}</h2>`;
+                    // Tree name
+                    children.push(
+                        new Paragraph({
+                            text: tree.treeName || `Fault Tree ${idx + 1}`,
+                            heading: HeadingLevel.HEADING_1
+                        })
+                    );
 
-                    if (includeGraphics) {
-                        html += `<h3>Fault Tree Diagram</h3>`;
-                        html += `<p><em>Note: Image capture not yet implemented in this version</em></p>`;
+                    // Add image if available
+                    if (treeImages[idx]) {
+                        try {
+                            const base64Data = treeImages[idx].split(',')[1];
+                            children.push(
+                                new Paragraph({
+                                    children: [
+                                        new ImageRun({
+                                            data: Uint8Array.from(atob(base64Data), c => c.charCodeAt(0)),
+                                            transformation: {
+                                                width: 600,
+                                                height: 400
+                                            }
+                                        })
+                                    ]
+                                })
+                            );
+                        } catch (err) {
+                            console.error('Error adding image:', err);
+                        }
                     }
 
+                    children.push(new Paragraph({ text: "" }));
+
+                    // Add cut sets if requested
                     if (includeCutSetsData && cutSets) {
                         const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
                         const cutSetData = cutSets[treeKey];
 
                         if (cutSetData && cutSetData.cutSets) {
-                            html += `<h3>Cut Sets</h3>`;
+                            children.push(
+                                new Paragraph({
+                                    text: "Cut Sets",
+                                    heading: HeadingLevel.HEADING_2
+                                })
+                            );
+
                             const limit = Math.min(cutSetData.cutSets.length, cutSetLimit);
-                            html += `<p>Showing ${limit} of ${cutSetData.cutSets.length} cut sets</p>`;
-                            html += `<table><thead><tr><th>#</th><th>Cut Set</th></tr></thead><tbody>`;
+                            children.push(
+                                new Paragraph({
+                                    text: `Showing ${limit} of ${cutSetData.cutSets.length} cut sets`
+                                })
+                            );
+
+                            // Create table
+                            const tableRows = [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ children: [new Paragraph({ text: "#", bold: true })] }),
+                                        new TableCell({ children: [new Paragraph({ text: "Cut Set", bold: true })] })
+                                    ]
+                                })
+                            ];
 
                             cutSetData.cutSets.slice(0, limit).forEach((cutSet, i) => {
                                 const cutSetText = cutSet.map(event => {
@@ -2308,37 +2448,143 @@
                                     const eventName = isComplemented ? event.substring(1) : event;
                                     return isComplemented ? `NOT(${eventName})` : eventName;
                                 }).join(' AND ');
-                                html += `<tr><td>${i + 1}</td><td>${cutSetText}</td></tr>`;
+
+                                tableRows.push(
+                                    new TableRow({
+                                        children: [
+                                            new TableCell({ children: [new Paragraph({ text: (i + 1).toString() })] }),
+                                            new TableCell({ children: [new Paragraph({ text: cutSetText })] })
+                                        ]
+                                    })
+                                );
                             });
 
-                            html += `</tbody></table>`;
+                            children.push(
+                                new Table({
+                                    width: { size: 100, type: WidthType.PERCENTAGE },
+                                    rows: tableRows
+                                })
+                            );
                         }
                     }
 
-                    html += `<hr>`;
-                });
-
-                html += `</body></html>`;
-                return html;
-            };
-
-            const downloadReport = (content, filename, format) => {
-                let blob, extension, mimeType;
-
-                if (format === 'markdown' || format === 'pdf') {
-                    extension = 'md';
-                    mimeType = 'text/markdown';
-                    blob = new Blob([content], { type: mimeType });
-                } else if (format === 'word') {
-                    extension = 'html';
-                    mimeType = 'application/msword';
-                    blob = new Blob([content], { type: mimeType });
+                    children.push(new Paragraph({ text: "" }));
                 }
 
+                // Create document
+                const doc = new Document({
+                    sections: [{
+                        children: children
+                    }]
+                });
+
+                // Generate and download
+                const blob = await Packer.toBlob(doc);
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${filename}.${extension}`;
+                a.download = `${fileName}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+
+            const generatePDFReport = async (treeIndices, treeImages, includeCutSetsData) => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                let y = 20;
+
+                // Title
+                doc.setFontSize(20);
+                doc.text("Fault Tree Analysis Report", 105, y, { align: 'center' });
+                y += 15;
+
+                // Project info
+                doc.setFontSize(12);
+                doc.text(`Project: ${currentProject?.projectName || 'Unnamed Project'}`, 20, y);
+                y += 7;
+                doc.text(`Generated: ${new Date().toLocaleString()}`, 20, y);
+                y += 15;
+
+                // Add trees
+                for (const idx of treeIndices) {
+                    const tree = availableTrees[idx];
+                    if (!tree) continue;
+
+                    // Check if need new page
+                    if (y > 250) {
+                        doc.addPage();
+                        y = 20;
+                    }
+
+                    // Tree name
+                    doc.setFontSize(16);
+                    doc.text(tree.treeName || `Fault Tree ${idx + 1}`, 20, y);
+                    y += 10;
+
+                    // Add image if available
+                    if (treeImages[idx]) {
+                        try {
+                            doc.addImage(treeImages[idx], 'PNG', 20, y, 170, 113);
+                            y += 120;
+                        } catch (err) {
+                            console.error('Error adding image to PDF:', err);
+                        }
+                    }
+
+                    // Add cut sets if requested
+                    if (includeCutSetsData && cutSets) {
+                        const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
+                        const cutSetData = cutSets[treeKey];
+
+                        if (cutSetData && cutSetData.cutSets) {
+                            if (y > 250) {
+                                doc.addPage();
+                                y = 20;
+                            }
+
+                            doc.setFontSize(14);
+                            doc.text("Cut Sets", 20, y);
+                            y += 7;
+
+                            doc.setFontSize(10);
+                            const limit = Math.min(cutSetData.cutSets.length, cutSetLimit);
+                            doc.text(`Showing ${limit} of ${cutSetData.cutSets.length} cut sets`, 20, y);
+                            y += 10;
+
+                            cutSetData.cutSets.slice(0, limit).forEach((cutSet, i) => {
+                                if (y > 280) {
+                                    doc.addPage();
+                                    y = 20;
+                                }
+
+                                const cutSetText = cutSet.map(event => {
+                                    const isComplemented = event.startsWith('/');
+                                    const eventName = isComplemented ? event.substring(1) : event;
+                                    return isComplemented ? `NOT(${eventName})` : eventName;
+                                }).join(' AND ');
+
+                                doc.text(`${i + 1}. ${cutSetText}`, 25, y);
+                                y += 5;
+                            });
+                        }
+                    }
+
+                    y += 10;
+                }
+
+                // Save PDF
+                doc.save(`${fileName}.pdf`);
+            };
+
+            const downloadReport = (content, filename, format) => {
+                // Only handles markdown format (Word and PDF handle their own downloads)
+                const blob = new Blob([content], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${filename}.md`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
