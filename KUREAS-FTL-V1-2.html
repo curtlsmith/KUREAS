@@ -2154,7 +2154,7 @@
             const [cutSetLimit, setCutSetLimit] = useState(100);
             const [selectedTrees, setSelectedTrees] = useState(new Set(['all']));
 
-            const availableTrees = currentProject?.fault_trees || [];
+            const availableTrees = currentProject?.faultTrees || [];
 
             const handleTreeToggle = (treeId) => {
                 const newSelected = new Set(selectedTrees);
@@ -2212,7 +2212,7 @@
 
             const generateMarkdownReport = (treeIndices, includeGraphics, includeCutSetsData) => {
                 let md = `# Fault Tree Analysis Report\n\n`;
-                md += `**Project:** ${currentProject?.project_name || 'Unnamed Project'}\n`;
+                md += `**Project:** ${currentProject?.projectName || 'Unnamed Project'}\n`;
                 md += `**Generated:** ${new Date().toLocaleString()}\n\n`;
                 md += `---\n\n`;
 
@@ -2220,16 +2220,16 @@
                     const tree = availableTrees[idx];
                     if (!tree) return;
 
-                    md += `## ${tree.tree_name || `Fault Tree ${idx + 1}`}\n\n`;
+                    md += `## ${tree.treeName || `Fault Tree ${idx + 1}`}\n\n`;
 
                     if (includeGraphics) {
                         md += `### Fault Tree Diagram\n\n`;
-                        md += `![${tree.tree_name}](data:image/png;base64,PLACEHOLDER_FOR_IMAGE)\n\n`;
+                        md += `![${tree.treeName}](data:image/png;base64,PLACEHOLDER_FOR_IMAGE)\n\n`;
                         md += `*Note: Image capture not yet implemented in this version*\n\n`;
                     }
 
                     if (includeCutSetsData && cutSets) {
-                        const treeKey = `${currentProject.project_name}_${tree.tree_name}_${tree.model_phase || ''}`.trim();
+                        const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
                         const cutSetData = cutSets[treeKey];
 
                         if (cutSetData && cutSetData.cutSets) {
@@ -2276,7 +2276,7 @@
 </head>
 <body>
     <h1>Fault Tree Analysis Report</h1>
-    <p class="meta"><strong>Project:</strong> ${currentProject?.project_name || 'Unnamed Project'}</p>
+    <p class="meta"><strong>Project:</strong> ${currentProject?.projectName || 'Unnamed Project'}</p>
     <p class="meta"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
     <hr>
 `;
@@ -2285,7 +2285,7 @@
                     const tree = availableTrees[idx];
                     if (!tree) return;
 
-                    html += `<h2>${tree.tree_name || `Fault Tree ${idx + 1}`}</h2>`;
+                    html += `<h2>${tree.treeName || `Fault Tree ${idx + 1}`}</h2>`;
 
                     if (includeGraphics) {
                         html += `<h3>Fault Tree Diagram</h3>`;
@@ -2293,7 +2293,7 @@
                     }
 
                     if (includeCutSetsData && cutSets) {
-                        const treeKey = `${currentProject.project_name}_${tree.tree_name}_${tree.model_phase || ''}`.trim();
+                        const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
                         const cutSetData = cutSets[treeKey];
 
                         if (cutSetData && cutSetData.cutSets) {
@@ -2390,7 +2390,7 @@
                                                 disabled={selectedTrees.has('all')}
                                                 className="w-4 h-4"
                                             />
-                                            <span className="text-sm">{tree.tree_name || `Tree ${idx + 1}`}</span>
+                                            <span className="text-sm">{tree.treeName || `Tree ${idx + 1}`}</span>
                                         </label>
                                     ))}
                                 </div>
