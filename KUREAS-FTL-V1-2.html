@@ -623,7 +623,7 @@
             return cutSetsByTree;
         }
 
-        // Layout Algorithm
+        // Compact Layout Algorithm - minimizes width at each level
         function calculateLayout(node, nodeMultiplier = 1) {
             const nodeWidth = 160 * nodeMultiplier;
             const nodeHeight = 80 * nodeMultiplier;
@@ -641,57 +641,96 @@
                 return gateGap;
             }
 
-            function calculatePositions(node, depth = 0) {
+            // Get the leftmost and rightmost positions of a subtree
+            function getSubtreeBounds(node) {
+                if (!node.children || node.children.length === 0) {
+                    return { left: node.x - nodeWidth / 2, right: node.x + nodeWidth / 2 };
+                }
+
+                let leftmost = Infinity;
+                let rightmost = -Infinity;
+
+                function traverse(n) {
+                    leftmost = Math.min(leftmost, n.x - nodeWidth / 2);
+                    rightmost = Math.max(rightmost, n.x + nodeWidth / 2);
+                    if (n.children) {
+                        n.children.forEach(traverse);
+                    }
+                }
+
+                traverse(node);
+                return { left: leftmost, right: rightmost };
+            }
+
+            // Shift a node and all its descendants by dx
+            function shiftSubtree(node, dx) {
+                node.x += dx;
+                if (node.children) {
+                    node.children.forEach(child => shiftSubtree(child, dx));
+                }
+            }
+
+            // First pass: position nodes bottom-up with compact spacing
+            function positionBottomUp(node, depth = 0) {
                 node.depth = depth;
 
                 if (!node.children || node.children.length === 0) {
-                    node.width = 1;
+                    // Leaf node - no children to position
                     return;
                 }
 
-                node.children.forEach(child => calculatePositions(child, depth + 1));
+                // Recursively position children first
+                node.children.forEach(child => positionBottomUp(child, depth + 1));
 
-                // Calculate total width considering dynamic gaps
-                let totalWidth = node.children[0].width;
-                for (let i = 1; i < node.children.length; i++) {
-                    const gap = getSiblingGap(node.children[i - 1], node.children[i]);
-                    totalWidth += node.children[i].width + gap / (nodeWidth + gateGap);
-                }
-                node.width = totalWidth;
-            }
-
-            function assignPositions(node, x = 0, y = 0) {
-                node.x = x;
-                node.y = y;
-
-                if (!node.children || node.children.length === 0) {
-                    return;
-                }
-
-                // Calculate starting position based on total width with dynamic gaps
-                let totalWidth = node.children[0].width * (nodeWidth + gateGap);
-                for (let i = 1; i < node.children.length; i++) {
-                    const gap = getSiblingGap(node.children[i - 1], node.children[i]);
-                    totalWidth += node.children[i].width * (nodeWidth + gateGap) + gap;
-                }
-
-                let currentX = x - totalWidth / 2 + (nodeWidth + gateGap) / 2;
+                // Position children compactly from left to right
+                let currentX = 0;
 
                 node.children.forEach((child, i) => {
-                    const childWidth = child.width * (nodeWidth + gateGap);
-                    const childX = currentX + childWidth / 2 - (nodeWidth + gateGap) / 2;
-                    assignPositions(child, childX, y + levelHeight);
-                    currentX += childWidth;
+                    if (i === 0) {
+                        // First child - get its bounds
+                        const bounds = getSubtreeBounds(child);
+                        const childWidth = bounds.right - bounds.left;
+                        // Position so the subtree starts at currentX
+                        currentX = -childWidth / 2;
+                        shiftSubtree(child, currentX - child.x);
+                        currentX = bounds.right - bounds.left + childWidth / 2;
+                    } else {
+                        // Subsequent children - position with gap from previous
+                        const prevChild = node.children[i - 1];
+                        const prevBounds = getSubtreeBounds(prevChild);
+                        const gap = getSiblingGap(prevChild, child);
 
-                    // Add gap before next child
-                    if (i < node.children.length - 1) {
-                        currentX += getSiblingGap(child, node.children[i + 1]);
+                        // Position this child's subtree to start after the previous one
+                        const childBounds = getSubtreeBounds(child);
+                        const childWidth = childBounds.right - childBounds.left;
+                        const newChildX = prevBounds.right + gap + childWidth / 2;
+                        const shift = newChildX - child.x;
+                        shiftSubtree(child, shift);
+                        currentX = newChildX + childWidth / 2;
                     }
                 });
+
+                // Position parent centered over children
+                const firstBounds = getSubtreeBounds(node.children[0]);
+                const lastBounds = getSubtreeBounds(node.children[node.children.length - 1]);
+                node.x = (firstBounds.left + lastBounds.right) / 2;
             }
 
-            calculatePositions(node);
-            assignPositions(node, 0, 0);
+            // Assign Y positions top-down
+            function assignYPositions(node, y = 0) {
+                node.y = y;
+                if (node.children) {
+                    node.children.forEach(child => assignYPositions(child, y + levelHeight));
+                }
+            }
+
+            // Initialize root position
+            node.x = 0;
+            node.y = 0;
+
+            // Position all nodes
+            positionBottomUp(node);
+            assignYPositions(node);
         }
 
         // Get bounding box of tree for auto-fit
