@@ -44,11 +44,30 @@ npm run dev
 
 ## Building for Production
 
+### Standard Build
+
 ```bash
 npm run build
 ```
 
 The production-ready files will be in the `dist/` directory.
+
+### Single-File Standalone Build
+
+For maximum portability, you can build a completely self-contained single HTML file with all CSS and JavaScript inlined:
+
+```bash
+npm run build:single
+```
+
+This creates `kureas-fta-standalone.html` (~157 KB) - a single file that can be:
+- Opened directly in any modern web browser
+- Shared via email or file transfer
+- Hosted on any web server without additional dependencies
+- Archived for long-term preservation
+- Used offline without internet connection
+
+Simply double-click the file or open it in your browser to run the complete KUREAS-FTA application.
 
 ## Usage
 

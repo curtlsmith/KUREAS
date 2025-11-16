@@ -24,6 +24,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:single": "npm run build && node build-single-file.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },
