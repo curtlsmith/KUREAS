@@ -628,7 +628,7 @@
             const nodeWidth = 160 * nodeMultiplier;
             const nodeHeight = 80 * nodeMultiplier;
             const levelHeight = 150 * nodeMultiplier;
-            const siblingGap = 10 * nodeMultiplier;
+            const siblingGap = 5 * nodeMultiplier;
 
             function calculatePositions(node, depth = 0) {
                 node.depth = depth;
@@ -1020,22 +1020,34 @@
                                 ctx.lineWidth = 2;
 
                                 if (node.type === 'OR') {
-                                    // Draw OR gate symbol (pointed arch)
+                                    // Draw OR gate symbol (rounded-pointy top, concave bottom)
                                     ctx.beginPath();
-                                    ctx.moveTo(node.x - gateWidth / 2, gateY);
-                                    ctx.quadraticCurveTo(node.x - gateWidth / 4, gateY + gateHeight / 2, node.x, gateY + gateHeight);
-                                    ctx.quadraticCurveTo(node.x + gateWidth / 4, gateY + gateHeight / 2, node.x + gateWidth / 2, gateY);
-                                    ctx.lineTo(node.x - gateWidth / 2, gateY);
+                                    // Start at bottom left
+                                    ctx.moveTo(node.x - gateWidth / 2, gateY + gateHeight);
+                                    // Concave bottom (curves inward)
+                                    ctx.quadraticCurveTo(node.x, gateY + gateHeight - 5, node.x + gateWidth / 2, gateY + gateHeight);
+                                    // Right side going up
+                                    ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight / 3);
+                                    // Rounded-pointy top (curves to point)
+                                    ctx.quadraticCurveTo(node.x + gateWidth / 4, gateY, node.x, gateY);
+                                    ctx.quadraticCurveTo(node.x - gateWidth / 4, gateY, node.x - gateWidth / 2, gateY + gateHeight / 3);
+                                    // Left side going down
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY + gateHeight);
                                     ctx.fill();
                                     ctx.stroke();
                                 } else if (node.type === 'AND') {
-                                    // Draw AND gate symbol (flat top with curved bottom)
+                                    // Draw AND gate symbol (rounded top, square bottom)
                                     ctx.beginPath();
-                                    ctx.moveTo(node.x - gateWidth / 2, gateY);
-                                    ctx.lineTo(node.x + gateWidth / 2, gateY);
+                                    // Start at bottom left
+                                    ctx.moveTo(node.x - gateWidth / 2, gateY + gateHeight);
+                                    // Bottom flat edge
+                                    ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight);
+                                    // Right side going up
                                     ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight / 2);
-                                    ctx.arc(node.x, gateY + gateHeight / 2, gateWidth / 2, 0, Math.PI);
-                                    ctx.lineTo(node.x - gateWidth / 2, gateY);
+                                    // Rounded top (arc from right to left)
+                                    ctx.arc(node.x, gateY + gateHeight / 2, gateWidth / 2, 0, Math.PI, false);
+                                    // Left side going down (completes the path)
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY + gateHeight);
                                     ctx.fill();
                                     ctx.stroke();
                                 }
