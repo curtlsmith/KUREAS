@@ -3682,13 +3682,211 @@
             React.useEffect(() => {
                 if (view === 'visualize' && currentProject && currentProject.faultTrees[selectedTreeIndex]) {
                     const treeName = currentProject.faultTrees[selectedTreeIndex].treeName;
-                    const cutSetData = currentProject.cutSets && currentProject.cutSets[treeName];
-                    
+                    const cutSetKey = findCutSetKey(treeName, currentProject.cutSets);
+                    const cutSetData = cutSetKey ? currentProject.cutSets[cutSetKey] : null;
+
                     if (cutSetData && cutSetData.cutSets) {
                         setCutSetsClosed(false); // Reopen when switching to tree with cut sets
                     }
                 }
             }, [selectedTreeIndex, view, currentProject]);
+
+            // Generate Word Report with Tree Images and Cut Sets using Word HTML format
+            async function handleGenerateReport() {
+                try {
+                    if (!currentProject || !currentProject.faultTrees || currentProject.faultTrees.length === 0) {
+                        alert('No fault trees available to generate a report.');
+                        return;
+                    }
+
+                    console.log('Starting report generation...');
+
+                    // Collect all tree images and data
+                    const treeDataArray = [];
+
+                    for (let i = 0; i < currentProject.faultTrees.length; i++) {
+                        const tree = currentProject.faultTrees[i];
+                        const treeName = tree.treeName;
+
+                        console.log(`Processing tree ${i}, name: "${treeName}"`);
+
+                        // Capture tree image as base64
+                        let imageBase64 = null;
+                        try {
+                            const canvases = document.querySelectorAll('canvas');
+                            console.log(`Found ${canvases.length} canvas element(s)`);
+
+                            if (canvases.length > 0) {
+                                const canvas = canvases[0];
+                                // Convert canvas to base64 data URL
+                                imageBase64 = canvas.toDataURL('image/png');
+                                console.log(`Image captured for tree ${i}, length: ${imageBase64.length} chars`);
+                            } else {
+                                console.log(`No canvas found for tree ${i}`);
+                            }
+                        } catch (err) {
+                            console.error(`Error capturing tree image for ${treeName}:`, err);
+                        }
+
+                        // Get cut set data for this tree using smart matching
+                        const cutSetKey = findCutSetKey(treeName, currentProject.cutSets);
+                        const cutSetData = cutSetKey ? currentProject.cutSets[cutSetKey] : null;
+                        console.log(`Cut set data found for tree ${i} (key: ${cutSetKey}):`, !!cutSetData);
+
+                        treeDataArray.push({
+                            treeName,
+                            imageBase64,
+                            cutSetData
+                        });
+                    }
+
+                    // Build Word HTML document
+                    let htmlContent = `
+<html xmlns:o='urn:schemas-microsoft-com:office:office'
+      xmlns:w='urn:schemas-microsoft-com:office:word'
+      xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+    <meta charset="utf-8">
+    <title>Fault Tree Analysis Report</title>
+    <!--[if gte mso 9]>
+    <xml>
+        <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+    </xml>
+    <![endif]-->
+    <style>
+        @page {
+            size: 8.5in 11in;
+            margin: 1in;
+        }
+        body {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+        }
+        h1 {
+            font-size: 24pt;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 12pt;
+        }
+        h2 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-top: 24pt;
+            margin-bottom: 12pt;
+            page-break-before: always;
+        }
+        h3 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 12pt;
+            margin-bottom: 6pt;
+        }
+        p {
+            margin: 6pt 0;
+        }
+        .center {
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 12pt auto;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12pt 0;
+        }
+        th, td {
+            border: 1pt solid black;
+            padding: 6pt;
+            text-align: left;
+        }
+        th {
+            background-color: #d9d9d9;
+            font-weight: bold;
+        }
+        .italic {
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fault Tree Analysis Report</h1>
+    <p class="center"><strong>Project:</strong> ${currentProject.projectName || 'Unnamed Project'}</p>
+    <p class="center"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+`;
+
+                    // Add each tree section
+                    for (const treeData of treeDataArray) {
+                        htmlContent += `\n    <h2>${treeData.treeName}</h2>\n`;
+
+                        // Tree image
+                        if (treeData.imageBase64) {
+                            htmlContent += `    <img src="${treeData.imageBase64}" alt="Fault Tree: ${treeData.treeName}" />\n`;
+                        } else {
+                            htmlContent += `    <p class="italic">[Tree image not available]</p>\n`;
+                        }
+
+                        // Cut sets section
+                        if (treeData.cutSetData && treeData.cutSetData.cutSets && treeData.cutSetData.cutSets.length > 0) {
+                            htmlContent += `    <h3>Minimal Cut Sets</h3>\n`;
+                            htmlContent += `    <table>\n`;
+                            htmlContent += `        <tr><th>#</th><th>Cut Set Events</th><th>Probability</th></tr>\n`;
+
+                            // Add up to 100 cut sets
+                            const cutSetsToShow = treeData.cutSetData.cutSets.slice(0, 100);
+                            cutSetsToShow.forEach((cutSet, index) => {
+                                const events = cutSet.events.join(', ');
+                                const prob = cutSet.probability || 'N/A';
+                                htmlContent += `        <tr><td>${index + 1}</td><td>${events}</td><td>${prob}</td></tr>\n`;
+                            });
+
+                            htmlContent += `    </table>\n`;
+
+                            if (treeData.cutSetData.cutSets.length > 100) {
+                                htmlContent += `    <p class="italic">... and ${treeData.cutSetData.cutSets.length - 100} more cut sets</p>\n`;
+                            }
+                        } else {
+                            htmlContent += `    <p class="italic">No cut set data available for this tree.</p>\n`;
+                        }
+                    }
+
+                    htmlContent += `
+</body>
+</html>`;
+
+                    // Create blob with Word MIME type
+                    const blob = new Blob([htmlContent], { type: 'application/msword' });
+
+                    // Create download link
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    const fileName = `${currentProject.projectName || 'FaultTree'}_Report_${new Date().toISOString().slice(0,10)}.doc`;
+                    link.href = url;
+                    link.download = fileName;
+
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    console.log(`Report generated successfully: ${fileName}`);
+                    alert(`Report generated successfully: ${fileName}`);
+
+                } catch (err) {
+                    console.error('Error generating report:', err);
+                    alert(`Error generating report: ${err.message}`);
+                }
+            }
 
             return (
                 <div className="h-screen flex flex-col bg-gray-50">
@@ -3908,11 +4106,16 @@
                     {/* Cut Sets Floating Window - Auto-show when in visualize view with cut sets */}
                     {view === 'visualize' && currentProject && currentProject.faultTrees[selectedTreeIndex] && !cutSetsClosed && (() => {
                         const treeName = currentProject.faultTrees[selectedTreeIndex].treeName;
-                        const cutSetData = currentProject.cutSets && currentProject.cutSets[treeName];
+                        const cutSetKey = findCutSetKey(treeName, currentProject.cutSets);
+                        const cutSetData = cutSetKey ? currentProject.cutSets[cutSetKey] : null;
                         return cutSetData;
                     })() && (
                         <CutSetsFloatingWindow
-                            cutSetsData={currentProject.cutSets[currentProject.faultTrees[selectedTreeIndex].treeName]}
+                            cutSetsData={(() => {
+                                const treeName = currentProject.faultTrees[selectedTreeIndex].treeName;
+                                const cutSetKey = findCutSetKey(treeName, currentProject.cutSets);
+                                return cutSetKey ? currentProject.cutSets[cutSetKey] : null;
+                            })()}
                             position={cutSetsPosition}
                             size={cutSetsSize}
                             minimized={cutSetsMinimized}
