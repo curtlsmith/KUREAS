@@ -8,6 +8,9 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Libraries for report generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -103,7 +106,7 @@
             </svg>
         );
 
-        const DocumentIcon = () => (
+        const ReportIcon = () => (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
@@ -112,56 +115,6 @@
                 <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
         );
-
-        // Helper function to find matching cut set key
-        function findCutSetKey(treeName, cutSetsObject) {
-            if (!cutSetsObject || !treeName) return null;
-
-            const availableKeys = Object.keys(cutSetsObject);
-            console.log(`Looking for cut set with tree name: "${treeName}"`);
-            console.log(`Available cut set keys (${availableKeys.length}):`, availableKeys.slice(0, 10));
-
-            // Strategy 1: Exact match
-            if (cutSetsObject[treeName]) {
-                console.log(`Found exact match: "${treeName}"`);
-                return treeName;
-            }
-
-            // Strategy 2: Try removing common prefixes and suffixes
-            const variations = [
-                treeName,
-                treeName.replace(/^.*_PRA_/, ''),  // Remove prefix like "AALO1_PRA_"
-                treeName.replace(/_+$/, ''),        // Remove trailing underscores
-                treeName.replace(/^.*_PRA_/, '').replace(/_+$/, ''), // Both
-            ];
-
-            for (const variation of variations) {
-                if (cutSetsObject[variation]) {
-                    console.log(`Found match with variation: "${variation}"`);
-                    return variation;
-                }
-            }
-
-            // Strategy 3: Try to find a key that contains the tree name or vice versa
-            for (const key of availableKeys) {
-                if (key.includes(treeName) || treeName.includes(key)) {
-                    console.log(`Found partial match: "${key}"`);
-                    return key;
-                }
-            }
-
-            // Strategy 4: Case-insensitive match
-            const treeNameLower = treeName.toLowerCase();
-            for (const key of availableKeys) {
-                if (key.toLowerCase() === treeNameLower) {
-                    console.log(`Found case-insensitive match: "${key}"`);
-                    return key;
-                }
-            }
-
-            console.log(`No match found for tree name: "${treeName}"`);
-            return null;
-        }
 
         // Settings Management
         const DEFAULT_SETTINGS = {
@@ -174,7 +127,9 @@
             background: 'light',       // dark, light, grid, engineering
             lineStyle: 'curved',       // straight, curved
             showProbability: '0',      // hide, 0, 1, 2 (digits after decimal) - changed from 'hide' to '0'
-            defaultViewStyle: 'fit'    // fit, 100
+            defaultViewStyle: 'fit',   // fit, 100
+            boxType: 'circle',         // box-only, circle, gate-symbol
+            treeSpacing: 'medium'      // small, medium, large
         };
 
         class SettingsManager {
@@ -232,6 +187,15 @@
                 return 'Courier New, monospace';
             } else {
                 return 'Arial, sans-serif';
+            }
+        }
+
+        // Get tree spacing multiplier based on setting
+        function getTreeSpacingMultiplier(setting) {
+            switch(setting) {
+                case 'small': return 0.85;
+                case 'large': return 1.5;
+                default: return 1.0; // medium
             }
         }
 
@@ -682,25 +646,50 @@
             return cutSetsByTree;
         }
 
-        // Layout Algorithm
-        function calculateLayout(node, nodeMultiplier = 1) {
+        // Compact Layout Algorithm - considers subtree widths to prevent overlaps
+        function calculateLayout(node, nodeMultiplier = 1, spacingMultiplier = 1) {
             const nodeWidth = 160 * nodeMultiplier;
             const nodeHeight = 80 * nodeMultiplier;
-            const levelHeight = 150 * nodeMultiplier;
-            const siblingGap = 10 * nodeMultiplier;
+            const levelHeight = 150 * nodeMultiplier * spacingMultiplier;
+            const eventGap = 8 * nodeMultiplier * spacingMultiplier;  // Gap between two events
+            const gateGap = 3 * nodeMultiplier * spacingMultiplier;    // Gap between gates or gate-event pairs
 
-            function calculatePositions(node, depth = 0) {
-                node.depth = depth;
+            // Function to determine gap between two siblings
+            function getSiblingGap(leftChild, rightChild) {
+                // If both are events, use larger gap
+                if (leftChild.type === 'EVENT' && rightChild.type === 'EVENT') {
+                    return eventGap;
+                }
+                // Otherwise use smaller gap (gate-gate or gate-event)
+                return gateGap;
+            }
 
+            // Calculate subtree widths (bottom-up)
+            function calculateWidths(node) {
                 if (!node.children || node.children.length === 0) {
-                    node.width = 1;
+                    // Leaf node
+                    node.subtreeWidth = nodeWidth;
                     return;
                 }
 
-                node.children.forEach(child => calculatePositions(child, depth + 1));
-                node.width = node.children.reduce((sum, child) => sum + child.width, 0);
+                // Recursively calculate children widths first
+                node.children.forEach(child => calculateWidths(child));
+
+                // Calculate this node's subtree width
+                // It's the sum of all children's subtree widths plus gaps
+                let totalWidth = 0;
+                node.children.forEach((child, i) => {
+                    totalWidth += child.subtreeWidth;
+                    if (i < node.children.length - 1) {
+                        totalWidth += getSiblingGap(child, node.children[i + 1]);
+                    }
+                });
+
+                // The subtree width is at least the sum of children, or the node's own width
+                node.subtreeWidth = Math.max(totalWidth, nodeWidth);
             }
 
+            // Assign positions to nodes based on subtree widths
             function assignPositions(node, x = 0, y = 0) {
                 node.x = x;
                 node.y = y;
@@ -709,16 +698,34 @@
                     return;
                 }
 
-                let currentX = x - (node.width * (nodeWidth + siblingGap)) / 2 + (nodeWidth + siblingGap) / 2;
+                // Calculate total width of all children's subtrees with gaps
+                let totalChildrenWidth = 0;
+                node.children.forEach((child, i) => {
+                    totalChildrenWidth += child.subtreeWidth;
+                    if (i < node.children.length - 1) {
+                        totalChildrenWidth += getSiblingGap(child, node.children[i + 1]);
+                    }
+                });
 
-                node.children.forEach(child => {
-                    const childX = currentX + (child.width * (nodeWidth + siblingGap)) / 2 - (nodeWidth + siblingGap) / 2;
+                // Start position for first child (left edge of children area)
+                let currentX = x - totalChildrenWidth / 2;
+
+                // Position each child
+                node.children.forEach((child, i) => {
+                    // Center the child within its subtree width
+                    const childX = currentX + child.subtreeWidth / 2;
                     assignPositions(child, childX, y + levelHeight);
-                    currentX += child.width * (nodeWidth + siblingGap);
+
+                    // Move to next position
+                    currentX += child.subtreeWidth;
+                    if (i < node.children.length - 1) {
+                        currentX += getSiblingGap(child, node.children[i + 1]);
+                    }
                 });
             }
 
-            calculatePositions(node);
+            // Calculate widths first, then assign positions
+            calculateWidths(node);
             assignPositions(node, 0, 0);
         }
 
@@ -769,6 +776,7 @@
             // Get multipliers and styles from settings
             const fontMultiplier = getFontSizeMultiplier(settings.fontSize);
             const nodeMultiplier = getNodeSizeMultiplier(settings.nodeSize);
+            const spacingMultiplier = getTreeSpacingMultiplier(settings.treeSpacing);
             const fontFamily = getFontFamily(settings.fontFamily);
             const backgroundStyle = getBackgroundStyle(settings.background);
             
@@ -794,8 +802,8 @@
                 const processedTree = processTreeForExpansion(tree.rootNode);
                 processedTreeRef.current = processedTree;
 
-                // Calculate layout with node size multiplier
-                calculateLayout(processedTree, nodeMultiplier);
+                // Calculate layout with node size and spacing multipliers
+                calculateLayout(processedTree, nodeMultiplier, spacingMultiplier);
 
                 // Auto-fit tree on first load based on settings
                 if (!isInitialized) {
@@ -1038,32 +1046,80 @@
                         ctx.closePath();
                         ctx.fill();
                         ctx.stroke();
-								// *** Draw circle with operator symbol below OR/AND gates ***
+								// *** Draw symbol below OR/AND gates based on boxType setting ***
                         if (node.type === 'OR' || node.type === 'AND') {
-                            const circleRadius = 11 * nodeMultiplier;
-                            const circleY = y + nodeHeight + circleRadius; // Position below gate box
-                            
-                            // Draw circle
-                            ctx.beginPath();
-                            ctx.arc(node.x, circleY, circleRadius, 0, 2 * Math.PI);
-                            ctx.fillStyle = 'white';
-                            ctx.fill();
-                            ctx.strokeStyle = colors.stroke;
-                            ctx.lineWidth = 2;
-                            ctx.stroke();
-                            
-                            // Draw operator symbol
-                            ctx.fillStyle = 'black';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            const symbolSize = 17 * fontMultiplier;
-                            ctx.font = `bold ${symbolSize}px ${fontFamily}`;
-                            
-                            if (node.type === 'OR') {
-                                ctx.fillText('+', node.x, circleY);
-                            } else if (node.type === 'AND') {
-                                ctx.fillText('×', node.x, circleY);
+                            const boxType = settings?.boxType || 'circle';
+
+                            if (boxType === 'circle') {
+                                // Option 2: Circle with +/- (current default behavior)
+                                const circleRadius = 11 * nodeMultiplier;
+                                const circleY = y + nodeHeight + circleRadius;
+
+                                // Draw circle
+                                ctx.beginPath();
+                                ctx.arc(node.x, circleY, circleRadius, 0, 2 * Math.PI);
+                                ctx.fillStyle = 'white';
+                                ctx.fill();
+                                ctx.strokeStyle = colors.stroke;
+                                ctx.lineWidth = 2;
+                                ctx.stroke();
+
+                                // Draw operator symbol
+                                ctx.fillStyle = 'black';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                const symbolSize = 17 * fontMultiplier;
+                                ctx.font = `bold ${symbolSize}px ${fontFamily}`;
+
+                                if (node.type === 'OR') {
+                                    ctx.fillText('+', node.x, circleY);
+                                } else if (node.type === 'AND') {
+                                    ctx.fillText('×', node.x, circleY);
+                                }
+                            } else if (boxType === 'gate-symbol') {
+                                // Option 3: Fault tree gate symbols
+                                const gateWidth = 30 * nodeMultiplier;
+                                const gateHeight = 20 * nodeMultiplier;
+                                const gateY = y + nodeHeight + 2;
+
+                                ctx.fillStyle = colors.fill;
+                                ctx.strokeStyle = colors.stroke;
+                                ctx.lineWidth = 2;
+
+                                if (node.type === 'OR') {
+                                    // Draw OR gate symbol (rounded-pointy top, concave bottom)
+                                    ctx.beginPath();
+                                    // Start at bottom left
+                                    ctx.moveTo(node.x - gateWidth / 2, gateY + gateHeight);
+                                    // Concave bottom (curves inward)
+                                    ctx.quadraticCurveTo(node.x, gateY + gateHeight - 5, node.x + gateWidth / 2, gateY + gateHeight);
+                                    // Right side going up
+                                    ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight / 3);
+                                    // Rounded-pointy top (curves to point)
+                                    ctx.quadraticCurveTo(node.x + gateWidth / 4, gateY, node.x, gateY);
+                                    ctx.quadraticCurveTo(node.x - gateWidth / 4, gateY, node.x - gateWidth / 2, gateY + gateHeight / 3);
+                                    // Left side going down
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY + gateHeight);
+                                    ctx.fill();
+                                    ctx.stroke();
+                                } else if (node.type === 'AND') {
+                                    // Draw AND gate symbol (box with rounded half-circle on top)
+                                    ctx.beginPath();
+                                    // Start at bottom left of the box
+                                    ctx.moveTo(node.x - gateWidth / 2, gateY + gateHeight);
+                                    // Left side going up to where semicircle starts
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY + gateHeight / 2);
+                                    // Top semicircle (arc from left to right, counterclockwise)
+                                    ctx.arc(node.x, gateY + gateHeight / 2, gateWidth / 2, Math.PI, 0, false);
+                                    // Right side going down
+                                    ctx.lineTo(node.x + gateWidth / 2, gateY + gateHeight);
+                                    // Bottom edge
+                                    ctx.lineTo(node.x - gateWidth / 2, gateY + gateHeight);
+                                    ctx.fill();
+                                    ctx.stroke();
+                                }
                             }
+                            // Option 1: box-only - don't draw anything (no else clause needed)
                         }
                     }
 
@@ -1165,17 +1221,26 @@
                 // Calculate start and end points based on node types
                 const isParentTrans = parent.type === 'TRAN' || parent.transferTo;
                 const isChildTrans = child.type === 'TRAN' || child.transferTo;
-                
+
                 // Check if parent is expanded (pointing up) or collapsed (pointing down)
                 const isParentExpanded = parent.isExpanded || (expandedTransNodes && parent.transferTo && expandedTransNodes.has(`${parent.name}_${parent.transferTo}`));
                 const isChildExpanded = child.isExpanded || (expandedTransNodes && child.transferTo && expandedTransNodes.has(`${child.name}_${child.transferTo}`));
-                
+
                 // Apply node size multiplier to offsets
                 const rectOffset = 40 * nodeMultiplier;
                 const tranOffset = 30 * nodeMultiplier;
-                
+                const nodeHeight = 80 * nodeMultiplier;
+
                 let startY = parent.y + (isParentTrans ? tranOffset : rectOffset);
                 let endY = child.y - (isChildTrans ? tranOffset : rectOffset);
+
+                // Adjust startY if parent is OR/AND gate with gate-symbol boxType
+                const boxType = settings?.boxType || 'circle';
+                if (boxType === 'gate-symbol' && (parent.type === 'OR' || parent.type === 'AND')) {
+                    const gateHeight = 20 * nodeMultiplier;
+                    // Connect to bottom of gate symbol: nodeHeight/2 (to bottom of box) + 2 (gap) + gateHeight
+                    startY = parent.y + nodeHeight / 2 + 2 + gateHeight;
+                }
 
                 // Set line style
                 ctx.strokeStyle = '#6b7280'; // Darker gray
@@ -2084,6 +2149,774 @@
             );
         }
 
+        // Report Modal Component
+        function ReportModal({ savedProjects, currentProject, cutSets, onClose }) {
+            // Load saved report preferences from localStorage
+            const loadReportPreferences = () => {
+                try {
+                    const saved = localStorage.getItem('reportPreferences');
+                    if (saved) {
+                        return JSON.parse(saved);
+                    }
+                } catch (error) {
+                    console.error('Error loading report preferences:', error);
+                }
+                return {
+                    fileFormat: 'markdown',
+                    contentType: 'graphics',
+                    cutSetLimit: 100,
+                    includeHeader: true,
+                    includeProject: true,
+                    includeDate: true,
+                    selectedTreeIndices: []
+                };
+            };
+
+            const prefs = loadReportPreferences();
+
+            const [fileFormat, setFileFormat] = useState(prefs.fileFormat);
+            const [fileName, setFileName] = useState('fault_tree_report');
+            const [contentType, setContentType] = useState(prefs.contentType);
+            const [cutSetLimit, setCutSetLimit] = useState(prefs.cutSetLimit);
+            const [selectedTrees, setSelectedTrees] = useState(() => {
+                // Restore previous selection if available
+                if (prefs.selectedTreeIndices && prefs.selectedTreeIndices.length > 0) {
+                    return new Set(prefs.selectedTreeIndices);
+                }
+                return new Set(['all']);
+            });
+            const [includeHeader, setIncludeHeader] = useState(prefs.includeHeader);
+            const [includeProject, setIncludeProject] = useState(prefs.includeProject);
+            const [includeDate, setIncludeDate] = useState(prefs.includeDate);
+
+            // Save report preferences to localStorage whenever they change
+            useEffect(() => {
+                const preferences = {
+                    fileFormat,
+                    contentType,
+                    cutSetLimit,
+                    includeHeader,
+                    includeProject,
+                    includeDate,
+                    selectedTreeIndices: Array.from(selectedTrees)
+                };
+                localStorage.setItem('reportPreferences', JSON.stringify(preferences));
+            }, [fileFormat, contentType, cutSetLimit, includeHeader, includeProject, includeDate, selectedTrees]);
+
+            const availableTrees = currentProject?.faultTrees || [];
+
+            const handleTreeToggle = (treeId) => {
+                const newSelected = new Set(selectedTrees);
+                if (treeId === 'all') {
+                    if (selectedTrees.has('all')) {
+                        newSelected.clear();
+                    } else {
+                        newSelected.clear();
+                        newSelected.add('all');
+                    }
+                } else {
+                    newSelected.delete('all');
+                    if (selectedTrees.has(treeId)) {
+                        newSelected.delete(treeId);
+                    } else {
+                        newSelected.add(treeId);
+                    }
+                }
+                setSelectedTrees(newSelected);
+            };
+
+            // Capture fault tree image from canvas
+            const captureFaultTreeImage = async (treeIndex) => {
+                return new Promise((resolve) => {
+                    try {
+                        const tree = availableTrees[treeIndex];
+                        if (!tree || !tree.rootNode) {
+                            console.log(`No tree or root node for index ${treeIndex}`);
+                            resolve(null);
+                            return;
+                        }
+
+                        // Create offscreen canvas
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1200;
+                        canvas.height = 800;
+                        const ctx = canvas.getContext('2d');
+
+                        // Set white background
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // Get settings for rendering
+                        const fontMultiplier = getFontSizeMultiplier('small');
+                        const nodeMultiplier = getNodeSizeMultiplier('medium');
+                        const spacingMultiplier = getTreeSpacingMultiplier('medium');
+                        const fontFamily = getFontFamily('sans-serif');
+                        const renderSettings = {
+                            fontSize: 'small',
+                            nodeSize: 'medium',
+                            colorMode: 'color',
+                            fontFamily: 'sans-serif',
+                            arrows: 'arrows',
+                            background: 'light',
+                            lineStyle: 'curved',
+                            showProbability: '0',
+                            boxType: 'circle',
+                            treeSpacing: 'medium'
+                        };
+
+                        // Process tree
+                        const processedTree = processTreeForExpansion(tree.rootNode);
+                        calculateLayout(processedTree, nodeMultiplier, spacingMultiplier);
+
+                        // Get tree bounds for centering
+                        const bounds = getTreeBounds(processedTree, nodeMultiplier);
+                        const padding = 50;
+                        const scaleX = (canvas.width - padding * 2) / bounds.width;
+                        const scaleY = (canvas.height - padding * 2) / bounds.height;
+                        const scale = Math.min(scaleX, scaleY, 1);
+
+                        // Center and scale
+                        ctx.save();
+                        ctx.translate(canvas.width / 2, padding);
+                        ctx.scale(scale, scale);
+
+                        // Draw tree
+                        const descriptions = {
+                            events: currentProject?.eventDescriptions || {},
+                            gates: currentProject?.gateDescriptions || {},
+                            eventInfo: currentProject?.eventInfo || {}
+                        };
+                        drawTree(ctx, processedTree, descriptions, currentProject, new Set(), renderSettings, fontMultiplier, nodeMultiplier, fontFamily);
+
+                        ctx.restore();
+
+                        // Convert to base64
+                        const imageData = canvas.toDataURL('image/png');
+                        console.log(`Captured image for tree ${treeIndex}, data length: ${imageData?.length || 0}`);
+                        resolve(imageData);
+                    } catch (error) {
+                        console.error('Error capturing tree image:', error);
+                        resolve(null);
+                    }
+                });
+            };
+
+            const handleGenerate = async () => {
+                try {
+                    // Determine which trees to include
+                    const treesToInclude = selectedTrees.has('all')
+                        ? availableTrees.map((_, idx) => idx)
+                        : Array.from(selectedTrees).filter(id => id !== 'all');
+
+                    if (treesToInclude.length === 0) {
+                        alert('Please select at least one fault tree to generate a report.');
+                        return;
+                    }
+
+                    const includeGraphics = contentType === 'graphics' || contentType === 'both';
+                    const includeCutSetsData = contentType === 'cutsets' || contentType === 'both';
+
+                    console.log('Report generation - Include graphics:', includeGraphics);
+                    console.log('Report generation - Include cut sets:', includeCutSetsData);
+                    console.log('Report generation - Trees to include:', treesToInclude);
+
+                    // Capture tree images if graphics are needed
+                    const treeImages = {};
+                    if (includeGraphics) {
+                        console.log('Capturing tree images...');
+                        for (const idx of treesToInclude) {
+                            const imageData = await captureFaultTreeImage(idx);
+                            if (imageData) {
+                                treeImages[idx] = imageData;
+                                console.log(`Added image for tree ${idx} to treeImages object`);
+                            }
+                        }
+                        console.log('Final treeImages object keys:', Object.keys(treeImages));
+                    }
+
+                    // Prepare header options
+                    const headerOptions = {
+                        includeHeader,
+                        includeProject,
+                        includeDate
+                    };
+
+                    // Generate report content based on format
+                    if (fileFormat === 'markdown') {
+                        const content = generateMarkdownReport(treesToInclude, treeImages, includeCutSetsData, headerOptions);
+                        downloadReport(content, fileName, 'markdown');
+                    } else if (fileFormat === 'word') {
+                        await generateWordReport(treesToInclude, treeImages, includeCutSetsData, headerOptions);
+                    } else if (fileFormat === 'pdf') {
+                        await generatePDFReport(treesToInclude, treeImages, includeCutSetsData, headerOptions);
+                    }
+
+                    onClose();
+                } catch (error) {
+                    console.error('Error in handleGenerate:', error);
+                    alert(`Error generating report: ${error.message}\n\nCheck browser console for details.`);
+                }
+            };
+
+            const generateMarkdownReport = (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
+                let md = '';
+
+                // Title (optional)
+                if (headerOptions.includeHeader !== false) {
+                    md += `# Fault Tree Analysis Report\n\n`;
+                }
+
+                // Project info (optional)
+                if (headerOptions.includeProject !== false) {
+                    md += `**Project:** ${currentProject?.projectName || 'Unnamed Project'}\n`;
+                }
+                if (headerOptions.includeDate !== false) {
+                    md += `**Generated:** ${new Date().toLocaleString()}\n`;
+                }
+
+                // Add separator if any header elements were included
+                if (headerOptions.includeHeader !== false || headerOptions.includeProject !== false || headerOptions.includeDate !== false) {
+                    md += `\n---\n\n`;
+                }
+
+                treeIndices.forEach(idx => {
+                    const tree = availableTrees[idx];
+                    if (!tree) return;
+
+                    md += `## ${tree.treeName || `Fault Tree ${idx + 1}`}\n\n`;
+
+                    if (treeImages[idx]) {
+                        md += `### Fault Tree Diagram\n\n`;
+                        md += `![${tree.treeName}](${treeImages[idx]})\n\n`;
+                    }
+
+                    if (includeCutSetsData && cutSets) {
+                        const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
+                        const cutSetData = cutSets[treeKey];
+
+                        if (cutSetData && cutSetData.cutSets) {
+                            md += `### Cut Sets\n\n`;
+                            const limit = Math.min(cutSetData.cutSets.length, cutSetLimit);
+                            md += `Showing ${limit} of ${cutSetData.cutSets.length} cut sets\n\n`;
+
+                            cutSetData.cutSets.slice(0, limit).forEach((cutSet, i) => {
+                                md += `${i + 1}. `;
+                                md += cutSet.map(event => {
+                                    const isComplemented = event.startsWith('/');
+                                    const eventName = isComplemented ? event.substring(1) : event;
+                                    return isComplemented ? `NOT(${eventName})` : eventName;
+                                }).join(' AND ');
+                                md += `\n`;
+                            });
+                            md += `\n`;
+                        }
+                    }
+
+                    md += `---\n\n`;
+                });
+
+                return md;
+            };
+
+            const generateWordReport = async (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
+                console.log('Word generation started');
+                console.log('Tree indices:', treeIndices);
+                console.log('Tree images keys:', Object.keys(treeImages));
+                console.log('Include cut sets:', includeCutSetsData);
+                console.log('Header options:', headerOptions);
+
+                try {
+                    const { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, WidthType } = docx;
+
+                    const children = [];
+
+                // Title (optional)
+                if (headerOptions.includeHeader !== false) {
+                    children.push(
+                        new Paragraph({
+                            text: "Fault Tree Analysis Report",
+                            heading: HeadingLevel.TITLE,
+                            alignment: AlignmentType.CENTER
+                        })
+                    );
+                }
+
+                // Project info (optional)
+                if (headerOptions.includeProject !== false) {
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "Project: ", bold: true }),
+                                new TextRun({ text: currentProject?.projectName || 'Unnamed Project' })
+                            ]
+                        })
+                    );
+                }
+
+                if (headerOptions.includeDate !== false) {
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "Generated: ", bold: true }),
+                                new TextRun({ text: new Date().toLocaleString() })
+                            ]
+                        })
+                    );
+                }
+
+                children.push(new Paragraph({ text: "" }));
+
+                // Add trees
+                for (const idx of treeIndices) {
+                    const tree = availableTrees[idx];
+                    if (!tree) continue;
+
+                    // Tree name
+                    children.push(
+                        new Paragraph({
+                            text: tree.treeName || `Fault Tree ${idx + 1}`,
+                            heading: HeadingLevel.HEADING_1
+                        })
+                    );
+
+                    // Add image if available
+                    console.log(`Checking image for tree ${idx}, exists: ${!!treeImages[idx]}`);
+                    if (treeImages[idx]) {
+                        try {
+                            console.log(`Adding image to Word for tree ${idx}`);
+                            const base64Data = treeImages[idx].split(',')[1];
+                            children.push(
+                                new Paragraph({
+                                    children: [
+                                        new ImageRun({
+                                            data: Uint8Array.from(atob(base64Data), c => c.charCodeAt(0)),
+                                            transformation: {
+                                                width: 600,
+                                                height: 400
+                                            }
+                                        })
+                                    ]
+                                })
+                            );
+                            console.log(`Image added successfully to Word for tree ${idx}`);
+                        } catch (err) {
+                            console.error('Error adding image to Word:', err);
+                        }
+                    } else {
+                        console.log(`No image data for tree ${idx}`);
+                    }
+
+                    children.push(new Paragraph({ text: "" }));
+
+                    // Add cut sets if requested
+                    if (includeCutSetsData && cutSets) {
+                        const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
+                        console.log(`Looking for cut sets with key: "${treeKey}"`);
+                        console.log('Available cut set keys:', Object.keys(cutSets));
+                        const cutSetData = cutSets[treeKey];
+
+                        if (cutSetData && cutSetData.cutSets) {
+                            console.log(`Found ${cutSetData.cutSets.length} cut sets for tree ${idx}`);
+                            children.push(
+                                new Paragraph({
+                                    text: "Cut Sets",
+                                    heading: HeadingLevel.HEADING_2
+                                })
+                            );
+
+                            const limit = Math.min(cutSetData.cutSets.length, cutSetLimit);
+                            children.push(
+                                new Paragraph({
+                                    text: `Showing ${limit} of ${cutSetData.cutSets.length} cut sets`
+                                })
+                            );
+
+                            // Create table
+                            const tableRows = [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ children: [new Paragraph({ text: "#", bold: true })] }),
+                                        new TableCell({ children: [new Paragraph({ text: "Cut Set", bold: true })] })
+                                    ]
+                                })
+                            ];
+
+                            cutSetData.cutSets.slice(0, limit).forEach((cutSet, i) => {
+                                const cutSetText = cutSet.map(event => {
+                                    const isComplemented = event.startsWith('/');
+                                    const eventName = isComplemented ? event.substring(1) : event;
+                                    return isComplemented ? `NOT(${eventName})` : eventName;
+                                }).join(' AND ');
+
+                                tableRows.push(
+                                    new TableRow({
+                                        children: [
+                                            new TableCell({ children: [new Paragraph({ text: (i + 1).toString() })] }),
+                                            new TableCell({ children: [new Paragraph({ text: cutSetText })] })
+                                        ]
+                                    })
+                                );
+                            });
+
+                            children.push(
+                                new Table({
+                                    width: { size: 100, type: WidthType.PERCENTAGE },
+                                    rows: tableRows
+                                })
+                            );
+                        }
+                    }
+
+                    children.push(new Paragraph({ text: "" }));
+                }
+
+                    console.log(`Creating Word document with ${children.length} elements`);
+
+                    // Create document
+                    const doc = new Document({
+                        sections: [{
+                            children: children
+                        }]
+                    });
+
+                    // Generate and download
+                    console.log('Generating Word blob...');
+                    const blob = await Packer.toBlob(doc);
+                    console.log('Word blob created, size:', blob.size);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${fileName}.docx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    console.log('Word document download triggered');
+                } catch (error) {
+                    console.error('Error generating Word report:', error);
+                    alert(`Error generating Word report: ${error.message}`);
+                }
+            };
+
+            const generatePDFReport = async (treeIndices, treeImages, includeCutSetsData, headerOptions = {}) => {
+                console.log('PDF generation started');
+                console.log('Tree indices:', treeIndices);
+                console.log('Tree images keys:', Object.keys(treeImages));
+                console.log('Include cut sets:', includeCutSetsData);
+                console.log('Header options:', headerOptions);
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                let y = 20;
+
+                // Title (optional)
+                if (headerOptions.includeHeader !== false) {
+                    doc.setFontSize(20);
+                    doc.text("Fault Tree Analysis Report", 105, y, { align: 'center' });
+                    y += 15;
+                }
+
+                // Project info (optional)
+                doc.setFontSize(12);
+                if (headerOptions.includeProject !== false) {
+                    doc.text(`Project: ${currentProject?.projectName || 'Unnamed Project'}`, 20, y);
+                    y += 7;
+                }
+                if (headerOptions.includeDate !== false) {
+                    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, y);
+                    y += 7;
+                }
+
+                // Add some space after header if any header elements were included
+                if (headerOptions.includeHeader !== false || headerOptions.includeProject !== false || headerOptions.includeDate !== false) {
+                    y += 8;
+                }
+
+                // Add trees
+                for (const idx of treeIndices) {
+                    const tree = availableTrees[idx];
+                    if (!tree) {
+                        console.log(`Tree at index ${idx} not found`);
+                        continue;
+                    }
+
+                    // Check if need new page
+                    if (y > 250) {
+                        doc.addPage();
+                        y = 20;
+                    }
+
+                    // Tree name
+                    doc.setFontSize(16);
+                    doc.text(tree.treeName || `Fault Tree ${idx + 1}`, 20, y);
+                    y += 10;
+
+                    // Add image if available
+                    console.log(`Checking image for tree ${idx}, exists: ${!!treeImages[idx]}`);
+                    if (treeImages[idx]) {
+                        try {
+                            console.log(`Adding image to PDF for tree ${idx}`);
+                            doc.addImage(treeImages[idx], 'PNG', 20, y, 170, 113);
+                            y += 120;
+                            console.log(`Image added successfully for tree ${idx}`);
+                        } catch (err) {
+                            console.error('Error adding image to PDF:', err);
+                        }
+                    } else {
+                        console.log(`No image data for tree ${idx}`);
+                    }
+
+                    // Add cut sets if requested
+                    if (includeCutSetsData && cutSets) {
+                        const treeKey = `${currentProject.projectName}_${tree.treeName}_${tree.modelPhase || ''}`.trim();
+                        console.log(`Looking for cut sets with key: "${treeKey}"`);
+                        console.log('Available cut set keys:', Object.keys(cutSets));
+                        const cutSetData = cutSets[treeKey];
+
+                        if (cutSetData && cutSetData.cutSets) {
+                            console.log(`Found ${cutSetData.cutSets.length} cut sets for tree ${idx}`);
+                            if (y > 250) {
+                                doc.addPage();
+                                y = 20;
+                            }
+
+                            doc.setFontSize(14);
+                            doc.text("Cut Sets", 20, y);
+                            y += 7;
+
+                            doc.setFontSize(10);
+                            const limit = Math.min(cutSetData.cutSets.length, cutSetLimit);
+                            doc.text(`Showing ${limit} of ${cutSetData.cutSets.length} cut sets`, 20, y);
+                            y += 10;
+
+                            cutSetData.cutSets.slice(0, limit).forEach((cutSet, i) => {
+                                if (y > 280) {
+                                    doc.addPage();
+                                    y = 20;
+                                }
+
+                                const cutSetText = cutSet.map(event => {
+                                    const isComplemented = event.startsWith('/');
+                                    const eventName = isComplemented ? event.substring(1) : event;
+                                    return isComplemented ? `NOT(${eventName})` : eventName;
+                                }).join(' AND ');
+
+                                doc.text(`${i + 1}. ${cutSetText}`, 25, y);
+                                y += 5;
+                            });
+                        } else {
+                            console.log(`No cut set data found for tree ${idx}, key: "${treeKey}"`);
+                        }
+                    }
+
+                    y += 10;
+                }
+
+                // Save PDF
+                console.log('Saving PDF');
+                doc.save(`${fileName}.pdf`);
+            };
+
+            const downloadReport = (content, filename, format) => {
+                // Only handles markdown format (Word and PDF handle their own downloads)
+                const blob = new Blob([content], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${filename}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+
+            const includeCutSets = contentType === 'cutsets' || contentType === 'both';
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full m-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="p-4 border-b border-gray-200">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-gray-800">Generate Report</h2>
+                                <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Two-column layout */}
+                        <div className="flex-1 flex overflow-hidden">
+                            {/* Left column - Fault Trees */}
+                            <div className="w-1/3 border-r border-gray-200 p-4 overflow-y-auto">
+                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Fault Trees</h3>
+                                <div className="space-y-0.5">
+                                    {/* All Trees Option */}
+                                    <label className="flex items-center gap-2 py-1 px-2 hover:bg-gray-50 rounded cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTrees.has('all')}
+                                            onChange={() => handleTreeToggle('all')}
+                                            className="w-4 h-4"
+                                        />
+                                        <span className="text-sm font-medium">All Trees</span>
+                                    </label>
+
+                                    {/* Individual Trees */}
+                                    {availableTrees.map((tree, idx) => (
+                                        <label key={idx} className="flex items-center gap-2 py-1 px-2 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTrees.has(idx) || selectedTrees.has('all')}
+                                                onChange={() => handleTreeToggle(idx)}
+                                                disabled={selectedTrees.has('all')}
+                                                className="w-4 h-4"
+                                            />
+                                            <span className="text-sm">{tree.treeName || `Tree ${idx + 1}`}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Right column - Options */}
+                            <div className="w-2/3 p-4 overflow-y-auto">
+                                <div className="space-y-4">
+                                    {/* File Format */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">File Format</label>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { value: 'word', label: 'Word' },
+                                                { value: 'markdown', label: 'Markdown' },
+                                                { value: 'pdf', label: 'PDF' }
+                                            ].map(format => (
+                                                <button
+                                                    key={format.value}
+                                                    onClick={() => setFileFormat(format.value)}
+                                                    className={`flex-1 px-4 py-2 rounded text-sm ${
+                                                        fileFormat === format.value
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {format.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* File Name */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">File Name</label>
+                                        <input
+                                            type="text"
+                                            value={fileName}
+                                            onChange={(e) => setFileName(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Enter file name"
+                                        />
+                                    </div>
+
+                                    {/* Content Type */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Content Type</label>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { value: 'graphics', label: 'Fault Tree Graphics' },
+                                                { value: 'cutsets', label: 'Fault Tree Cut Sets' },
+                                                { value: 'both', label: 'Graphics + Cut Sets' }
+                                            ].map(type => (
+                                                <button
+                                                    key={type.value}
+                                                    onClick={() => setContentType(type.value)}
+                                                    className={`flex-1 px-3 py-2 rounded text-xs ${
+                                                        contentType === type.value
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {type.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Limit Cut Sets */}
+                                    {includeCutSets && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Limit Cut Sets to</label>
+                                            <input
+                                                type="number"
+                                                value={cutSetLimit}
+                                                onChange={(e) => setCutSetLimit(parseInt(e.target.value) || 100)}
+                                                min="1"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Report Header Options */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-2">Report Header Options</label>
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={includeHeader}
+                                                    onChange={(e) => setIncludeHeader(e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700">Include "Fault Tree Analysis Report" header</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={includeProject}
+                                                    onChange={(e) => setIncludeProject(e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700">Include project name</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={includeDate}
+                                                    onChange={(e) => setIncludeDate(e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700">Include date generated</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer - Action Buttons */}
+                        <div className="p-4 border-t border-gray-200">
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={onClose}
+                                    className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleGenerate}
+                                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function SettingsModal({ settings, onSave, onClose }) {
             const [localSettings, setLocalSettings] = useState({ ...settings });
 
@@ -2353,6 +3186,54 @@
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Box Type */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Box Type</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'box-only', label: 'Just the Box' },
+                                            { value: 'circle', label: 'Circle Below Box' },
+                                            { value: 'gate-symbol', label: 'Fault Tree Symbol' }
+                                        ].map(type => (
+                                            <button
+                                                key={type.value}
+                                                onClick={() => handleChange('boxType', type.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.boxType === type.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {type.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Tree Spacing */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Tree Spacing</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'small', label: 'Small' },
+                                            { value: 'medium', label: 'Medium' },
+                                            { value: 'large', label: 'Large' }
+                                        ].map(spacing => (
+                                            <button
+                                                key={spacing.value}
+                                                onClick={() => handleChange('treeSpacing', spacing.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.treeSpacing === spacing.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {spacing.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Action Buttons */}
@@ -2402,6 +3283,7 @@
             const [autoLoadFTC, setAutoLoadFTC] = useState(true);
             const [settings, setSettings] = useState(() => SettingsManager.load());
             const [showSettings, setShowSettings] = useState(false);
+            const [showReport, setShowReport] = useState(false);
             const [workingDirectory, setWorkingDirectory] = useState('');
             
             // Cut sets floating window state
@@ -3031,12 +3913,12 @@
                                 {view === 'visualize' && (
                                     <>
                                         <button
-                                            onClick={handleGenerateReport}
-                                            className="px-3 py-1 rounded flex items-center gap-2 bg-green-500 hover:bg-green-700 text-white text-sm"
-                                            title="Generate Word Report"
+                                            onClick={() => setShowReport(true)}
+                                            className="px-3 py-1 rounded flex items-center gap-2 bg-blue-500 hover:bg-blue-700 text-white text-sm"
+                                            title="Generate Report"
                                         >
-                                            <DocumentIcon />
-                                            <span>Generate Report</span>
+                                            <ReportIcon />
+                                            <span>Report</span>
                                         </button>
                                         <button
                                             onClick={() => setShowSettings(true)}
@@ -3201,6 +4083,16 @@
                             </div>
                         )}
                     </main>
+
+                    {/* Report Modal */}
+                    {showReport && (
+                        <ReportModal
+                            savedProjects={savedProjects}
+                            currentProject={currentProject}
+                            cutSets={cutSets}
+                            onClose={() => setShowReport(false)}
+                        />
+                    )}
 
                     {/* Settings Modal */}
                     {showSettings && (
