@@ -8,8 +8,6 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
-    <script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -2811,7 +2809,7 @@
                 }
             }, [selectedTreeIndex, view, currentProject]);
 
-            // Generate Word Report with Tree Images and Cut Sets
+            // Generate Word Report with Tree Images and Cut Sets using Word HTML format
             async function handleGenerateReport() {
                 try {
                     if (!currentProject || !currentProject.faultTrees || currentProject.faultTrees.length === 0) {
@@ -2819,8 +2817,7 @@
                         return;
                     }
 
-                    // Import docx classes from the global docx object
-                    const { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType } = docx;
+                    console.log('Starting report generation...');
 
                     // Collect all tree images and data
                     const treeDataArray = [];
@@ -2829,33 +2826,19 @@
                         const tree = currentProject.faultTrees[i];
                         const treeName = tree.treeName;
 
-                        console.log(`Processing tree ${i}, key: "${treeName}"`);
+                        console.log(`Processing tree ${i}, name: "${treeName}"`);
 
-                        // Try to capture tree image
-                        let imageData = null;
+                        // Capture tree image as base64
+                        let imageBase64 = null;
                         try {
-                            // Find canvas element
                             const canvases = document.querySelectorAll('canvas');
                             console.log(`Found ${canvases.length} canvas element(s)`);
 
                             if (canvases.length > 0) {
-                                const canvas = canvases[0]; // Get the first canvas (tree canvas)
-
-                                // Convert canvas to blob
-                                const blob = await new Promise((resolve, reject) => {
-                                    canvas.toBlob((b) => {
-                                        if (b) {
-                                            console.log(`Canvas converted to blob for tree ${i}`);
-                                            resolve(b);
-                                        } else {
-                                            reject(new Error('Failed to create blob from canvas'));
-                                        }
-                                    }, 'image/png');
-                                });
-
-                                // Convert blob to array buffer
-                                imageData = await blob.arrayBuffer();
-                                console.log(`Image captured for tree ${i}, size: ${imageData.byteLength} bytes`);
+                                const canvas = canvases[0];
+                                // Convert canvas to base64 data URL
+                                imageBase64 = canvas.toDataURL('image/png');
+                                console.log(`Image captured for tree ${i}, length: ${imageBase64.length} chars`);
                             } else {
                                 console.log(`No canvas found for tree ${i}`);
                             }
@@ -2870,164 +2853,151 @@
 
                         treeDataArray.push({
                             treeName,
-                            imageData,
+                            imageBase64,
                             cutSetData
                         });
                     }
 
-                    // Build document sections
-                    const sections = [];
-
-                    // Title page
-                    sections.push(
-                        new Paragraph({
-                            text: "Fault Tree Analysis Report",
-                            heading: HeadingLevel.HEADING_1,
-                            alignment: AlignmentType.CENTER,
-                            spacing: { after: 400 }
-                        }),
-                        new Paragraph({
-                            text: `Project: ${currentProject.projectName || 'Unnamed Project'}`,
-                            alignment: AlignmentType.CENTER,
-                            spacing: { after: 200 }
-                        }),
-                        new Paragraph({
-                            text: `Generated: ${new Date().toLocaleString()}`,
-                            alignment: AlignmentType.CENTER,
-                            spacing: { after: 400 }
-                        })
-                    );
+                    // Build Word HTML document
+                    let htmlContent = `
+<html xmlns:o='urn:schemas-microsoft-com:office:office'
+      xmlns:w='urn:schemas-microsoft-com:office:word'
+      xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+    <meta charset="utf-8">
+    <title>Fault Tree Analysis Report</title>
+    <!--[if gte mso 9]>
+    <xml>
+        <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+    </xml>
+    <![endif]-->
+    <style>
+        @page {
+            size: 8.5in 11in;
+            margin: 1in;
+        }
+        body {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+        }
+        h1 {
+            font-size: 24pt;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 12pt;
+        }
+        h2 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-top: 24pt;
+            margin-bottom: 12pt;
+            page-break-before: always;
+        }
+        h3 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 12pt;
+            margin-bottom: 6pt;
+        }
+        p {
+            margin: 6pt 0;
+        }
+        .center {
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 12pt auto;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12pt 0;
+        }
+        th, td {
+            border: 1pt solid black;
+            padding: 6pt;
+            text-align: left;
+        }
+        th {
+            background-color: #d9d9d9;
+            font-weight: bold;
+        }
+        .italic {
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fault Tree Analysis Report</h1>
+    <p class="center"><strong>Project:</strong> ${currentProject.projectName || 'Unnamed Project'}</p>
+    <p class="center"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+`;
 
                     // Add each tree section
                     for (const treeData of treeDataArray) {
-                        // Tree heading
-                        sections.push(
-                            new Paragraph({
-                                text: treeData.treeName,
-                                heading: HeadingLevel.HEADING_2,
-                                spacing: { before: 400, after: 200 }
-                            })
-                        );
+                        htmlContent += `\n    <h2>${treeData.treeName}</h2>\n`;
 
                         // Tree image
-                        if (treeData.imageData) {
-                            sections.push(
-                                new Paragraph({
-                                    children: [
-                                        new ImageRun({
-                                            data: treeData.imageData,
-                                            transformation: {
-                                                width: 600,
-                                                height: 400
-                                            }
-                                        })
-                                    ],
-                                    spacing: { after: 200 }
-                                })
-                            );
+                        if (treeData.imageBase64) {
+                            htmlContent += `    <img src="${treeData.imageBase64}" alt="Fault Tree: ${treeData.treeName}" />\n`;
                         } else {
-                            sections.push(
-                                new Paragraph({
-                                    text: "[Tree image not available]",
-                                    italics: true,
-                                    spacing: { after: 200 }
-                                })
-                            );
+                            htmlContent += `    <p class="italic">[Tree image not available]</p>\n`;
                         }
 
                         // Cut sets section
                         if (treeData.cutSetData && treeData.cutSetData.cutSets && treeData.cutSetData.cutSets.length > 0) {
-                            sections.push(
-                                new Paragraph({
-                                    text: "Minimal Cut Sets",
-                                    heading: HeadingLevel.HEADING_3,
-                                    spacing: { before: 200, after: 100 }
-                                })
-                            );
+                            htmlContent += `    <h3>Minimal Cut Sets</h3>\n`;
+                            htmlContent += `    <table>\n`;
+                            htmlContent += `        <tr><th>#</th><th>Cut Set Events</th><th>Probability</th></tr>\n`;
 
-                            // Add cut set table
-                            const tableRows = [
-                                new TableRow({
-                                    children: [
-                                        new TableCell({
-                                            children: [new Paragraph({ text: "#", bold: true })],
-                                            width: { size: 10, type: WidthType.PERCENTAGE }
-                                        }),
-                                        new TableCell({
-                                            children: [new Paragraph({ text: "Cut Set Events", bold: true })],
-                                            width: { size: 70, type: WidthType.PERCENTAGE }
-                                        }),
-                                        new TableCell({
-                                            children: [new Paragraph({ text: "Probability", bold: true })],
-                                            width: { size: 20, type: WidthType.PERCENTAGE }
-                                        })
-                                    ]
-                                })
-                            ];
-
-                            // Add up to 50 cut sets
-                            const cutSetsToShow = treeData.cutSetData.cutSets.slice(0, 50);
+                            // Add up to 100 cut sets
+                            const cutSetsToShow = treeData.cutSetData.cutSets.slice(0, 100);
                             cutSetsToShow.forEach((cutSet, index) => {
                                 const events = cutSet.events.join(', ');
                                 const prob = cutSet.probability || 'N/A';
-
-                                tableRows.push(
-                                    new TableRow({
-                                        children: [
-                                            new TableCell({
-                                                children: [new Paragraph({ text: `${index + 1}` })]
-                                            }),
-                                            new TableCell({
-                                                children: [new Paragraph({ text: events })]
-                                            }),
-                                            new TableCell({
-                                                children: [new Paragraph({ text: prob.toString() })]
-                                            })
-                                        ]
-                                    })
-                                );
+                                htmlContent += `        <tr><td>${index + 1}</td><td>${events}</td><td>${prob}</td></tr>\n`;
                             });
 
-                            sections.push(
-                                new Table({
-                                    rows: tableRows,
-                                    width: { size: 100, type: WidthType.PERCENTAGE }
-                                })
-                            );
+                            htmlContent += `    </table>\n`;
 
-                            if (treeData.cutSetData.cutSets.length > 50) {
-                                sections.push(
-                                    new Paragraph({
-                                        text: `... and ${treeData.cutSetData.cutSets.length - 50} more cut sets`,
-                                        italics: true,
-                                        spacing: { before: 100 }
-                                    })
-                                );
+                            if (treeData.cutSetData.cutSets.length > 100) {
+                                htmlContent += `    <p class="italic">... and ${treeData.cutSetData.cutSets.length - 100} more cut sets</p>\n`;
                             }
                         } else {
-                            sections.push(
-                                new Paragraph({
-                                    text: "No cut set data available for this tree.",
-                                    italics: true,
-                                    spacing: { before: 100, after: 200 }
-                                })
-                            );
+                            htmlContent += `    <p class="italic">No cut set data available for this tree.</p>\n`;
                         }
                     }
 
-                    // Create document
-                    const doc = new Document({
-                        sections: [{
-                            properties: {},
-                            children: sections
-                        }]
-                    });
+                    htmlContent += `
+</body>
+</html>`;
 
-                    // Generate and save
-                    const blob = await Packer.toBlob(doc);
-                    const fileName = `${currentProject.projectName || 'FaultTree'}_Report_${new Date().toISOString().slice(0,10)}.docx`;
-                    saveAs(blob, fileName);
+                    // Create blob with Word MIME type
+                    const blob = new Blob([htmlContent], { type: 'application/msword' });
 
+                    // Create download link
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    const fileName = `${currentProject.projectName || 'FaultTree'}_Report_${new Date().toISOString().slice(0,10)}.doc`;
+                    link.href = url;
+                    link.download = fileName;
+
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    console.log(`Report generated successfully: ${fileName}`);
                     alert(`Report generated successfully: ${fileName}`);
 
                 } catch (err) {
