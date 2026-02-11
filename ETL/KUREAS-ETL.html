@@ -1,0 +1,3091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KUREAS-ETL v2.0 - Event Tree Logic Visualizer</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEzUlEQVR4AcRXSUxUWRQ9r4oZmZpBpGkGATdudKUrh5hoXLgEosbExKEdAJV2ionzEDXRxKgxNmgjLETAGIdoTEx04caliImhAYONAgKFNHSoiaq+99f313/1XxVVHZP+4f733rn3vnv+rffvv9jwP18agcrKSv+PliraUyXmOPzsGgGetLW1gaW1uRl/HDmCxj170FhXBx6bz59HW2urpmebiEJ2zRcuoKGmBg27d+P3Xbs04XXTmTPGHhyTxSDAC/j9cH/+jD+3bkXnsmXoXL4c71auxJdr1+BzuTSTiLeZGTieP8c73bdzxQrNv2vVKvQSIe/4uMVdJsBqIgGfD5IwxrpI4vXC8ewZerdtg2tgIGhpsyF18WJUUGbTliwJ4vrMSkBXxDTowXu2b4eLMmj4UvD0pUux4M4dzFm0yIDNEysBIcz6wDxSBjj406fg4O7BwYA93yl4Jv0UC5qakLJwISNKsRJQmqlBPwUfe/IE3XRm3ENDQSMKnrV6Ncpv30ZSRUUQV8wkAn4yEELOgD/M0/s8How9fKg9uXdkhDz1Pwr+07p1KG9oQFJpqQ6GHyQC4c1kjRb8wQP07tgBT0jw3MpKlN+4gcTCQtkpzEoiIIQAZ8Fsy/kwZ4HT7rh/H730fntGRw1TQU+et2kT5l+9ioR58wx8tolEYDZjP6V9lApWz86d8I6NBc0peD69fvMvXUJ8bm4Qj2JmISCEnAV+ei0LHPzePe3Jvd++GVsLux0FtbUopuoXl51t4NFOLARUjn63G19bWtBDafdOTARNiGze5s0oPnUKcRkZQTyGmZUAbSoEP7O+C70Fw1RI+vbuxczkpA7qA+n+fv0azo8fdSD2wUpAsYdvehp8+BQqOLu78enkSfltUBmGwaIiEMZXg/mMOB4/xtDNm+CfSgNjuMVEwJaUhNLLl1HR2Ah7aqoRhrPzhfBx+hLyF9VQRDGJmgAHL6G+oIC+8TlVVZi7ZYu0vYc+tf1Hj2L6wwcJn21hJWA+gLq3FvzcOeRT5RMJCbCnpaGADmXo5/Wft2/x6fRpeB0ORHtZCSg88zZuxFz64NgSEw1tUkkJiujwxefkGBhPRjs6MNzUFPV5UBMIyYJITgao4HAAQ8gmgzqegn37IOLiDJir5cDFi5h49Qp+bmwMjXqiJqC2taCckXzKTNbatZLOMzyM/mPH4Orrk3DVwqYCLRgVHGEBA0B8Xh6K6PAll5UFAP0++eYN/qJMzJgrp64zD9ERMHso5tzz/Xz4MOwpKZJ2pKUFX+/ehY9KuaQwLX4IAT4DufRq5qxfD9DZgH75nE4MnD2LKcoGKIs6LA1qArSJEHLSueJJniELe3o6Cg8exBzqgM0kuEPuP34czv5+qPZQE8B/u5LLy/ELnYe4zExpg4mXLzF45Qp8U1MSzgslASHUPQE7RBRqTLLWrAkULHo1uUsCYSxDt25hjNo4SoO0hYWAPTNT26D4xAkUsVCxyaYmkyug5BlmYaOaUVhfj7Lr17U+gYsVS+GhQ2AioW4GgSo6RCwbqLWqpf9w9nd14cD79zhA46/UXldTNWR9NLKBGpe6Fy9QT6V5f2cnWH6jec2jR6iqrgbv8Z2IRqC9vV1I0tEh2gj7LpKO8FjWkWyZxL8AAAD//4MEZNkAAAAGSURBVAMAE0k4X2fO1c4AAAAASUVORK5CYII=" type="image/png">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        canvas {
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Icon Components
+        const UploadIcon = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+        );
+
+        const SettingsIcon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+        );
+
+        const ZoomInIcon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <line x1="11" y1="8" x2="11" y2="14"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+            </svg>
+        );
+
+        const ZoomOutIcon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+            </svg>
+        );
+
+        const RefreshIcon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+        );
+
+        const DownloadIcon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        );
+
+        const CopyIcon = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+        );
+
+        // Settings Management
+        const DEFAULT_SETTINGS = {
+            fontSize: 'medium',
+            boxSize: 'medium',
+            colorMode: 'color',
+            background: 'light',
+            showFrequency: true,
+            defaultViewStyle: 'fit',
+            verticalSpacing: 'medium',
+            branchLabeling: 'showSF'
+        };
+
+        class SettingsManager {
+            static STORAGE_KEY = 'KUREAS_ETL_settings';
+            
+            static load() {
+                try {
+                    const saved = localStorage.getItem(this.STORAGE_KEY);
+                    return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : { ...DEFAULT_SETTINGS };
+                } catch (err) {
+                    return { ...DEFAULT_SETTINGS };
+                }
+            }
+            
+            static save(settings) {
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
+                    return true;
+                } catch (err) {
+                    return false;
+                }
+            }
+            
+            static reset() {
+                localStorage.removeItem(this.STORAGE_KEY);
+                return { ...DEFAULT_SETTINGS };
+            }
+        }
+
+        // Helper functions for settings
+        function getFontSizeMultiplier(setting) {
+            switch(setting) {
+                case 'small': return 0.8;
+                case 'large': return 1.2;
+                default: return 1.0;
+            }
+        }
+
+        function getBoxSizeMultiplier(setting) {
+            switch(setting) {
+                case 'small': return 0.8;
+                case 'large': return 1.2;
+                default: return 1.0;
+            }
+        }
+
+        function getBackgroundStyle(setting) {
+            switch(setting) {
+                case 'dark':
+                    return { backgroundColor: '#000000', color: '#ffffff' };
+                case 'light':
+                    return { backgroundColor: '#ffffff', color: '#000000' };
+                case 'grid':
+                    return { 
+                        backgroundColor: '#ffffff', 
+                        backgroundImage: 'linear-gradient(#add8e6 1px, transparent 1px), linear-gradient(90deg, #add8e6 1px, transparent 1px)',
+                        backgroundSize: '20px 20px',
+                        color: '#000000'
+                    };
+                default:
+                    return { backgroundColor: '#ffffff', color: '#000000' };
+            }
+        }
+
+        function getVerticalSpacingMultiplier(setting) {
+            switch(setting) {
+                case 'small': return 0.7;
+                case 'large': return 1.3;
+                default: return 1.0;
+            }
+        }
+
+        // ============================================================================
+        // ETL PARSING FUNCTIONS
+        // ============================================================================
+
+        function parseLogicSection(logicText) {
+            if (!logicText) return [];
+            
+            const lines = logicText.split('\n').filter(l => l.length > 0);
+            if (lines.length === 0) return [];
+
+            // First line defines column positions
+            const firstLine = lines[0];
+            const columnPositions = [];
+            let match;
+            const regex = /([+-]?)(\d+\.\d+)/g;
+            
+            while ((match = regex.exec(firstLine)) !== null) {
+                const signPos = match[1] ? match.index : match.index - 1;
+                columnPositions.push({
+                    position: signPos,
+                    eventNum: parseInt(match[2])
+                });
+            }
+
+            if (columnPositions.length === 0) return [];
+
+
+            // Parse sequences - inherit from PREVIOUS line
+            const sequences = [];
+            let previousPath = null;
+            
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+                const line = lines[lineIdx];
+                const path = [];
+                
+                // Check if leading spaces were removed from this line
+                // If the first column position doesn't have ' 1.0', '+1.0', or '-1.0',
+                // then we need to find which column actually starts the line
+                let columnOffset = 0;
+                
+                if (lineIdx > 0 && columnPositions.length > 0) {
+                    const firstCol = columnPositions[0];
+                    const charAtFirstCol = line[firstCol.position];
+                    const nextCharAtFirstCol = line[firstCol.position + 1];
+                    
+                    // Check if first column has expected format (space or sign followed by 1.0)
+                    const hasExpectedFirstCol = (charAtFirstCol === ' ' || charAtFirstCol === '+' || charAtFirstCol === '-') &&
+                                                nextCharAtFirstCol === '1';
+                    
+                    if (!hasExpectedFirstCol) {
+                        // Find the first occurrence of +/- followed by a number in the line
+                        const firstSignMatch = line.match(/([+-])(\d+\.\d+)/);
+                        if (firstSignMatch) {
+                            const eventNum = parseInt(firstSignMatch[2]);
+                            
+                            // Find which column this event number corresponds to
+                            const matchedColIdx = columnPositions.findIndex(col => col.eventNum === eventNum);
+                            
+                            if (matchedColIdx > 0) {
+                                // Leading spaces were removed - this line starts at a later column
+                                columnOffset = matchedColIdx;
+                            }
+                        }
+                    }
+                }
+                
+                for (let colIdx = 0; colIdx < columnPositions.length; colIdx++) {
+                    const col = columnPositions[colIdx];
+                    let branch;
+                    
+                    // If we're before the column offset, inherit from previous line
+                    if (colIdx < columnOffset) {
+                        if (previousPath && previousPath[colIdx]) {
+                            branch = previousPath[colIdx].branch;
+                        } else {
+                            branch = 'PASS';
+                        }
+                    } else {
+                        // Normal parsing logic
+                        const char = line[col.position];
+                        const nextChar = line[col.position + 1];
+                        
+                        if (char === '+') {
+                            branch = 'SUCCESS';
+                        } else if (char === '-') {
+                            branch = 'FAILURE';
+                        } else if (!char || char === ' ') {
+                            if (nextChar && /\d/.test(nextChar)) {
+                                branch = 'PASS';
+                            } else if (previousPath && previousPath[colIdx]) {
+                                branch = previousPath[colIdx].branch;
+                            } else {
+                                branch = 'PASS';
+                            }
+                        } else if (/\d/.test(char)) {
+                            if (previousPath && previousPath[colIdx]) {
+                                branch = previousPath[colIdx].branch;
+                            } else {
+                                branch = 'PASS';
+                            }
+                        } else {
+                            branch = 'PASS';
+                        }
+                    }
+                    
+                    path.push({
+                        event: col.eventNum,
+                        branch: branch
+                    });
+                }
+                
+                sequences.push({
+                    index: lineIdx,
+                    path: path
+                });
+                
+                previousPath = path;
+            }
+
+            sequences.forEach((seq, i) => {
+                const pathStr = seq.path.map((p, idx) => `TE${idx+1}:${p.branch[0]}`).join(' ');
+            });
+
+            return sequences;
+        }
+
+
+        function parseSingleEventTree(text) {
+            const lines = text.split('\n');
+            
+            // Parse header: PROJECT, EVENT TREE, IE NAME, T = (or IE NAME =)
+            const headerLine = lines[0];
+            const headerParts = headerLine.split(',');
+            const projectName = headerParts[0] ? headerParts[0].trim() : 'Unknown Project';
+            const treeName = headerParts[1] ? headerParts[1].trim() : 'Unknown Tree';
+            
+            // Check if this is a subtree by looking for "T =" anywhere in the header line
+            const isSubtree = headerLine.includes('T =');
+            
+            // IE name is the 3rd element, but may have " T =" or " =" suffix
+            let ieName = 'IE';
+            if (headerParts[2]) {
+                ieName = headerParts[2].trim()
+                    .replace(/\s*T\s*=\s*$/, '')  // Remove " T =" at end
+                    .replace(/\s*=\s*$/, '')      // Remove " =" at end
+                    .trim();
+            }
+
+            // Extract sections
+            let toptypesText = '';
+            let topsText = '';
+            let logicText = '';
+            let sequencesText = '';
+            let topdescText = '';
+
+            let currentSection = '';
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Skip comment lines starting with '*'
+                if (line.trim().startsWith('*')) {
+                    continue;
+                }
+                
+                if (line.startsWith('^TOPTYPES')) {
+                    currentSection = 'TOPTYPES';
+                } else if (line.startsWith('^TOPS')) {
+                    currentSection = 'TOPS';
+                } else if (line.startsWith('^LOGIC')) {
+                    currentSection = 'LOGIC';
+                } else if (line.startsWith('^SEQUENCES')) {
+                    currentSection = 'SEQUENCES';
+                } else if (line.startsWith('^TOPDESC')) {
+                    currentSection = 'TOPDESC';
+                } else if (line.startsWith('^ENDSEQUENCES')) {
+                    // Don't break here - continue to read other sections like TOPDESC, TEXT, etc.
+                    currentSection = '';  // Reset section, but continue parsing
+                } else if (line.startsWith('^EOS')) {
+                    // This is the true end of the tree section
+                    break;
+                } else if (line.startsWith('^TEXT') || line.startsWith('^NODESUBS') || line.startsWith('^PARMS')) {
+                    // Other sections we don't currently parse, but don't break
+                    currentSection = '';
+                } else {
+                    if (currentSection === 'TOPTYPES') toptypesText += line + '\n';
+                    else if (currentSection === 'TOPS') topsText += line + '\n';
+                    else if (currentSection === 'LOGIC') logicText += line + '\n';
+                    else if (currentSection === 'SEQUENCES') sequencesText += line + '\n';
+                    else if (currentSection === 'TOPDESC') topdescText += line + '\n';
+                }
+            }
+
+            // Parse TOPS section - these are ALL top events (no IE in this section)
+            const topEventNames = topsText.trim().split(/[\n,]/).map(s => s.trim()).filter(s => s);
+
+            // Parse LOGIC section
+            const sequences = parseLogicSection(logicText);
+
+            // Parse SEQUENCES section
+            const seqLines = sequencesText.trim().split('\n').filter(l => l.trim());
+            const seqMetadata = [];
+            for (let i = 1; i < seqLines.length; i++) {
+                const parts = seqLines[i].split(',');
+                if (parts.length >= 8) {
+                    // Transfer flag is based on field8 being 'Y' or 'T'
+                    const field0 = parts[0] ? parts[0].trim().toUpperCase() === 'Y' : false;
+                    const field8Value = parts.length >= 9 ? parts[8].trim().toUpperCase() : '';
+                    // Transfer is true when field8 = 'Y' or 'T'
+                    const transfer = field8Value === 'Y' || field8Value === 'T';
+                    
+                    seqMetadata.push({
+                        name: parts[1].trim() || `S${i}`,
+                        endState: parts[3].trim(),
+                        frequency: parseFloat(parts[5].trim()) || 0,
+                        comments: parts[7] ? parts[7].trim() : '',
+                        transfer: transfer
+                    });
+                }
+            }
+
+            // Combine sequences with metadata
+            sequences.forEach((seq, idx) => {
+                if (seqMetadata[idx]) {
+                    seq.name = seqMetadata[idx].name;
+                    seq.endState = seqMetadata[idx].endState;
+                    seq.frequency = seqMetadata[idx].frequency;
+                    seq.comments = seqMetadata[idx].comments;
+                    seq.transfer = seqMetadata[idx].transfer;
+                } else {
+                    seq.name = `S${idx + 1}`;
+                    seq.endState = 'Unknown';
+                    seq.frequency = 0;
+                    seq.transfer = false;
+                }
+            });
+
+            // Parse TOPDESC section - handle multiline descriptions
+            const topDescriptions = [];
+            const descParts = topdescText.split('!').map(s => s.trim()).filter(s => s);
+            descParts.forEach(part => {
+                // Remove quotes and join multiline descriptions
+                const cleanPart = part.replace(/"/g, '').replace(/\n/g, ' ').trim();
+                const commaIdx = cleanPart.indexOf(',');
+                if (commaIdx !== -1) {
+                    topDescriptions.push({
+                        name: cleanPart.substring(0, commaIdx).trim(),
+                        description: cleanPart.substring(commaIdx + 1).trim()
+                    });
+                } else if (cleanPart) {
+                    topDescriptions.push({
+                        name: '',
+                        description: cleanPart
+                    });
+                }
+            });
+
+            return {
+                projectName,
+                name: treeName,
+                isSubtree,
+                initiatingEvent: { name: ieName },
+                topEvents: topEventNames.map((name, idx) => ({ 
+                    name,
+                    // Top event descriptions start at index 1 in topDescriptions (index 0 is IE)
+                    description: topDescriptions[idx + 1] ? topDescriptions[idx + 1].description : ''
+                })),
+                ieDescription: topDescriptions[0] ? topDescriptions[0].description : '',
+                sequences
+            };
+        }
+
+        function parseETLFile(text) {
+            // Split by ^EOS to get multiple trees
+            const treeSections = text.split('^EOS').filter(s => s.trim());
+            
+            
+            const trees = [];
+            let projectName = '';
+            
+            treeSections.forEach((section, idx) => {
+                try {
+                    const tree = parseSingleEventTree(section.trim());
+                    if (tree && tree.sequences && tree.sequences.length > 0) {
+                        if (idx === 0) {
+                            projectName = tree.projectName;
+                        }
+                        trees.push(tree);
+                    }
+                } catch (err) {
+                }
+            });
+
+            return {
+                projectName: projectName || 'Unknown Project',
+                trees
+            };
+        }
+
+        // Parse BED file
+        function parseEventDescriptions(text) {
+            const descriptions = {};
+            const lines = text.split('\n')
+                .filter(line => line.trim())
+                .filter(line => !line.trim().startsWith('*')); // Filter out comment lines
+
+            lines.forEach(line => {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const eventName = parts[0].trim();
+                    const description = parts[1].trim();
+                    descriptions[eventName] = description;
+                }
+            });
+
+            return descriptions;
+        }
+
+        // Parse BEI file
+        function parseBEI(text) {
+            const eventInfo = {};
+            const lines = text.split('\n')
+                .filter(line => line.trim())
+                .filter(line => !line.trim().startsWith('*')); // Filter out comment lines
+
+            lines.forEach(line => {
+                const parts = line.split(',');
+                if (parts.length >= 13) {
+                    const name = parts[0] ? parts[0].trim() : '';
+                    if (name) {
+                        eventInfo[name] = {
+                            Name: name,
+                            Prob: parseFloat(parts[5].trim()) || 0,
+                            Calc_Prob: parseFloat(parts[12].trim()) || 0,
+                            Description: parts[1] ? parts[1].trim() : ''
+                        };
+                    }
+                }
+            });
+
+            return eventInfo;
+        }
+
+        // Parse SAPHIRE Sequence Cut Set (SQC) file
+        // 
+        // Two format variations supported:
+        // 
+        // Variation 1: Header line ends with '='
+        //   PROJECT_NAME, EVENT_TREE_NAME, SEQUENCE_#, PHASE=
+        //   BASIC_EVENT
+        //   EVENT_A * EVENT_B
+        //   ...
+        //   ^EOS
+        // 
+        // Variation 2: Separate '=' line
+        //   PROJECT_NAME, EVENT_TREE_NAME, SEQUENCE_#, PHASE
+        //   =
+        //   BASIC_EVENT
+        //   EVENT_A * EVENT_B
+        //   ...
+        //   ^EOS
+        // 
+        // Each line after '=' is a single cut set
+        // Events in a cut set are separated by '*'
+        // Lines starting with '*' are comments and are ignored
+        // Helper function to normalize sequence identifiers by removing leading zeros
+        // Example: "02-04-01" -> "2-4-1", "002" -> "2"
+        function normalizeSequenceId(sequenceId) {
+            if (!sequenceId) return sequenceId;
+            
+            // Split by dash, remove leading zeros from each part, rejoin
+            const parts = sequenceId.split('-');
+            const normalized = parts.map(part => {
+                // Convert to number and back to string to remove leading zeros
+                // This handles "02" -> "2", "001" -> "1", etc.
+                const num = parseInt(part, 10);
+                return isNaN(num) ? part : num.toString();
+            });
+            
+            return normalized.join('-');
+        }
+
+        function parseSQC(text) {
+            const cutSetsByTreeAndSequence = {};
+            
+            // Split by ^EOS, but keep content after last ^EOS
+            const sections = [];
+            const parts = text.split('^EOS');
+            
+            for (let i = 0; i < parts.length; i++) {
+                const trimmed = parts[i].trim();
+                if (trimmed.length > 0) {
+                    sections.push(trimmed);
+                }
+            }
+
+
+            sections.forEach((section, sectionIndex) => {
+                const allLines = section.split('\n').map(l => l.trim());
+                
+                // CRITICAL: Filter out comment lines starting with '*' FIRST
+                // Also filter out empty lines
+                const lines = allLines.filter(l => l.length > 0 && !l.startsWith('*'));
+                
+                if (lines.length < 2) {
+                    return;
+                }
+
+                // Parse header: PROJECT_NAME, EVENT_TREE_NAME, SEQUENCE_#
+                // The header is the first non-comment line
+                const headerLine = lines[0];
+                const headerParts = headerLine.split(',').map(p => p.trim());
+                
+                if (headerParts.length < 3) {
+                    return;
+                }
+
+                const project = headerParts[0];
+                const eventTree = headerParts[1];
+                const sequenceName = headerParts[2]; // This is the sequence identifier (could be number or name)
+
+
+                // Find where cut sets start - two variations supported:
+                // Variation 1: Header line ends with '=' (e.g., "PROJECT, TREE, SEQ, PHASE=")
+                // Variation 2: Header line without '=', then separate line with just '=' or ending with '='
+                let startIndex = -1;
+                
+                // Check if header line itself ends with '='
+                if (headerLine.endsWith('=')) {
+                    startIndex = 1;  // Cut sets start right after header
+                } else {
+                    // Variation 2: Look for a line that is just '=' OR ends with '='
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i] === '=' || lines[i].endsWith('=')) {
+                            startIndex = i + 1;
+                            break;
+                        }
+                    }
+                }
+
+                if (startIndex === -1 || startIndex >= lines.length) {
+                    // Normalize sequence identifier to remove leading zeros (e.g., "02" -> "2", "02-04" -> "2-4")
+                    const normalizedSequence = normalizeSequenceId(sequenceName);
+                    const key = `${eventTree}|||${normalizedSequence}`;
+                    cutSetsByTreeAndSequence[key] = {
+                        project: project,
+                        eventTree: eventTree,
+                        sequence: normalizedSequence,
+                        cutSets: []
+                    };
+                    return;
+                }
+
+                // Parse cut sets - each line is one cut set
+                const cutSets = [];
+                
+                for (let i = startIndex; i < lines.length; i++) {
+                    const line = lines[i];
+                    
+                    // Skip if line is empty
+                    if (!line) {
+                        continue;
+                    }
+                    
+                    // Each line is one cut set
+                    // Split by * to get events
+                    const events = line.split('*').map(e => e.trim()).filter(e => e);
+                    
+                    // Parse each event (check for complement / and remove trailing + or .)
+                    const parsedEvents = events.map(event => {
+                        // Remove trailing '+' or '.' if present
+                        let cleanEvent = event;
+                        if (cleanEvent.endsWith('+') || cleanEvent.endsWith('.')) {
+                            cleanEvent = cleanEvent.slice(0, -1).trim();
+                        }
+                        
+                        if (cleanEvent.startsWith('/')) {
+                            return {
+                                name: cleanEvent.substring(1).trim(),
+                                complement: true
+                            };
+                        } else {
+                            return {
+                                name: cleanEvent.trim(),
+                                complement: false
+                            };
+                        }
+                    });
+
+                    if (parsedEvents.length > 0) {
+                        cutSets.push(parsedEvents);
+                    }
+                }
+
+                // Normalize sequence identifier to remove leading zeros (e.g., "02" -> "2", "02-04" -> "2-4")
+                const normalizedSequence = normalizeSequenceId(sequenceName);
+                const key = `${eventTree}|||${normalizedSequence}`;
+                cutSetsByTreeAndSequence[key] = {
+                    project: project,
+                    eventTree: eventTree,
+                    sequence: normalizedSequence,
+                    cutSets: cutSets
+                };
+            });
+
+            return cutSetsByTreeAndSequence;
+        }
+
+        // ============================================================================
+        // LAYOUT CALCULATION - Working Backwards Algorithm
+        // ============================================================================
+
+        function calculateEventTreeLayout(tree, canvasWidth, canvasHeight, boxMultiplier, settings, fontMultiplier) {
+            const numTopEvents = tree.topEvents.length;
+            const numSequences = tree.sequences.length;
+            
+            // Box dimensions - wider top event boxes
+            const teBoxWidth = 180 * boxMultiplier; // Wider top event boxes
+            const boxHeight = 60 * boxMultiplier;
+            
+            // Calculate individual end box widths for each sequence
+            // Create temporary canvas for text measurement
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.font = `${11 * fontMultiplier}px Arial`;
+            
+            const endBoxWidths = tree.sequences.map(seq => {
+                // Measure all lines that will be displayed
+                const nameLine = seq.name || '';
+                const endStateLine = seq.endState || '';
+                const freqLine = settings.showFrequency && seq.frequency 
+                    ? seq.frequency.toExponential(2) 
+                    : '';
+                
+                // Measure each line
+                const nameWidth = tempCtx.measureText(nameLine).width;
+                const endStateWidth = tempCtx.measureText(endStateLine).width;
+                const freqWidth = freqLine ? tempCtx.measureText(freqLine).width : 0;
+                
+                // Find the widest line
+                const maxTextWidth = Math.max(nameWidth, endStateWidth, freqWidth);
+                
+                // Add padding (30px) and apply box multiplier, with max cap of 250px
+                const calculatedWidth = Math.min(250, Math.max(140, maxTextWidth + 30));
+                return calculatedWidth * boxMultiplier;
+            });
+            
+            // Use the maximum width for positioning to ensure alignment
+            const maxEndBoxWidth = Math.max(...endBoxWidths);
+            
+            // Calculate positions to span full width
+            const leftMargin = 50; // Small margin from left edge
+            const rightMargin = 50; // Small margin for end state boxes
+            
+            // Calculate available width for IE + top events + "End States" label box
+            const availableWidth = canvasWidth - leftMargin - maxEndBoxWidth - rightMargin - 100;
+            
+            // Calculate top event spacing to fill available width
+            const teGap = 10;
+            // IE box + TE boxes + End States label box
+            const totalBoxes = numTopEvents + 2; // +1 for IE, +1 for End States label
+            const calculatedBoxWidth = (availableWidth - (totalBoxes - 1) * teGap) / totalBoxes;
+            const finalTEBoxWidth = Math.max(teBoxWidth, calculatedBoxWidth);
+            const ieBoxWidth = finalTEBoxWidth; // IE same width as TE boxes
+            const endStateLabelBoxWidth = finalTEBoxWidth; // End States label same width as TE boxes
+            
+            // IE starts at left margin
+            const ieX = leftMargin + ieBoxWidth / 2;
+            
+            // Calculate TE positions
+            const teStartX = ieX + ieBoxWidth / 2 + teGap;
+            const teX = [];
+            for (let i = 0; i < numTopEvents; i++) {
+                teX.push(teStartX + i * (finalTEBoxWidth + teGap) + finalTEBoxWidth / 2);
+            }
+            
+            // End States label box position (after last TE)
+            const endStateLabelX = teX[numTopEvents - 1] + finalTEBoxWidth / 2 + teGap + endStateLabelBoxWidth / 2;
+            
+            // End state boxes X position (after End States label) - use smaller gap (50% of teGap)
+            const endStateGap = teGap * 0.5;
+            const endX = endStateLabelX + endStateLabelBoxWidth / 2 + endStateGap + maxEndBoxWidth / 2;
+            
+            // Calculate Y positions - start near top of viewing window
+            const ieY = 60; // Position for IE and TE boxes (moved up from 80)
+            const verticalSpacingMultiplier = getVerticalSpacingMultiplier(settings.verticalSpacing);
+            const endStateSpacing = 100 * boxMultiplier * verticalSpacingMultiplier;
+            const topMargin = 50; // Small margin from top
+            const endStateStartY = topMargin + endStateSpacing / 2;
+            
+            // End state Y positions
+            const endStateY = [];
+            for (let i = 0; i < numSequences; i++) {
+                endStateY.push(endStateStartY + i * endStateSpacing);
+            }
+            
+            
+            // Store branch mid-points
+            const branchMidY = [];
+            for (let i = 0; i < numTopEvents; i++) {
+                branchMidY.push({});
+            }
+            
+            // Store line segments for each sequence
+            const sequenceSegments = [];
+            
+            // Process each sequence backwards
+            for (let seqIdx = 0; seqIdx < numSequences; seqIdx++) {
+                const seq = tree.sequences[seqIdx];
+                const segments = [];
+                let currentY = endStateY[seqIdx];
+                
+                
+                let currentX = endX;
+                
+                // Work backwards through top events
+                for (let teIdx = numTopEvents - 1; teIdx >= 0; teIdx--) {
+                    const teX_current = teX[teIdx];
+                    const decision = seq.path[teIdx];
+                    
+                    
+                    if (decision.branch === 'PASS') {
+                        segments.push({
+                            x1: currentX,
+                            y1: currentY,
+                            x2: teX_current,
+                            y2: currentY,
+                            type: 'horizontal'
+                        });
+                        currentX = teX_current;
+                    } else {
+                        // Horizontal to this TE
+                        segments.push({
+                            x1: currentX,
+                            y1: currentY,
+                            x2: teX_current,
+                            y2: currentY,
+                            type: 'horizontal'
+                        });
+                        
+                        // Calculate branch mid-point
+                        const branchKey = getBranchKey(tree, seqIdx, teIdx);
+                        
+                        let midY;
+                        if (branchMidY[teIdx][branchKey] !== undefined) {
+                            midY = branchMidY[teIdx][branchKey];
+                        } else {
+                            midY = calculateBranchMidPoint(tree, seqIdx, teIdx, currentY, endStateY, endStateSpacing, branchMidY);
+                            branchMidY[teIdx][branchKey] = midY;
+                        }
+                        
+                        // Vertical branch
+                        segments.push({
+                            x1: teX_current,
+                            y1: currentY,
+                            x2: teX_current,
+                            y2: midY,
+                            type: 'branch',
+                            branch: decision.branch
+                        });
+                        
+                        currentY = midY;
+                        currentX = teX_current;
+                    }
+                }
+                
+                // Final horizontal to IE
+                segments.push({
+                    x1: currentX,
+                    y1: currentY,
+                    x2: ieX,
+                    y2: currentY,
+                    type: 'horizontal'
+                });
+                
+                sequenceSegments.push(segments);
+            }
+            
+            return {
+                ieX,
+                ieY,
+                teX,
+                endStateLabelX,
+                endX,
+                endStateY,
+                sequenceSegments,
+                ieBoxWidth,
+                teBoxWidth: finalTEBoxWidth,
+                endStateLabelBoxWidth,
+                boxHeight,
+                endBoxWidth: maxEndBoxWidth  // Single width for all end boxes (widest)
+            };
+        }
+
+        function getBranchKey(tree, seqIdx, teIdx) {
+            const seq = tree.sequences[seqIdx];
+            let key = '';
+            for (let i = 0; i < teIdx; i++) {
+                if (seq.path[i].branch !== 'PASS') {
+                    key += seq.path[i].branch[0];
+                }
+            }
+            return key;
+        }
+
+        function calculateBranchMidPoint(tree, seqIdx, teIdx, currentY, endStateY, endStateSpacing, branchMidY) {
+            const branchKey = getBranchKey(tree, seqIdx, teIdx);
+            
+            // Find all sequences that share this branch
+            const matchingSeqs = [];
+            for (let i = 0; i < tree.sequences.length; i++) {
+                if (getBranchKey(tree, i, teIdx) === branchKey) {
+                    matchingSeqs.push(i);
+                }
+            }
+            
+            // Get the end state Y values for matching sequences
+            const matchingYs = matchingSeqs.map(i => endStateY[i]);
+            const minY = Math.min(...matchingYs);
+            const maxY = Math.max(...matchingYs);
+            
+            return (minY + maxY) / 2;
+        }
+
+        // ============================================================================
+        // TREE CANVAS COMPONENT - WITH FIXED HEADER
+        // ============================================================================
+
+        function TreeCanvas({ tree, eventDescriptions, eventInfo, settings, selectedSequenceIndex, onSequenceClick, project, onTreeSwitch }) {
+            const headerCanvasRef = useRef(null);
+            const sequenceCanvasRef = useRef(null);
+            const containerRef = useRef(null);
+            const scrollContainerRef = useRef(null);
+            const [scale, setScale] = useState(1);
+            const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            const [isInitialized, setIsInitialized] = useState(false);
+            const [highlightedSequence, setHighlightedSequence] = useState(null);
+            const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+            const [tooltipInfo, setTooltipInfo] = useState(null);
+            const layoutRef = useRef(null);
+            const viewportWidthRef = useRef(null);
+
+            const fontMultiplier = getFontSizeMultiplier(settings.fontSize);
+            const boxMultiplier = getBoxSizeMultiplier(settings.boxSize);
+            const backgroundStyle = getBackgroundStyle(settings.background);
+
+            // Header height constant
+            const HEADER_HEIGHT = 120;
+            
+            // Sync highlightedSequence with selectedSequenceIndex from parent
+            useEffect(() => {
+                if (selectedSequenceIndex !== null && selectedSequenceIndex >= 0) {
+                    setHighlightedSequence(selectedSequenceIndex);
+                } else {
+                    setHighlightedSequence(null);
+                }
+            }, [selectedSequenceIndex, tree.sequences]);
+
+            useEffect(() => {
+                if (!tree || !headerCanvasRef.current || !sequenceCanvasRef.current) return;
+
+                const headerCanvas = headerCanvasRef.current;
+                const sequenceCanvas = sequenceCanvasRef.current;
+                const container = containerRef.current;
+
+                // Capture the viewable window width ONCE when tree loads
+                // This ensures the tree doesn't grow as different trees are selected
+                if (!viewportWidthRef.current || !isInitialized) {
+                    viewportWidthRef.current = container.clientWidth;
+                }
+                const width = viewportWidthRef.current;
+                const height = container.clientHeight;
+
+                // Calculate layout first to determine actual content height
+                // Use the fixed viewport width to ensure the tree doesn't exceed viewable area
+                const tempLayout = calculateEventTreeLayout(tree, width, 2000, boxMultiplier, settings, fontMultiplier);
+                
+                // Find the maximum Y position of all sequences
+                const maxSequenceY = Math.max(...tempLayout.endStateY);
+                const minSequenceY = Math.min(...tempLayout.endStateY);
+                const contentHeight = maxSequenceY + 100; // Add padding at bottom
+                
+                // Set canvas sizes
+                const canvasWidth = width;
+                const canvasHeight = Math.max(contentHeight, height - HEADER_HEIGHT + 200);
+                
+                headerCanvas.width = canvasWidth;
+                headerCanvas.height = HEADER_HEIGHT;
+                sequenceCanvas.width = canvasWidth;
+                sequenceCanvas.height = canvasHeight;
+                
+                // Store dimensions for styling
+                setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
+
+                // Calculate layout with proper dimensions
+                const layout = calculateEventTreeLayout(tree, canvasWidth, canvasHeight + HEADER_HEIGHT, boxMultiplier, settings, fontMultiplier);
+                layoutRef.current = layout;
+
+                // Mark as initialized on first load
+                if (!isInitialized) {
+                    setIsInitialized(true);
+                }
+
+                // Draw header (IE and TEs)
+                const headerCtx = headerCanvas.getContext('2d');
+                headerCtx.clearRect(0, 0, headerCanvas.width, headerCanvas.height);
+                
+                headerCtx.save();
+                headerCtx.scale(scale, scale);
+
+                // Draw IE box with description
+                const ieDescription = tree.ieDescription || '';
+                drawBoxWithDescription(headerCtx, layout.ieX, layout.ieY, layout.ieBoxWidth, layout.boxHeight, 
+                    tree.initiatingEvent.name, ieDescription, '#fef3c7', fontMultiplier, false, settings.background);
+
+                // Draw TE boxes with descriptions
+                tree.topEvents.forEach((te, idx) => {
+                    // Get description from the topEvent object itself, with fallback to eventDescriptions
+                    const description = te.description || eventDescriptions[te.name] || '';
+                    
+                    // Determine color based on highlighted sequence
+                    let teColor = '#dbeafe'; // Default light blue (PASS)
+                    
+                    if (highlightedSequence !== null && highlightedSequence >= 0 && highlightedSequence < tree.sequences.length) {
+                        const seq = tree.sequences[highlightedSequence];
+                        if (seq.path && seq.path[idx]) {
+                            const branch = seq.path[idx].branch;
+                            if (branch === 'SUCCESS') {
+                                teColor = '#d1fae5'; // Light green
+                            } else if (branch === 'FAILURE') {
+                                teColor = '#fecaca'; // Light red
+                            }
+                            // PASS remains light blue (#dbeafe)
+                        }
+                    }
+                    
+                    drawBoxWithDescription(headerCtx, layout.teX[idx], layout.ieY, layout.teBoxWidth, layout.boxHeight,
+                        te.name, description, teColor, fontMultiplier, false, settings.background);
+                });
+
+                // Draw End States label box
+                drawBox(headerCtx, layout.endStateLabelX, layout.ieY, layout.endStateLabelBoxWidth, layout.boxHeight,
+                    'End States', '#d1fae5', fontMultiplier, false, settings.background);
+
+                headerCtx.restore();
+
+                // Draw sequences
+                const seqCtx = sequenceCanvas.getContext('2d');
+                seqCtx.clearRect(0, 0, sequenceCanvas.width, sequenceCanvas.height);
+                seqCtx.save();
+                seqCtx.scale(scale, scale);
+
+                drawSequences(seqCtx, tree, layout, highlightedSequence, settings, fontMultiplier, project);
+
+                seqCtx.restore();
+            }, [tree, scale, settings, isInitialized, fontMultiplier, boxMultiplier, eventDescriptions, project]);
+
+            // Separate effect to redraw sequences when highlightedSequence changes
+            useEffect(() => {
+                if (!sequenceCanvasRef.current || !layoutRef.current) return;
+                
+                const sequenceCanvas = sequenceCanvasRef.current;
+                const seqCtx = sequenceCanvas.getContext('2d');
+                
+                seqCtx.clearRect(0, 0, sequenceCanvas.width, sequenceCanvas.height);
+                seqCtx.save();
+                seqCtx.scale(scale, scale);
+
+                drawSequences(seqCtx, tree, layoutRef.current, highlightedSequence, settings, fontMultiplier, project);
+
+                seqCtx.restore();
+                
+                // Also redraw header to update top event colors
+                if (!headerCanvasRef.current) return;
+                
+                const headerCanvas = headerCanvasRef.current;
+                const headerCtx = headerCanvas.getContext('2d');
+                const layout = layoutRef.current;
+                
+                headerCtx.clearRect(0, 0, headerCanvas.width, headerCanvas.height);
+                headerCtx.save();
+                headerCtx.scale(scale, scale);
+
+                // Draw IE box with description
+                const ieDescription = tree.ieDescription || '';
+                drawBoxWithDescription(headerCtx, layout.ieX, layout.ieY, layout.ieBoxWidth, layout.boxHeight, 
+                    tree.initiatingEvent.name, ieDescription, '#fef3c7', fontMultiplier, false, settings.background);
+
+                // Draw TE boxes with descriptions and colors based on highlighted sequence
+                tree.topEvents.forEach((te, idx) => {
+                    const description = te.description || eventDescriptions[te.name] || '';
+                    
+                    // Determine color based on highlighted sequence
+                    let teColor = '#dbeafe'; // Default light blue (PASS)
+                    
+                    if (highlightedSequence !== null && highlightedSequence >= 0 && highlightedSequence < tree.sequences.length) {
+                        const seq = tree.sequences[highlightedSequence];
+                        if (seq.path && seq.path[idx]) {
+                            const branch = seq.path[idx].branch;
+                            if (branch === 'SUCCESS') {
+                                teColor = '#d1fae5'; // Light green
+                            } else if (branch === 'FAILURE') {
+                                teColor = '#fecaca'; // Light red
+                            }
+                        }
+                    }
+                    
+                    drawBoxWithDescription(headerCtx, layout.teX[idx], layout.ieY, layout.teBoxWidth, layout.boxHeight,
+                        te.name, description, teColor, fontMultiplier, false, settings.background);
+                });
+
+                // Draw End States label box
+                drawBox(headerCtx, layout.endStateLabelX, layout.ieY, layout.endStateLabelBoxWidth, layout.boxHeight,
+                    'End States', '#d1fae5', fontMultiplier, false, settings.background);
+
+                headerCtx.restore();
+            }, [highlightedSequence]);
+
+            useEffect(() => {
+                setIsInitialized(false);
+                setHighlightedSequence(null);
+                setTooltipInfo(null); // Clear tooltip when tree changes
+                viewportWidthRef.current = null; // Reset viewport width for new tree
+                
+                // Calculate scale based on defaultViewStyle setting
+                if (settings.defaultViewStyle === 'fit' && containerRef.current && layoutRef.current) {
+                    const containerWidth = containerRef.current.clientWidth;
+                    const layout = layoutRef.current;
+                    
+                    // Calculate total content width (from left margin to end of end boxes)
+                    const contentWidth = layout.endX + layout.endBoxWidth / 2 + 50; // Add right margin
+                    
+                    // Calculate scale to fit width with some padding
+                    const fitScale = (containerWidth * 0.95) / contentWidth;
+                    setScale(Math.min(1, fitScale)); // Don't zoom in beyond 100%
+                } else {
+                    setScale(1);
+                }
+                
+                // Reset scroll position
+                const scrollContainer = scrollContainerRef.current;
+                if (scrollContainer) {
+                    scrollContainer.scrollLeft = 0;
+                    scrollContainer.scrollTop = 0;
+                }
+            }, [tree, settings.defaultViewStyle]);
+
+            // Sync horizontal scroll between header and sequence canvas
+            useEffect(() => {
+                const scrollContainer = scrollContainerRef.current;
+                if (!scrollContainer) return;
+
+                const handleScroll = () => {
+                    setScrollOffset({
+                        x: scrollContainer.scrollLeft,
+                        y: scrollContainer.scrollTop
+                    });
+                };
+
+                scrollContainer.addEventListener('scroll', handleScroll);
+                return () => scrollContainer.removeEventListener('scroll', handleScroll);
+            }, []);
+
+            function drawSequences(ctx, tree, layout, highlightedSequence, settings, fontMultiplier, project) {
+                // Determine line color based on background
+                const normalLineColor = settings.background === 'dark' ? '#ffffff' : '#374151';
+                const highlightLineColor = '#FF6B35'; // Bright orange for highlight
+                
+                // Helper function to get branch label based on settings
+                const getBranchLabel = (branch) => {
+                    if (settings.branchLabeling === 'hide') return null;
+                    if (settings.branchLabeling === 'showFull') {
+                        return branch === 'SUCCESS' ? 'Success' : 'Failure';
+                    }
+                    // Default: 'showSF'
+                    return branch === 'SUCCESS' ? 'S' : 'F';
+                };
+                
+                // Draw sequence lines - non-highlighted first, then highlighted last
+                // First pass: draw all non-highlighted sequences
+                tree.sequences.forEach((seq, idx) => {
+                    const isHighlighted = highlightedSequence === idx;
+                    if (isHighlighted) return; // Skip highlighted for now
+                    
+                    // Use normal color for non-highlighted
+                    ctx.strokeStyle = normalLineColor;
+                    ctx.lineWidth = 4;
+
+                    layout.sequenceSegments[idx].forEach(segment => {
+                        ctx.beginPath();
+                        ctx.moveTo(segment.x1, segment.y1);
+                        ctx.lineTo(segment.x2, segment.y2);
+                        ctx.stroke();
+
+                        // Draw branch label
+                        if (segment.type === 'branch') {
+                            const label = getBranchLabel(segment.branch);
+                            if (label) {
+                                ctx.fillStyle = normalLineColor;
+                                ctx.font = `bold ${12 * fontMultiplier}px Arial`;
+                                
+                                // Position S near top of branch line, F near bottom of branch line
+                                // Use Math.min/max to handle branches going up or down
+                                const labelY = segment.branch === 'SUCCESS' 
+                                    ? Math.min(segment.y1, segment.y2) + 15  // S at 15px below top end
+                                    : Math.max(segment.y1, segment.y2) - 15; // F at 15px above bottom end
+                                
+                                ctx.fillText(label, segment.x1 + 5, labelY);
+                            }
+                        }
+                    });
+                });
+
+                // Second pass: draw highlighted sequence last so it appears on top
+                if (highlightedSequence !== null && highlightedSequence >= 0 && highlightedSequence < tree.sequences.length) {
+                    const idx = highlightedSequence;
+                    
+                    // Use bright orange for highlighted
+                    ctx.strokeStyle = highlightLineColor;
+                    ctx.lineWidth = 6; // Thicker line for highlighted
+
+                    layout.sequenceSegments[idx].forEach(segment => {
+                        ctx.beginPath();
+                        ctx.moveTo(segment.x1, segment.y1);
+                        ctx.lineTo(segment.x2, segment.y2);
+                        ctx.stroke();
+
+                        // Draw branch label
+                        if (segment.type === 'branch') {
+                            const label = getBranchLabel(segment.branch);
+                            if (label) {
+                                ctx.fillStyle = highlightLineColor;
+                                ctx.font = `bold ${12 * fontMultiplier}px Arial`;
+                                
+                                // Position S near top of branch line, F near bottom of branch line
+                                // Use Math.min/max to handle branches going up or down
+                                const labelY = segment.branch === 'SUCCESS' 
+                                    ? Math.min(segment.y1, segment.y2) + 15  // S at 15px below top end
+                                    : Math.max(segment.y1, segment.y2) - 15; // F at 15px above bottom end
+                                
+                                ctx.fillText(label, segment.x1 + 5, labelY);
+                            }
+                        }
+                    });
+                }
+
+                // Draw end state boxes with uniform width
+                tree.sequences.forEach((seq, idx) => {
+                    const isHighlighted = highlightedSequence === idx;
+                    // Use bright yellow-orange for highlighted end state, normal green for others
+                    const color = isHighlighted ? '#FFD93D' : '#d1fae5';
+                    
+                    // Text in box: only end state and optionally frequency (no sequence name/number)
+                    const text = settings.showFrequency && seq.frequency
+                        ? `${seq.endState}\n${seq.frequency.toExponential(2)}`
+                        : seq.endState;
+                    
+                    // Use uniform width for all end boxes (widest one)
+                    const boxWidth = layout.endBoxWidth;
+                    const boxHeight = layout.boxHeight;
+                    const boxX = layout.endX;
+                    const boxY = layout.endStateY[idx];
+                    
+                    // Draw the main end state box
+                    drawBox(ctx, boxX, boxY, boxWidth, boxHeight,
+                        text, color, fontMultiplier, false, settings.background);
+                    
+                    // Draw sequence number circle on the left side
+                    const circleRadius = 14 * fontMultiplier;
+                    const circleX = boxX - boxWidth/2 - circleRadius - 5; // 5px gap from box
+                    const circleY = boxY;
+                    
+                    // Determine border color based on background
+                    const borderColor = settings.background === 'dark' ? '#ffffff' : '#000000';
+                    
+                    // Draw circle
+                    ctx.fillStyle = isHighlighted ? '#FFD93D' : '#ffffff';
+                    ctx.strokeStyle = borderColor;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Draw sequence number in circle (just the number, no "S")
+                    ctx.fillStyle = '#000000';
+                    ctx.font = `bold ${11 * fontMultiplier}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(String(idx + 1), circleX, circleY);
+                    
+                    // Draw transfer arrow on the right side if applicable
+                    if (seq.transfer) {
+                        const arrowX = boxX + boxWidth/2 + 5; // 5px gap from box
+                        const arrowY = boxY;
+                        const arrowWidth = 28 * fontMultiplier; // Increased from 20 to 28
+                        const arrowHeight = 40 * fontMultiplier; // Doubled vertical size
+                        
+                        // Check if target tree exists (endState name matches a tree name in project)
+                        const targetTreeExists = project && project.trees && 
+                            project.trees.some(t => t.name === seq.endState);
+                        
+                        // Draw arrow
+                        ctx.fillStyle = targetTreeExists ? '#fef3c7' : '#9ca3af'; // Yellow (IE color) if exists, grey if not
+                        ctx.strokeStyle = targetTreeExists ? '#f59e0b' : '#6b7280';
+                        ctx.lineWidth = 3; // Increased from 2 to 3
+                        
+                        ctx.beginPath();
+                        // Right-pointing triangle arrow with doubled height
+                        ctx.moveTo(arrowX, arrowY - arrowHeight/2);      // Top left of base
+                        ctx.lineTo(arrowX + arrowWidth, arrowY);         // Tip (points right)
+                        ctx.lineTo(arrowX, arrowY + arrowHeight/2);      // Bottom left of base
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                });
+            }
+
+            function drawBox(ctx, x, y, w, h, text, color, fontMult, dashed = false, background = 'light') {
+                // Determine border color based on background (text always black)
+                const borderColor = background === 'dark' ? '#ffffff' : '#000000';
+                const textColor = '#000000'; // Always black text
+                
+                ctx.fillStyle = color;
+                ctx.strokeStyle = borderColor;
+                ctx.lineWidth = 2;
+
+                if (dashed) {
+                    ctx.setLineDash([5, 5]);
+                }
+
+                ctx.fillRect(x - w/2, y - h/2, w, h);
+                ctx.strokeRect(x - w/2, y - h/2, w, h);
+                
+                if (dashed) {
+                    ctx.setLineDash([]);
+                }
+
+                ctx.fillStyle = textColor;
+                ctx.font = `${12 * fontMult}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const lines = text.split('\n');
+                const lineHeight = 15 * fontMult;
+                const startY = y - ((lines.length - 1) * lineHeight) / 2;
+
+                lines.forEach((line, idx) => {
+                    ctx.fillText(line, x, startY + idx * lineHeight);
+                });
+            }
+
+            function drawBoxWithDescription(ctx, x, y, w, h, name, description, color, fontMult, dashed = false, background = 'light') {
+                // Determine border color based on background (text always black)
+                const borderColor = background === 'dark' ? '#ffffff' : '#000000';
+                const textColor = '#000000'; // Always black text
+                
+                ctx.fillStyle = color;
+                ctx.strokeStyle = borderColor;
+                ctx.lineWidth = 2;
+
+                if (dashed) {
+                    ctx.setLineDash([5, 5]);
+                }
+
+                ctx.fillRect(x - w/2, y - h/2, w, h);
+                ctx.strokeRect(x - w/2, y - h/2, w, h);
+                
+                if (dashed) {
+                    ctx.setLineDash([]);
+                }
+
+                ctx.fillStyle = textColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Draw name in regular font
+                ctx.font = `bold ${12 * fontMult}px Arial`;
+                const nameY = description ? y - 12 * fontMult : y;
+                ctx.fillText(name, x, nameY);
+
+                // Draw description in smaller font if present
+                if (description) {
+                    ctx.font = `${11 * fontMult}px Arial`;
+                    
+                    // Word wrap description to fit in box
+                    const maxWidth = w - 10;
+                    const words = description.split(' ');
+                    const lines = [];
+                    let currentLine = '';
+
+                    words.forEach(word => {
+                        const testLine = currentLine ? `${currentLine} ${word}` : word;
+                        const metrics = ctx.measureText(testLine);
+                        
+                        if (metrics.width > maxWidth && currentLine) {
+                            lines.push(currentLine);
+                            currentLine = word;
+                        } else {
+                            currentLine = testLine;
+                        }
+                    });
+                    
+                    if (currentLine) {
+                        lines.push(currentLine);
+                    }
+
+                    // Draw description lines (limit to 2 lines)
+                    const descLines = lines.slice(0, 2);
+                    const lineHeight = 12 * fontMult;
+                    const descStartY = y + 4 * fontMult;
+
+                    descLines.forEach((line, idx) => {
+                        ctx.fillText(line, x, descStartY + idx * lineHeight);
+                    });
+                }
+            }
+
+            function handleMouseDown(e) {
+                const canvas = sequenceCanvasRef.current;
+                const scrollContainer = scrollContainerRef.current;
+                
+                if (!canvas || !scrollContainer) return;
+                
+                // Get the bounding rectangles
+                const containerRect = scrollContainer.getBoundingClientRect();
+                
+                // Calculate position relative to the container's viewport
+                const containerX = e.clientX - containerRect.left;
+                const containerY = e.clientY - containerRect.top;
+                
+                // Add scroll offset to get actual position in canvas content
+                const canvasX = (containerX + scrollContainer.scrollLeft) / scale;
+                const canvasY = (containerY + scrollContainer.scrollTop) / scale;
+
+                let clickHandled = false;
+                
+                // Check if clicked on a transfer arrow first (priority over box clicks)
+                if (layoutRef.current && project && onTreeSwitch) {
+                    tree.sequences.forEach((seq, idx) => {
+                        if (clickHandled || !seq.transfer) return;
+                        
+                        const endY = layoutRef.current.endStateY[idx];
+                        const endX = layoutRef.current.endX;
+                        const boxWidth = layoutRef.current.endBoxWidth;
+                        const arrowWidth = 20 * fontMultiplier;
+                        const arrowHeight = 40 * fontMultiplier; // Doubled vertical size
+                        const arrowX = endX + boxWidth/2 + 5;
+                        const arrowY = endY;
+                        
+                        // Check if target tree exists (only clickable if yellow)
+                        const targetTreeIndex = project.trees.findIndex(t => t.name === seq.endState);
+                        const isClickable = targetTreeIndex >= 0;
+                        
+                        
+                        // Expanded click detection area for easier clicking
+                        const clickPadding = 5; // Extra pixels around arrow for easier clicking
+                        if (isClickable && 
+                            canvasX >= arrowX - clickPadding && 
+                            canvasX <= arrowX + arrowWidth + clickPadding &&
+                            canvasY >= arrowY - arrowHeight/2 - clickPadding && 
+                            canvasY <= arrowY + arrowHeight/2 + clickPadding) {
+                            
+                            clickHandled = true;
+                            // Switch to the target tree
+                            onTreeSwitch(targetTreeIndex);
+                        }
+                    });
+                }
+                
+                // Check if clicked on end state box
+                if (!clickHandled && layoutRef.current) {
+                    tree.sequences.forEach((seq, idx) => {
+                        if (clickHandled) return;
+                        
+                        const endY = layoutRef.current.endStateY[idx];
+                        const endX = layoutRef.current.endX;
+                        const boxWidth = layoutRef.current.endBoxWidth;
+                        const boxHeight = layoutRef.current.boxHeight;
+                        
+                        if (Math.abs(canvasX - endX) < boxWidth/2 && Math.abs(canvasY - endY) < boxHeight/2) {
+                            clickHandled = true;
+                            // Toggle highlight: if already highlighted, clear it; otherwise highlight it
+                            setHighlightedSequence(prev => prev === idx ? null : idx);
+                            // Call the parent's onSequenceClick handler to show cut sets
+                            if (onSequenceClick) {
+                                onSequenceClick(idx);
+                            }
+                        }
+                    });
+                }
+
+                if (!clickHandled) {
+                    e.preventDefault();
+                    setIsDragging(true);
+                    setTooltipInfo(null); // Clear tooltip when starting to drag
+                    setDragStart({ 
+                        x: e.clientX + scrollContainer.scrollLeft, 
+                        y: e.clientY + scrollContainer.scrollTop 
+                    });
+                }
+            }
+
+            function handleMouseMove(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    const scrollContainer = scrollContainerRef.current;
+                    if (scrollContainer) {
+                        scrollContainer.scrollLeft = dragStart.x - e.clientX;
+                        scrollContainer.scrollTop = dragStart.y - e.clientY;
+                    }
+                } else {
+                    // Check if hovering over an end state box for tooltip
+                    const canvas = sequenceCanvasRef.current;
+                    const layout = layoutRef.current;
+                    const scrollContainer = scrollContainerRef.current;
+                    const container = containerRef.current;
+                    
+                    if (canvas && layout && scrollContainer && container) {
+                        const containerRect = scrollContainer.getBoundingClientRect();
+                        const parentContainerRect = container.getBoundingClientRect();
+                        
+                        // Calculate position relative to the scroll container's viewport
+                        const containerX = e.clientX - containerRect.left;
+                        const containerY = e.clientY - containerRect.top;
+                        
+                        // Add scroll offset to get actual position in canvas content
+                        const canvasX = (containerX + scrollContainer.scrollLeft) / scale;
+                        const canvasY = (containerY + scrollContainer.scrollTop) / scale;
+                        
+                        const endX = layout.endX;
+                        const boxWidth = layout.endBoxWidth;
+                        const boxHeight = layout.boxHeight;
+                        
+                        let foundTooltip = null;
+                        let isOverClickableArrow = false;
+                        
+                        tree.sequences.forEach((seq, idx) => {
+                            const endY = layout.endStateY[idx];
+                            
+                            // Check if hovering over a clickable transfer arrow
+                            if (seq.transfer && project && project.trees) {
+                                const arrowWidth = 20 * fontMultiplier;
+                                const arrowHeight = 40 * fontMultiplier;
+                                const arrowX = endX + boxWidth/2 + 5;
+                                const arrowY = endY;
+                                const targetTreeIndex = project.trees.findIndex(t => t.name === seq.endState);
+                                const isClickable = targetTreeIndex >= 0;
+                                
+                                const clickPadding = 5;
+                                if (isClickable &&
+                                    canvasX >= arrowX - clickPadding && 
+                                    canvasX <= arrowX + arrowWidth + clickPadding &&
+                                    canvasY >= arrowY - arrowHeight/2 - clickPadding && 
+                                    canvasY <= arrowY + arrowHeight/2 + clickPadding) {
+                                    isOverClickableArrow = true;
+                                }
+                            }
+                            
+                            // Check if hovering over end state box for tooltip
+                            if (Math.abs(canvasX - endX) < boxWidth/2 && Math.abs(canvasY - endY) < boxHeight/2) {
+                                // Mouse is over this end state box
+                                if (seq.comments && seq.comments.trim() !== '') {
+                                    // Calculate position relative to parent container for tooltip display
+                                    const tooltipX = e.clientX - parentContainerRect.left;
+                                    const tooltipY = e.clientY - parentContainerRect.top;
+                                    
+                                    // Check if tooltip would go off right edge
+                                    const tooltipWidth = 300;
+                                    const offsetX = (tooltipX + 10 + tooltipWidth > parentContainerRect.width) ? -tooltipWidth - 10 : 10;
+                                    
+                                    foundTooltip = {
+                                        text: seq.comments,
+                                        x: tooltipX + offsetX,
+                                        y: tooltipY + 10
+                                    };
+                                }
+                            }
+                        });
+                        
+                        // Update cursor style
+                        canvas.style.cursor = isOverClickableArrow ? 'pointer' : 'grab';
+                        
+                        setTooltipInfo(foundTooltip);
+                    }
+                }
+            }
+
+            function handleMouseUp(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                }
+                setIsDragging(false);
+            }
+
+            function handleMouseLeave(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                }
+                setIsDragging(false);
+                setTooltipInfo(null); // Clear tooltip when mouse leaves canvas
+            }
+
+            function handleWheel(e) {
+                // Only zoom when Ctrl or Cmd is held, otherwise allow normal scroll
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                    setScale(prev => Math.max(0.1, Math.min(3, prev + delta)));
+                }
+                // Normal wheel events without Ctrl will scroll naturally
+            }
+
+            useEffect(() => {
+                const container = scrollContainerRef.current;
+                if (!container) return;
+
+                // Use passive: false only for Ctrl+Wheel to enable preventDefault
+                container.addEventListener('wheel', handleWheel, { passive: false });
+                return () => container.removeEventListener('wheel', handleWheel);
+            }, []);
+
+            function handleZoomIn() {
+                setScale(prev => Math.min(3, prev + 0.2));
+            }
+
+            function handleZoomOut() {
+                setScale(prev => Math.max(0.1, prev - 0.2));
+            }
+
+            function handleReset() {
+                setScale(1);
+                const scrollContainer = scrollContainerRef.current;
+                if (scrollContainer) {
+                    scrollContainer.scrollLeft = 0;
+                    scrollContainer.scrollTop = 0;
+                }
+            }
+
+            function handleDownload() {
+                if (!headerCanvasRef.current || !sequenceCanvasRef.current) return;
+
+                try {
+                    // Create a temporary canvas to combine both canvases
+                    const tempCanvas = document.createElement('canvas');
+                    const headerCanvas = headerCanvasRef.current;
+                    const seqCanvas = sequenceCanvasRef.current;
+                    
+                    tempCanvas.width = Math.max(headerCanvas.width, seqCanvas.width);
+                    tempCanvas.height = headerCanvas.height + seqCanvas.height;
+                    
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.fillStyle = backgroundStyle.backgroundColor || '#ffffff';
+                    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                    
+                    tempCtx.drawImage(headerCanvas, 0, 0);
+                    tempCtx.drawImage(seqCanvas, 0, headerCanvas.height);
+
+                    const treeName = tree.name || 'event_tree';
+                    const fileName = `${treeName.replace(/[^a-z0-9]/gi, '_')}.png`;
+                    const dataURL = tempCanvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.download = fileName;
+                    link.href = dataURL;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } catch (err) {
+                    alert('Failed to download: ' + err.message);
+                }
+            }
+
+            async function handleCopyToClipboard(e) {
+                if (!headerCanvasRef.current || !sequenceCanvasRef.current) return;
+
+                try {
+                    // Create a temporary canvas to combine both canvases
+                    const tempCanvas = document.createElement('canvas');
+                    const headerCanvas = headerCanvasRef.current;
+                    const seqCanvas = sequenceCanvasRef.current;
+                    
+                    tempCanvas.width = Math.max(headerCanvas.width, seqCanvas.width);
+                    tempCanvas.height = headerCanvas.height + seqCanvas.height;
+                    
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.fillStyle = backgroundStyle.backgroundColor || '#ffffff';
+                    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                    
+                    tempCtx.drawImage(headerCanvas, 0, 0);
+                    tempCtx.drawImage(seqCanvas, 0, headerCanvas.height);
+
+                    // Get button reference for visual feedback
+                    const btn = e ? e.target.closest('button') : null;
+
+                    // Convert canvas to blob and copy to clipboard
+                    tempCanvas.toBlob(async (blob) => {
+                        try {
+                            await navigator.clipboard.write([
+                                new ClipboardItem({ 'image/png': blob })
+                            ]);
+                            // Brief visual feedback
+                            if (btn) {
+                                const originalTitle = btn.title;
+                                btn.title = 'Copied!';
+                                btn.style.backgroundColor = '#86efac';
+                                setTimeout(() => {
+                                    btn.title = originalTitle;
+                                    btn.style.backgroundColor = '';
+                                }, 1000);
+                            }
+                        } catch (err) {
+                            alert('Failed to copy to clipboard: ' + err.message);
+                        }
+                    }, 'image/png');
+                } catch (err) {
+                    alert('Failed to copy to clipboard: ' + err.message);
+                }
+            }
+
+            return (
+                <div ref={containerRef} className="relative w-full h-full flex flex-col" style={{...backgroundStyle, overflow: 'hidden'}}>
+                    {/* Fixed Header */}
+                    <div className="relative" style={{ 
+                        height: `${HEADER_HEIGHT}px`, 
+                        overflow: 'hidden',
+                        backgroundColor: '#f3f4f6',
+                        borderBottom: settings.background === 'dark' ? '2px solid #ffffff' : '2px solid #e5e7eb'
+                    }}>
+                        <div style={{ 
+                            position: 'relative',
+                            transform: `translateX(${-scrollOffset.x}px)`,
+                            transition: 'transform 0s'
+                        }}>
+                            <canvas
+                                ref={headerCanvasRef}
+                                style={{ 
+                                    display: 'block',
+                                    height: `${HEADER_HEIGHT}px`,
+                                    backgroundColor: 'transparent',
+                                    maxWidth: '100%'
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Scrollable Sequences */}
+                    <div 
+                        ref={scrollContainerRef}
+                        className="flex-1"
+                        style={{ 
+                            overflow: 'auto',
+                            cursor: isDragging ? 'grabbing' : 'grab',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                            msUserSelect: 'none'
+                        }}
+                    >
+                        <canvas
+                            ref={sequenceCanvasRef}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseLeave}
+                            style={{ 
+                                display: 'block',
+                                width: `${canvasDimensions.width}px`,
+                                height: `${canvasDimensions.height}px`,
+                                maxWidth: '100%'
+                            }}
+                        />
+                    </div>
+
+                    {/* Controls */}
+                    <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-2 flex gap-2" 
+                         style={{ color: '#000000', zIndex: 1000 }}>
+                        <button onClick={handleZoomIn} className="p-2 hover:bg-gray-100 rounded" title="Zoom In">
+                            <ZoomInIcon />
+                        </button>
+                        <button onClick={handleZoomOut} className="p-2 hover:bg-gray-100 rounded" title="Zoom Out">
+                            <ZoomOutIcon />
+                        </button>
+                        <button onClick={handleReset} className="p-2 hover:bg-gray-100 rounded" title="Reset View">
+                            <RefreshIcon />
+                        </button>
+                        <div className="border-l border-gray-300 mx-1"></div>
+                        <button onClick={handleDownload} className="p-2 hover:bg-gray-100 rounded" title="Download as PNG">
+                            <DownloadIcon />
+                        </button>
+                        <button onClick={handleCopyToClipboard} className="p-2 hover:bg-gray-100 rounded" title="Copy to Clipboard">
+                            <CopyIcon />
+                        </button>
+                        <div className="px-3 py-2 text-sm font-medium text-gray-700">
+                            {Math.round(scale * 100)}%
+                        </div>
+                    </div>
+                    
+                    {/* Scroll Instructions */}
+                    <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 text-xs text-gray-600 max-w-xs" 
+                         style={{ zIndex: 1000 }}>
+                        <div className="font-semibold mb-1">Controls:</div>
+                        <div>• Mouse wheel: Scroll up/down</div>
+                        <div>• Ctrl+Mouse wheel: Zoom in/out</div>
+                        <div>• Click end states: Highlight sequence</div>
+                    </div>
+
+                    {/* Tooltip */}
+                    {tooltipInfo && (
+                        <div 
+                            className="absolute bg-gray-800 text-white text-sm rounded px-3 py-2 shadow-lg pointer-events-none"
+                            style={{
+                                left: `${tooltipInfo.x}px`,
+                                top: `${tooltipInfo.y}px`,
+                                maxWidth: '300px',
+                                zIndex: 2000
+                            }}
+                        >
+                            {tooltipInfo.text}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ============================================================================
+        // SETTINGS MODAL
+        // ============================================================================
+
+        function SettingsModal({ settings, onSave, onClose }) {
+            const [localSettings, setLocalSettings] = useState({ ...settings });
+
+            const handleChange = (key, value) => {
+                setLocalSettings(prev => ({ ...prev, [key]: value }));
+            };
+
+            const handleSave = () => {
+                SettingsManager.save(localSettings);
+                onSave(localSettings);
+                onClose();
+            };
+
+            const handleReset = () => {
+                const defaults = SettingsManager.reset();
+                setLocalSettings(defaults);
+                SettingsManager.save(defaults);
+                onSave(defaults);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full m-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-gray-800">Settings</h2>
+                                <button onClick={onClose} className="text-gray-500 hover:text-gray-700">×</button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Text Font Size</label>
+                                    <div className="flex gap-2">
+                                        {['small', 'medium', 'large'].map(size => (
+                                            <button
+                                                key={size}
+                                                onClick={() => handleChange('fontSize', size)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.fontSize === size
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {size.charAt(0).toUpperCase() + size.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Box Size</label>
+                                    <div className="flex gap-2">
+                                        {['small', 'medium', 'large'].map(size => (
+                                            <button
+                                                key={size}
+                                                onClick={() => handleChange('boxSize', size)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.boxSize === size
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {size.charAt(0).toUpperCase() + size.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Background</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'light', label: 'Light' },
+                                            { value: 'dark', label: 'Dark' },
+                                            { value: 'grid', label: 'Grid' }
+                                        ].map(bg => (
+                                            <button
+                                                key={bg.value}
+                                                onClick={() => handleChange('background', bg.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.background === bg.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {bg.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">End State Vertical Spacing</label>
+                                    <div className="flex gap-2">
+                                        {['small', 'medium', 'large'].map(size => (
+                                            <button
+                                                key={size}
+                                                onClick={() => handleChange('verticalSpacing', size)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.verticalSpacing === size
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {size.charAt(0).toUpperCase() + size.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Branch Labeling</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'showSF', label: 'Show S/F' },
+                                            { value: 'showFull', label: 'Show Success/Failure' },
+                                            { value: 'hide', label: 'Do not show' }
+                                        ].map(option => (
+                                            <button
+                                                key={option.value}
+                                                onClick={() => handleChange('branchLabeling', option.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.branchLabeling === option.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Show Frequency on End States</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleChange('showFrequency', true)}
+                                            className={`flex-1 px-4 py-2 rounded ${
+                                                localSettings.showFrequency
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            Show
+                                        </button>
+                                        <button
+                                            onClick={() => handleChange('showFrequency', false)}
+                                            className={`flex-1 px-4 py-2 rounded ${
+                                                !localSettings.showFrequency
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            Hide
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Default View Style</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'fit', label: 'Fit to Window' },
+                                            { value: '100', label: '100%' }
+                                        ].map(style => (
+                                            <button
+                                                key={style.value}
+                                                onClick={() => handleChange('defaultViewStyle', style.value)}
+                                                className={`flex-1 px-4 py-2 rounded ${
+                                                    localSettings.defaultViewStyle === style.value
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {style.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between mt-4">
+                                <button onClick={handleReset} className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                    Reset to Defaults
+                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={onClose} className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                        Cancel
+                                    </button>
+                                    <button onClick={handleSave} className="px-4 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ============================================================================
+        // RESIZABLE SIDEBAR COMPONENT
+        // ============================================================================
+
+        function ResizableSidebar({ project, selectedTreeIndex, setSelectedTreeIndex, sequenceCutSets, selectedSequenceIndex, onSequenceClick, findCutSetsForSequence }) {
+            const [width, setWidth] = useState(256); // Default 256px (w-64)
+            const [isResizingWidth, setIsResizingWidth] = useState(false);
+            const [isResizingHeight, setIsResizingHeight] = useState(false);
+            const [topHeight, setTopHeight] = useState(40); // Default 40% for top section
+            const sidebarRef = useRef(null);
+
+            useEffect(() => {
+                const handleMouseMove = (e) => {
+                    if (isResizingWidth) {
+                        const newWidth = Math.max(200, Math.min(800, e.clientX));
+                        setWidth(newWidth);
+                    }
+                    if (isResizingHeight && sidebarRef.current) {
+                        const rect = sidebarRef.current.getBoundingClientRect();
+                        const newHeight = ((e.clientY - rect.top) / rect.height) * 100;
+                        setTopHeight(Math.max(20, Math.min(80, newHeight)));
+                    }
+                };
+
+                const handleMouseUp = () => {
+                    setIsResizingWidth(false);
+                    setIsResizingHeight(false);
+                };
+
+                if (isResizingWidth || isResizingHeight) {
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                }
+
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [isResizingWidth, isResizingHeight]);
+
+            return (
+                <div 
+                    ref={sidebarRef}
+                    className="bg-white border-r border-gray-200 relative flex flex-col"
+                    style={{ width: `${width}px`, minWidth: '200px', maxWidth: '600px' }}
+                >
+                    {/* Top section - Event Trees */}
+                    <div 
+                        className="p-4 overflow-y-auto"
+                        style={{ height: `${topHeight}%` }}
+                    >
+                        <h3 className="font-bold text-lg mb-2">{project.projectName}</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            {project.trees.length} event tree(s)
+                        </p>
+
+                        {/* Tree Selector */}
+                        <div className="space-y-2">
+                            {project.trees.map((tree, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setSelectedTreeIndex(index)}
+                                    className={`w-full text-left px-3 py-2 rounded text-xs ${
+                                        selectedTreeIndex === index
+                                            ? 'bg-blue-600 text-white'
+                                            : tree.isSubtree
+                                                ? 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    } ${!tree.isSubtree ? 'font-bold' : ''}`}
+                                >
+                                    {tree.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Horizontal resize handle */}
+                    <div
+                        className="w-full h-1 cursor-row-resize hover:bg-blue-500 transition-colors relative"
+                        style={{ 
+                            background: isResizingHeight ? '#3b82f6' : '#e5e7eb',
+                            height: '4px'
+                        }}
+                        onMouseDown={() => setIsResizingHeight(true)}
+                    />
+
+                    {/* Bottom section - Sequences */}
+                    <div 
+                        className="p-4 overflow-y-auto border-t"
+                        style={{ height: `${100 - topHeight}%` }}
+                    >
+                        <h4 className="font-semibold text-sm mb-2">
+                            {project.trees[selectedTreeIndex].name}
+                        </h4>
+                        <p className="text-xs text-gray-600 mb-3">
+                            {project.trees[selectedTreeIndex].sequences.length} sequence(s)
+                        </p>
+                        <div className="space-y-1">
+                            {project.trees[selectedTreeIndex].sequences.map((seq, idx) => {
+                                const treeName = project.trees[selectedTreeIndex].name;
+                                const cutSetsData = findCutSetsForSequence(treeName, seq.name, idx);
+                                
+                                // Check for cut sets in both grouped and non-grouped formats
+                                let hasCutSets = false;
+                                let cutSetsCount = 0;
+                                
+                                if (cutSetsData) {
+                                    if (cutSetsData.isGrouped) {
+                                        // New grouped format - check if any groups have cut sets
+                                        const groups = cutSetsData.groups || {};
+                                        Object.values(groups).forEach(group => {
+                                            if (group.cutSets && group.cutSets.length > 0) {
+                                                hasCutSets = true;
+                                                cutSetsCount += group.cutSets.length;
+                                            }
+                                        });
+                                    } else {
+                                        // Old non-grouped format
+                                        hasCutSets = cutSetsData.cutSets && cutSetsData.cutSets.length > 0;
+                                        cutSetsCount = cutSetsData.cutSets ? cutSetsData.cutSets.length : 0;
+                                    }
+                                }
+                                
+                                const isSelected = selectedSequenceIndex === idx;
+                                
+                                if (hasCutSets) {
+                                    // Clickable button for sequences with cut sets - LIGHT GREEN
+                                    return (
+                                        <button 
+                                            key={idx} 
+                                            className={`w-full text-left text-xs p-2 rounded transition-colors ${
+                                                isSelected
+                                                    ? 'bg-green-600 text-white font-bold'
+                                                    : 'bg-green-100 text-green-900 hover:bg-green-200 border border-green-300'
+                                            }`}
+                                            onClick={() => onSequenceClick(idx)}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="font-semibold">
+                                                        {seq.name ? `${seq.name} - ${seq.endState}` : seq.endState}
+                                                    </div>
+                                                    {seq.frequency > 0 && (
+                                                        <div className={`text-[10px] ${isSelected ? 'text-green-100' : 'text-green-700'}`}>
+                                                            Freq: {seq.frequency.toExponential(2)}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className={`text-[10px] ml-2 font-semibold ${isSelected ? 'text-green-100' : 'text-green-700'}`}>
+                                                    {cutSetsCount} cut set{cutSetsCount !== 1 ? 's' : ''}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                } else {
+                                    // Non-clickable div for sequences without cut sets - GRAY
+                                    return (
+                                        <div key={idx} className="text-xs bg-gray-100 text-gray-600 p-2 rounded">
+                                            <div>
+                                                {seq.name ? `${seq.name} - ${seq.endState}` : seq.endState}
+                                            </div>
+                                            {seq.frequency > 0 && (
+                                                <div className="text-[10px] text-gray-500">
+                                                    Freq: {seq.frequency.toExponential(2)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Vertical resize handle */}
+                    <div
+                        className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors"
+                        style={{ 
+                            background: isResizingWidth ? '#3b82f6' : 'transparent',
+                            width: '4px',
+                            marginRight: '-2px'
+                        }}
+                        onMouseDown={() => setIsResizingWidth(true)}
+                    />
+                </div>
+            );
+        }
+
+        // ============================================================================
+        // CUT SETS MODAL COMPONENT
+        // ============================================================================
+
+        // Cut Sets Floating Window Component (adapted from KURAS-FTL)
+        function CutSetsFloatingWindow({ 
+            cutSetsData, 
+            position, 
+            size, 
+            minimized,
+            onPositionChange, 
+            onSizeChange,
+            onMinimize,
+            onClose,
+            onMouseDown,
+            eventInfo,
+            eventDescriptions,
+            sequenceName,
+            treeName,
+            settings
+        }) {
+            const [isResizing, setIsResizing] = React.useState(false);
+            const [resizeStart, setResizeStart] = React.useState({ x: 0, y: 0, width: 0, height: 0 });
+            const [highlightedEvent, setHighlightedEvent] = React.useState(null);
+
+            // Check and adjust position to keep window in viewport
+            React.useEffect(() => {
+                const adjustedY = Math.max(20, position.y); // Ensure at least 20px from top
+                if (adjustedY !== position.y) {
+                    onPositionChange({ ...position, y: adjustedY });
+                }
+            }, [position.y]);
+
+            const handleResizeStart = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsResizing(true);
+                setResizeStart({
+                    x: e.clientX,
+                    y: e.clientY,
+                    width: size.width,
+                    height: size.height
+                });
+            };
+
+            React.useEffect(() => {
+                if (!isResizing) return;
+
+                const handleMouseMove = (e) => {
+                    const deltaX = e.clientX - resizeStart.x;
+                    const deltaY = e.clientY - resizeStart.y;
+                    const newWidth = Math.max(200, resizeStart.width + deltaX);
+                    const newHeight = Math.max(150, resizeStart.height + deltaY);
+                    onSizeChange({ width: newWidth, height: newHeight });
+                };
+
+                const handleMouseUp = () => {
+                    setIsResizing(false);
+                };
+
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [isResizing, resizeStart, onSizeChange]);
+
+            if (!cutSetsData) {
+                return null;
+            }
+            
+            // Check if this is grouped data or legacy single-group data
+            const isGrouped = cutSetsData.isGrouped === true;
+            
+            // For backward compatibility, handle both grouped and non-grouped data
+            if (!isGrouped && !cutSetsData.cutSets) {
+                return null;
+            }
+            
+            // Get font size classes based on settings
+            const getFontSizeClasses = () => {
+                switch(settings?.fontSize) {
+                    case 'small': return { title: 'text-xs', content: 'text-[10px]', groupHeader: 'text-[11px]' };
+                    case 'large': return { title: 'text-base', content: 'text-sm', groupHeader: 'text-base' };
+                    default: return { title: 'text-sm', content: 'text-xs', groupHeader: 'text-sm' }; // medium
+                }
+            };
+            
+            const fontSizeClasses = getFontSizeClasses();
+            
+            // Helper function to check if an event has a valid probability
+            // For complemented events (/EVENT), probability of 0 is valid (complement = 1)
+            const isEventValid = (event) => {
+                const eventName = typeof event === 'string' ? event : event.name;
+                const isComplement = typeof event === 'object' && event.complement;
+                
+                const info = eventInfo && eventInfo[eventName];
+                if (!info || info.Calc_Prob === undefined) {
+                    return false;
+                }
+                
+                // For complemented events, probability = 0 is valid (complement = 1)
+                if (isComplement && info.Calc_Prob === 0) {
+                    return true;
+                }
+                
+                // For normal events, probability must be non-zero
+                return info.Calc_Prob !== 0;
+            };
+            
+            // Helper function to check if a cut set has all valid events
+            const isCutSetValid = (cutSet) => {
+                return cutSet.every(event => isEventValid(event));
+            };
+            
+            // Helper function to calculate cut set probability
+            const calculateCutSetProbability = (cutSet) => {
+                let probability = 1.0;
+                
+                for (const event of cutSet) {
+                    const info = eventInfo && eventInfo[event.name];
+                    
+                    // Check if we have probability data
+                    if (!info || info.Calc_Prob === undefined) {
+                        // Missing probability data
+                        return null;
+                    }
+                    
+                    if (event.complement) {
+                        // Complemented event: use (1 - prob)
+                        // Special case: if prob = 0, complement = 1, which is valid
+                        const complementProb = 1.0 - info.Calc_Prob;
+                        probability *= complementProb;
+                    } else {
+                        // Normal event: use prob
+                        // If prob = 0, this makes the entire cut set probability 0 (invalid)
+                        if (info.Calc_Prob === 0) {
+                            return null;
+                        }
+                        probability *= info.Calc_Prob;
+                    }
+                }
+                
+                return probability;
+            };
+            
+            // Helper function to calculate probability for a group of cut sets
+            const calculateGroupProbability = (cutSets) => {
+                let groupProb = 1.0;
+                
+                for (const cutSet of cutSets) {
+                    // Skip cut sets with invalid events
+                    if (!isCutSetValid(cutSet)) {
+                        continue;
+                    }
+                    
+                    const csProb = calculateCutSetProbability(cutSet);
+                    if (csProb === null) {
+                        continue;
+                    }
+                    groupProb *= (1.0 - csProb);
+                }
+                
+                return 1.0 - groupProb;
+            };
+            
+            // Helper function to format probability
+            const formatProbability = (prob) => {
+                if (prob === null || prob === undefined) return 'N/A';
+                return prob.toExponential(2);
+            };
+            
+            // Helper function to get event tooltip
+            // Now accepts the full event object to check if it's complemented
+            const getEventTooltip = (event) => {
+                const eventName = typeof event === 'string' ? event : event.name;
+                const isComplement = typeof event === 'object' && event.complement;
+                
+                const info = eventInfo && eventInfo[eventName];
+                const description = eventDescriptions && eventDescriptions[eventName];
+                
+                const parts = [];
+                
+                // Add description first if available
+                if (description) {
+                    parts.push(description);
+                }
+                
+                // Check for missing or zero probability
+                if (!info || info.Calc_Prob === undefined) {
+                    parts.push('⚠️ MISSING PROBABILITY DATA');
+                } else if (info.Calc_Prob === 0 && !isComplement) {
+                    // Zero probability is only a problem for non-complemented events
+                    parts.push('⚠️ ZERO PROBABILITY');
+                } else {
+                    // Valid probability - show it
+                    parts.push(`Probability: ${formatProbability(info.Calc_Prob)}`);
+                    
+                    // If complemented, also show the complemented probability
+                    if (isComplement) {
+                        const complementProb = 1.0 - info.Calc_Prob;
+                        parts.push(`Complemented Probability: ${formatProbability(complementProb)}`);
+                    }
+                }
+                
+                // Could also show other useful info
+                if (info && info.Lambda !== undefined && info.Lambda !== 0) {
+                    parts.push(`Lambda: ${info.Lambda.toExponential(2)}`);
+                }
+                if (info && info.Mission !== undefined && info.Mission !== 0) {
+                    parts.push(`Mission Time: ${info.Mission}`);
+                }
+                
+                return parts.length > 0 ? parts.join('\n') : eventName;
+            };
+            
+            // Helper function to toggle event highlighting
+            const handleEventClick = (eventName) => {
+                if (highlightedEvent === eventName) {
+                    setHighlightedEvent(null); // Deselect if already selected
+                } else {
+                    setHighlightedEvent(eventName); // Select new event
+                }
+            };
+            
+            // Helper function to get event color classes
+            const getEventColorClasses = (event) => {
+                // Check if event has valid probability first
+                const valid = isEventValid(event.name);
+                
+                if (!valid) {
+                    // Invalid event (missing or zero probability) - grey out
+                    return 'bg-gray-300 text-gray-600 line-through opacity-70';
+                } else if (highlightedEvent === event.name) {
+                    // Highlighted event - use bright yellow/gold
+                    return 'bg-yellow-300 text-yellow-900 ring-2 ring-yellow-500';
+                } else if (event.complement) {
+                    // Complemented event - red
+                    return 'bg-red-100 text-red-700';
+                } else {
+                    // Normal event - blue
+                    return 'bg-blue-100 text-blue-700';
+                }
+            };
+            
+            // Prepare data for display based on whether it's grouped or not
+            let displayData;
+            let totalProbability = null;
+            let titleText;
+            
+            if (isGrouped) {
+                // NEW GROUPED FORMAT
+                // Process each group and calculate its probability
+                const groupsArray = Object.entries(cutSetsData.groups).map(([sequenceId, groupData]) => {
+                    const cutSets = groupData.cutSets || [];
+                    
+                    // Sort cut sets within this group by probability
+                    const sortedCutSets = cutSets.map((cutSet, originalIndex) => ({
+                        cutSet,
+                        probability: calculateCutSetProbability(cutSet),
+                        originalIndex
+                    })).sort((a, b) => {
+                        if (a.probability === null && b.probability === null) return 0;
+                        if (a.probability === null) return 1;
+                        if (b.probability === null) return -1;
+                        return b.probability - a.probability; // Descending order
+                    });
+                    
+                    // Calculate group probability
+                    const groupProbability = calculateGroupProbability(cutSets);
+                    
+                    // Count valid cut sets
+                    const validCount = cutSets.filter(cs => isCutSetValid(cs)).length;
+                    const totalCount = cutSets.length;
+                    
+                    return {
+                        sequenceId,
+                        sortedCutSets,
+                        groupProbability,
+                        validCount,
+                        totalCount
+                    };
+                });
+                
+                // Sort groups by sequence ID (numerical sort considering hierarchical structure)
+                groupsArray.sort((a, b) => {
+                    const aParts = a.sequenceId.split('-').map(n => parseInt(n));
+                    const bParts = b.sequenceId.split('-').map(n => parseInt(n));
+                    
+                    for (let i = 0; i < Math.min(aParts.length, bParts.length); i++) {
+                        if (aParts[i] !== bParts[i]) {
+                            return aParts[i] - bParts[i];
+                        }
+                    }
+                    return aParts.length - bParts.length;
+                });
+                
+                // Calculate total probability across all groups (sum of group probabilities)
+                totalProbability = groupsArray.reduce((sum, group) => {
+                    if (group.groupProbability !== null && !isNaN(group.groupProbability)) {
+                        return sum + group.groupProbability;
+                    }
+                    return sum;
+                }, 0);
+                
+                // Count total cut sets
+                const totalCutSets = groupsArray.reduce((sum, g) => sum + g.totalCount, 0);
+                const totalValidCutSets = groupsArray.reduce((sum, g) => sum + g.validCount, 0);
+                
+                displayData = { isGrouped: true, groups: groupsArray };
+                
+                titleText = `Cut Sets: ${treeName} - Seq ${cutSetsData.mainSequence} [Total: ${formatProbability(totalProbability)}] (${groupsArray.length} groups, ${totalValidCutSets}/${totalCutSets} valid)`;
+                
+            } else {
+                // LEGACY SINGLE GROUP FORMAT (for backward compatibility)
+                const cutSets = cutSetsData.cutSets || [];
+                
+                // Sort cut sets by probability (highest first)
+                const sortedCutSets = cutSets.map((cutSet, originalIndex) => ({
+                    cutSet,
+                    probability: calculateCutSetProbability(cutSet),
+                    originalIndex
+                })).sort((a, b) => {
+                    if (a.probability === null && b.probability === null) return 0;
+                    if (a.probability === null) return 1;
+                    if (b.probability === null) return -1;
+                    return b.probability - a.probability; // Descending order
+                });
+                
+                // Calculate sequence probability
+                totalProbability = calculateGroupProbability(cutSets);
+                
+                const validCutSetsCount = cutSets.filter(cs => isCutSetValid(cs)).length;
+                const totalCutSetsCount = cutSets.length;
+                const cutSetsInfo = validCutSetsCount < totalCutSetsCount 
+                    ? `${validCutSetsCount}/${totalCutSetsCount} valid` 
+                    : `${totalCutSetsCount} cut sets`;
+                
+                displayData = { isGrouped: false, sortedCutSets };
+                
+                titleText = `Cut Sets: ${treeName} - ${sequenceName} [${formatProbability(totalProbability)}] (${cutSetsInfo})`;
+            }
+
+            return (
+                <div
+                    style={{
+                        position: 'fixed',
+                        left: `${position.x}px`,
+                        top: `${position.y}px`,
+                        width: `${size.width}px`,
+                        height: minimized ? 'auto' : `${size.height}px`,
+                        zIndex: 1000
+                    }}
+                    className="bg-white rounded shadow-2xl border-2 border-gray-300 flex flex-col"
+                >
+                    {/* Title Bar */}
+                    <div
+                        onMouseDown={onMouseDown}
+                        className={`bg-blue-600 text-white px-2 py-1 rounded-t cursor-move flex items-center justify-between ${fontSizeClasses.title} font-semibold select-none`}
+                        title={titleText}
+                    >
+                        <span className="truncate">{titleText}</span>
+                        <div className="flex gap-1 flex-shrink-0">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onMinimize();
+                                }}
+                                className="hover:bg-blue-700 px-1 rounded"
+                                title={minimized ? "Expand" : "Minimize"}
+                            >
+                                {minimized ? '□' : '_'}
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClose();
+                                }}
+                                className="hover:bg-blue-700 px-1 rounded"
+                                title="Close"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    {!minimized && (
+                        <>
+                            <div className={`flex-1 overflow-y-auto p-2 ${fontSizeClasses.content}`}>
+                                {displayData.isGrouped ? (
+                                    // GROUPED DISPLAY
+                                    displayData.groups.length === 0 ? (
+                                        <div className="text-gray-500 text-center py-4">
+                                            No groups found
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {displayData.groups.map((group, groupIndex) => (
+                                                <div key={groupIndex} className="border border-gray-300 rounded p-2 bg-gray-50">
+                                                    {/* Group Header */}
+                                                    <div className={`font-bold mb-2 pb-1 border-b border-gray-400 ${fontSizeClasses.groupHeader}`}>
+                                                        <span className="text-blue-700">Sequence {group.sequenceId}</span>
+                                                        <span className="ml-2 text-purple-700">
+                                                            [{formatProbability(group.groupProbability)}]
+                                                        </span>
+                                                        <span className="ml-2 text-gray-600">
+                                                            ({group.validCount < group.totalCount 
+                                                                ? `${group.validCount}/${group.totalCount} valid` 
+                                                                : `${group.totalCount} cut sets`})
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* Cut Sets in this Group */}
+                                                    {group.sortedCutSets.length === 0 ? (
+                                                        <div className="text-gray-500 text-center py-2 text-xs">
+                                                            No cut sets
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-1">
+                                                            {group.sortedCutSets.map(({ cutSet, probability }, index) => {
+                                                                const cutSetValid = isCutSetValid(cutSet);
+                                                                
+                                                                return (
+                                                                    <div key={index} className={`flex items-start gap-1 ${!cutSetValid ? 'opacity-60' : ''}`}>
+                                                                        <span className="text-gray-600 font-semibold whitespace-nowrap">
+                                                                            #{index + 1}
+                                                                        </span>
+                                                                        {probability !== null ? (
+                                                                            <span 
+                                                                                className="px-1 py-0.5 rounded font-medium bg-purple-100 text-purple-700 whitespace-nowrap"
+                                                                                title={`Cut set probability: ${formatProbability(probability)}`}
+                                                                            >
+                                                                                {formatProbability(probability)}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span 
+                                                                                className="px-1 py-0.5 rounded font-medium bg-orange-100 text-orange-700 whitespace-nowrap"
+                                                                                title="Excluded from calculation due to missing/zero probability"
+                                                                            >
+                                                                                EXCLUDED
+                                                                            </span>
+                                                                        )}
+                                                                        <div className="flex flex-wrap gap-1 items-center">
+                                                                            {cutSet.map((event, eventIndex) => (
+                                                                                <React.Fragment key={eventIndex}>
+                                                                                    <span
+                                                                                        className={`px-1 py-0.5 rounded font-medium cursor-pointer transition-all ${getEventColorClasses(event)}`}
+                                                                                        title={getEventTooltip(event)}
+                                                                                        onClick={() => handleEventClick(event.name)}
+                                                                                    >
+                                                                                        {event.complement && '/'}
+                                                                                        {event.name}
+                                                                                    </span>
+                                                                                    {eventIndex < cutSet.length - 1 && (
+                                                                                        <span className="text-gray-400">*</span>
+                                                                                    )}
+                                                                                </React.Fragment>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )
+                                ) : (
+                                    // LEGACY SINGLE GROUP DISPLAY
+                                    displayData.sortedCutSets.length === 0 ? (
+                                        <div className="text-gray-500 text-center py-4">
+                                            0 cut sets
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {displayData.sortedCutSets.map(({ cutSet, probability }, index) => {
+                                                const cutSetValid = isCutSetValid(cutSet);
+                                                
+                                                return (
+                                                    <div key={index} className={`flex items-start gap-1 ${!cutSetValid ? 'opacity-60' : ''}`}>
+                                                        <span className="text-gray-600 font-semibold whitespace-nowrap">
+                                                            #{index + 1}
+                                                        </span>
+                                                        {probability !== null ? (
+                                                            <span 
+                                                                className="px-1 py-0.5 rounded font-medium bg-purple-100 text-purple-700 whitespace-nowrap"
+                                                                title={`Cut set probability: ${formatProbability(probability)}`}
+                                                            >
+                                                                {formatProbability(probability)}
+                                                            </span>
+                                                        ) : (
+                                                            <span 
+                                                                className="px-1 py-0.5 rounded font-medium bg-orange-100 text-orange-700 whitespace-nowrap"
+                                                                title="Excluded from calculation due to missing/zero probability"
+                                                            >
+                                                                EXCLUDED
+                                                            </span>
+                                                        )}
+                                                        <div className="flex flex-wrap gap-1 items-center">
+                                                            {cutSet.map((event, eventIndex) => (
+                                                                <React.Fragment key={eventIndex}>
+                                                                    <span
+                                                                        className={`px-1 py-0.5 rounded font-medium cursor-pointer transition-all ${getEventColorClasses(event)}`}
+                                                                        title={getEventTooltip(event)}
+                                                                        onClick={() => handleEventClick(event.name)}
+                                                                    >
+                                                                        {event.complement && '/'}
+                                                                        {event.name}
+                                                                    </span>
+                                                                    {eventIndex < cutSet.length - 1 && (
+                                                                        <span className="text-gray-400">*</span>
+                                                                    )}
+                                                                </React.Fragment>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )
+                                )}
+                            </div>
+
+                            {/* Resize Handle */}
+                            <div
+                                onMouseDown={handleResizeStart}
+                                className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+                                style={{
+                                    background: 'linear-gradient(135deg, transparent 50%, #9ca3af 50%)'
+                                }}
+                            />
+                        </>
+                    )}
+                </div>
+            );
+        }
+
+        // ============================================================================
+        // MAIN APPLICATION
+        // ============================================================================
+
+        function EventTreeVisualizer() {
+            const [project, setProject] = useState(null);
+            const [selectedTreeIndex, setSelectedTreeIndex] = useState(0);
+            const [error, setError] = useState('');
+            const [eventDescriptions, setEventDescriptions] = useState({});
+            const [eventInfo, setEventInfo] = useState({});
+            const [sequenceCutSets, setSequenceCutSets] = useState({});
+            const [selectedSequenceIndex, setSelectedSequenceIndex] = useState(null);
+            const [settings, setSettings] = useState(() => SettingsManager.load());
+            const [showSettings, setShowSettings] = useState(false);
+            const [view, setView] = useState('upload');
+            
+            // Floating window state
+            const [cutSetsPosition, setCutSetsPosition] = useState({ x: 50, y: 100 });
+            const [cutSetsSize, setCutSetsSize] = useState({ width: 400, height: 500 });
+            const [cutSetsMinimized, setCutSetsMinimized] = useState(false);
+            const [cutSetsClosed, setCutSetsClosed] = useState(false);
+            const [isDraggingCutSets, setIsDraggingCutSets] = useState(false);
+            const [dragStartCutSets, setDragStartCutSets] = useState({ x: 0, y: 0 });
+
+            // Clear selected sequence when tree changes
+            useEffect(() => {
+                setSelectedSequenceIndex(null);
+            }, [selectedTreeIndex]);
+            
+            // Reset cutSetsClosed when selectedSequenceIndex changes (new sequence selected)
+            useEffect(() => {
+                if (selectedSequenceIndex !== null) {
+                    setCutSetsClosed(false);
+                }
+            }, [selectedSequenceIndex]);
+            
+            // Handle dragging the cut sets window
+            const handleCutSetsDragStart = (e) => {
+                setIsDraggingCutSets(true);
+                setDragStartCutSets({
+                    x: e.clientX - cutSetsPosition.x,
+                    y: e.clientY - cutSetsPosition.y
+                });
+            };
+            
+            useEffect(() => {
+                if (!isDraggingCutSets) return;
+                
+                const handleMouseMove = (e) => {
+                    setCutSetsPosition({
+                        x: e.clientX - dragStartCutSets.x,
+                        y: e.clientY - dragStartCutSets.y
+                    });
+                };
+                
+                const handleMouseUp = () => {
+                    setIsDraggingCutSets(false);
+                };
+                
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+                
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [isDraggingCutSets, dragStartCutSets]);
+
+            // Helper function to find cut sets for a sequence using multiple key patterns
+            const findCutSetsForSequence = (treeName, sequenceName, sequenceIndex) => {
+                if (!sequenceCutSets) return null;
+                
+                // Determine the main sequence number to search for
+                let mainSequenceNum = null;
+                
+                // PRIORITY 1: Try 1-based sequence number (most common in SQC files)
+                if (sequenceIndex !== undefined) {
+                    mainSequenceNum = (sequenceIndex + 1).toString();
+                }
+                
+                // PRIORITY 2: Try extracting number from sequence name
+                if (!mainSequenceNum && sequenceName) {
+                    const match = sequenceName.match(/\d+/);
+                    if (match) {
+                        mainSequenceNum = match[0];
+                    }
+                }
+                
+                if (!mainSequenceNum) {
+                    return null;
+                }
+                
+                // Find all cut sets that match this main sequence number
+                // This includes exact matches (e.g., "2") and hierarchical matches (e.g., "2-2", "2-3", "2-2-2")
+                // NOTE: Sequence IDs in the map are already normalized (leading zeros removed during parsing)
+                // so "02", "02-04" have been stored as "2", "2-4" respectively
+                const matchingGroups = {};
+                const treePrefix = `${treeName}|||`;
+                
+                Object.keys(sequenceCutSets).forEach(key => {
+                    if (key.startsWith(treePrefix)) {
+                        const sequenceId = key.substring(treePrefix.length);
+                        
+                        // Check if this sequence ID starts with our main sequence number
+                        // It should match patterns like: "2", "2-2", "2-3", "2-2-2", etc.
+                        const sequenceParts = sequenceId.split('-');
+                        
+                        // First part must match our main sequence number
+                        if (sequenceParts[0] === mainSequenceNum) {
+                            // This is a match! Add it to our groups
+                            matchingGroups[sequenceId] = sequenceCutSets[key];
+                        }
+                    }
+                });
+                
+                if (Object.keys(matchingGroups).length === 0) {
+                    return null;
+                }
+                
+                // Return grouped structure
+                return {
+                    isGrouped: true,
+                    mainSequence: mainSequenceNum,
+                    groups: matchingGroups,
+                    treeName: treeName
+                };
+            };
+
+            async function handleFileUpload(e) {
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
+
+                setError('');
+
+                let etlFile = null;
+                let bedFile = null;
+                let beiFile = null;
+                let sqcFile = null;
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const fileName = file.name.toLowerCase();
+                    if (fileName.endsWith('.etl') || (fileName.endsWith('.txt') && !fileName.endsWith('.bed') && !fileName.endsWith('.bei') && !fileName.endsWith('.sqc'))) {
+                        etlFile = file;
+                    } else if (fileName.endsWith('.bed')) {
+                        bedFile = file;
+                    } else if (fileName.endsWith('.bei')) {
+                        beiFile = file;
+                    } else if (fileName.endsWith('.sqc')) {
+                        sqcFile = file;
+                    }
+                }
+
+                if (!etlFile) {
+                    setError('No ETL file found in selection.');
+                    return;
+                }
+
+                const etlReader = new FileReader();
+                etlReader.onload = async (event) => {
+                    try {
+                        const text = event.target.result;
+                        const parsed = parseETLFile(text);
+
+                        if (!parsed || !parsed.trees || parsed.trees.length === 0) {
+                            setError('Invalid ETL file format or no valid trees found.');
+                            return;
+                        }
+
+                        let bedDescriptions = {};
+                        let beiInfo = {};
+                        let sqcData = {};
+
+                        const processFiles = async () => {
+                            if (bedFile) {
+                                const bedText = await bedFile.text();
+                                bedDescriptions = parseEventDescriptions(bedText);
+                                setEventDescriptions(bedDescriptions);
+                            }
+
+                            if (beiFile) {
+                                const beiText = await beiFile.text();
+                                beiInfo = parseBEI(beiText);
+                                setEventInfo(beiInfo);
+                            }
+
+                            if (sqcFile) {
+                                const sqcText = await sqcFile.text();
+                                sqcData = parseSQC(sqcText);
+                                setSequenceCutSets(sqcData);
+                            }
+
+                            setProject(parsed);
+                            setSelectedTreeIndex(0);
+                            setSelectedSequenceIndex(null);
+                            setView('visualize');
+                        };
+
+                        await processFiles();
+                    } catch (err) {
+                        setError(`Error parsing file: ${err.message}`);
+                    }
+                };
+
+                etlReader.readAsText(etlFile);
+            }
+
+            return (
+                <div className="h-screen flex flex-col bg-gray-50">
+                    <header className="bg-blue-600 text-white p-3 shadow-lg">
+                        <div className="container mx-auto flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <h1 className="text-xl font-bold">KUREAS-ETL v2.0</h1>
+                                <span className="text-sm opacity-90">Event Tree Logic Visualizer</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        setView('upload');
+                                        setProject(null);
+                                        setSelectedTreeIndex(0);
+                                    }}
+                                    className="px-3 py-1 rounded flex items-center gap-2 bg-blue-500 hover:bg-blue-700 text-white text-sm"
+                                >
+                                    <UploadIcon />
+                                    <span>Open New ETL</span>
+                                </button>
+                                {view === 'visualize' && (
+                                    <button
+                                        onClick={() => setShowSettings(true)}
+                                        className="px-3 py-1 rounded flex items-center gap-2 bg-blue-500 hover:bg-blue-700 text-white text-sm"
+                                    >
+                                        <SettingsIcon />
+                                        <span>Settings</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+
+                    {error && (
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 mx-4 mt-4 rounded">
+                            {error}
+                        </div>
+                    )}
+
+                    <main className="flex-1 overflow-hidden">
+                        {view === 'upload' && (
+                            <div className="container mx-auto p-8 max-w-4xl">
+                                <div className="bg-white rounded-lg shadow-lg p-8">
+                                    <h2 className="text-2xl font-bold mb-6">Open Event Tree File(s)</h2>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                ETL File (Required)
+                                            </label>
+                                            <input
+                                                type="file"
+                                                accept=".etl,.txt,.bed,.bei,.sqc"
+                                                multiple
+                                                onChange={handleFileUpload}
+                                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                            />
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                Select multiple files (ETL, BED, BEI, SQC) at once. Files with multiple event trees are supported.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 p-4 bg-blue-50 rounded border border-blue-200">
+                                        <p className="text-sm text-blue-800">
+                                            💡 <strong>Tip:</strong> Click on end state boxes to highlight individual sequences. Use mouse wheel to zoom and drag to pan.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'visualize' && project && (
+                            <div className="h-full flex">
+                                <ResizableSidebar 
+                                    project={project}
+                                    selectedTreeIndex={selectedTreeIndex}
+                                    setSelectedTreeIndex={setSelectedTreeIndex}
+                                    sequenceCutSets={sequenceCutSets}
+                                    selectedSequenceIndex={selectedSequenceIndex}
+                                    onSequenceClick={(seqIndex) => {
+                                        setSelectedSequenceIndex(selectedSequenceIndex === seqIndex ? null : seqIndex);
+                                    }}
+                                    findCutSetsForSequence={findCutSetsForSequence}
+                                />
+
+                                <div className="flex-1">
+                                    <TreeCanvas
+                                        tree={project.trees[selectedTreeIndex]}
+                                        eventDescriptions={eventDescriptions}
+                                        eventInfo={eventInfo}
+                                        settings={settings}
+                                        selectedSequenceIndex={selectedSequenceIndex}
+                                        onSequenceClick={(seqIndex) => {
+                                            setSelectedSequenceIndex(selectedSequenceIndex === seqIndex ? null : seqIndex);
+                                        }}
+                                        project={project}
+                                        onTreeSwitch={(treeIndex) => {
+                                            setSelectedTreeIndex(treeIndex);
+                                            setSelectedSequenceIndex(null); // Clear selected sequence when switching trees
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {showSettings && (
+                        <SettingsModal
+                            settings={settings}
+                            onSave={(newSettings) => setSettings(newSettings)}
+                            onClose={() => setShowSettings(false)}
+                        />
+                    )}
+                    
+                    {/* Cut Sets Floating Window - Shows when sequence is selected and not closed */}
+                    {selectedSequenceIndex !== null && project && !cutSetsClosed && (() => {
+                        // Use the selected sequence index directly
+                        const seq = project.trees[selectedTreeIndex].sequences[selectedSequenceIndex];
+                        const cutSetsData = findCutSetsForSequence(
+                            project.trees[selectedTreeIndex].name,
+                            seq.name,
+                            selectedSequenceIndex
+                        );
+                        
+                        return cutSetsData ? (
+                            <CutSetsFloatingWindow
+                                cutSetsData={cutSetsData}
+                                position={cutSetsPosition}
+                                size={cutSetsSize}
+                                minimized={cutSetsMinimized}
+                                onPositionChange={setCutSetsPosition}
+                                onSizeChange={setCutSetsSize}
+                                onMinimize={() => setCutSetsMinimized(!cutSetsMinimized)}
+                                onClose={() => {
+                                    setCutSetsClosed(true);
+                                    setSelectedSequenceIndex(null);
+                                }}
+                                onMouseDown={handleCutSetsDragStart}
+                                eventInfo={eventInfo}
+                                eventDescriptions={eventDescriptions}
+                                sequenceName={seq.name}
+                                treeName={project.trees[selectedTreeIndex].name}
+                                settings={settings}
+                            />
+                        ) : null;
+                    })()}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EventTreeVisualizer />);
+    </script>
+</body>
+</html>
