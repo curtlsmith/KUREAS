@@ -1,0 +1,93 @@
+<!-- Sample Hazard List for Nuclear Facility -->
+<!-- Format: 
+     Level 1 (no tabs): General Hazard Category
+     Level 2 (1 tab): Hazard Group
+     Level 3 (2 tabs): Hazard Type
+     Level 4 (3 tabs): Hazard Event
+-->
+- Internal Events
+	- Loss of Coolant
+		- Primary System LOCA
+			- Large Break LOCA
+			- Medium Break LOCA
+			- Small Break LOCA
+		- Secondary System LOCA
+			- Cooling System Pipe Break
+			- Heat Exchanger Tube Rupture
+	- Reactivity Events
+		- Inadvertent Reactivity Insertion
+			- Control Rod Withdrawal
+			- Fuel Loading Error
+			- Moderator Temperature Decrease
+		- Loss of Reactivity Control
+			- Control Rod Ejection
+			- Control System Failure
+	- Loss of Core Cooling
+		- Loss of Forced Circulation
+			- Primary Pump Failure
+			- Power Supply Failure
+		- Loss of Heat Sink
+			- Secondary System Failure
+			- Ultimate Heat Sink Loss
+
+- External Events
+	- Natural Phenomena
+		- Seismic Events
+			- Design Basis Earthquake
+			- Beyond Design Basis Earthquake
+		- Weather Events
+			- High Winds
+			- Tornado
+			- Lightning Strike
+		- Flooding
+			- External Flooding
+			- Internal Flooding
+	- Man-Made Events
+		- Aircraft Impact
+			- Small Aircraft
+			- Large Aircraft
+		- Nearby Industrial Hazards
+			- Chemical Release
+			- Explosion
+
+- Fire and Explosion
+	- Internal Fire
+		- Control Room Fire
+			- Electrical Fire
+			- Cable Fire
+		- Reactor Building Fire
+			- Equipment Fire
+			- Combustible Material Fire
+		- Auxiliary Building Fire
+			- Pump Room Fire
+			- Electrical Room Fire
+	- Explosion Events
+		- Chemical Explosion
+			- Hydrogen Explosion
+			- Solvent Explosion
+		- Pressure Vessel Rupture
+			- Steam Generator Rupture
+			- Compressed Gas Cylinder Failure
+
+- Radiation Release
+	- Gaseous Release
+		- Noble Gas Release
+			- Planned Release
+			- Unplanned Release
+		- Iodine Release
+			- Filter Failure
+			- Containment Bypass
+	- Liquid Release
+		- Contaminated Water Release
+			- Tank Overflow
+			- Pipe Leak
+		- Coolant System Leak
+			- Primary System Leak
+			- Waste System Leak
+	- Direct Radiation
+		- Spent Fuel Handling
+			- Fuel Drop
+			- Cask Drop
+		- Source Exposure
+			- Shielding Failure
+			- Uncontrolled Source
