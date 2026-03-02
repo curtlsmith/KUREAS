@@ -1,0 +1,1 @@
+SAPHIRE models can be found here. Note that these models will be the SAPHIRE project extracted as a set of MAR-D files (see https://www.nrc.gov/reading-rm/doc-collections/nuregs/contract/cr7039/v7/index for details on the MAR-D file format).
