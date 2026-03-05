@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <!--
-    KUREAS-HE - Hazard Analysis Knowledge Management
+    KUREAS-HA - Hazard Analysis Knowledge Management
     
     Developed by Curtis Lee Smith and Claude.ai
     
     MIT License
     
-    Copyright (c) 2024-2025 Curtis Lee Smith
+    Copyright (c) 2024-2026 Curtis Lee Smith
     
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -213,7 +213,7 @@
         const DEFAULT_OPERATING_STATES = [
             {
                 id: 'FOS-1',
-                name: 'Zero Power Operations',
+                name: 'Power Operations',
                 description: 'Test operations including operator training',
                 color: '#93c5fd'
             },
@@ -662,10 +662,11 @@
         }
 
         // Operating Schedule Editor Component
-        function OperatingScheduleEditor({ schedule, onSave, onClose }) {
+        function OperatingScheduleEditor({ schedule, onSave, onClose, operatingStates }) {
+            const defaultStateId = operatingStates.length > 0 ? operatingStates[0].id : 'FOS-1';
             const [periodYears, setPeriodYears] = useState(schedule.periodYears || 1);
             const [periods, setPeriods] = useState(schedule.periods || [
-                { stateId: 'FOS-1', startDay: 0, endDay: 365 }
+                { stateId: defaultStateId, startDay: 0, endDay: 365 }
             ]);
 
             const totalDays = periodYears * 365;
@@ -673,7 +674,7 @@
             const handleAddPeriod = () => {
                 // Add a new period with default values
                 const newPeriod = {
-                    stateId: 'FOS-1',
+                    stateId: defaultStateId,
                     startDay: 0,
                     endDay: Math.min(30, totalDays)
                 };
@@ -700,15 +701,15 @@
                 
                 // If no periods, return default
                 if (periods.length === 0) {
-                    return [{ stateId: 'FOS-1', startDay: 0, endDay: totalDays }];
+                    return [{ stateId: defaultStateId, startDay: 0, endDay: totalDays }];
                 }
                 
                 // Create a timeline array where each day has a state
                 const timeline = new Array(totalDays);
                 
-                // Initialize with FOS-1
+                // Initialize with first operating state
                 for (let i = 0; i < totalDays; i++) {
-                    timeline[i] = 'FOS-1';
+                    timeline[i] = defaultStateId;
                 }
                 
                 // Apply each period (later periods override earlier ones if they overlap)
@@ -806,7 +807,7 @@
                                                 onChange={(e) => handlePeriodChange(index, 'stateId', e.target.value)}
                                                 className="border rounded px-2 py-1 flex-1"
                                             >
-                                                {DEFAULT_OPERATING_STATES.map(state => (
+                                                {operatingStates.map(state => (
                                                     <option key={state.id} value={state.id}>
                                                         {state.id}: {state.name}
                                                     </option>
@@ -845,7 +846,7 @@
                                 </div>
                                 
                                 <div className="mt-3 p-3 bg-blue-50 rounded text-sm">
-                                    <strong>Note:</strong> Overlapping periods will be merged. Gaps will be filled with FOS-1. 
+                                    <strong>Note:</strong> Overlapping periods will be merged. Gaps will be filled with {defaultStateId}. 
                                     Periods are automatically sorted by start time when saved.
                                 </div>
                             </div>
@@ -871,7 +872,7 @@
         }
 
         // Operating Schedule Display Component
-        function OperatingScheduleDisplay({ schedule, stateColors }) {
+        function OperatingScheduleDisplay({ schedule, stateColors, operatingStates }) {
             const totalDays = (schedule.periodYears || 1) * 365;
             const periods = schedule.periods || [];
 
@@ -879,17 +880,17 @@
                 if (stateColors && stateColors[stateId]) {
                     return stateColors[stateId];
                 }
-                const state = DEFAULT_OPERATING_STATES.find(s => s.id === stateId);
+                const state = operatingStates.find(s => s.id === stateId);
                 return state ? state.color : '#e5e7eb';
             };
 
             const getStateName = (stateId) => {
-                const state = DEFAULT_OPERATING_STATES.find(s => s.id === stateId);
+                const state = operatingStates.find(s => s.id === stateId);
                 return state ? state.id : stateId;
             };
 
             const getStateDescription = (stateId) => {
-                const state = DEFAULT_OPERATING_STATES.find(s => s.id === stateId);
+                const state = operatingStates.find(s => s.id === stateId);
                 return state ? state.description : '';
             };
 
@@ -1295,7 +1296,7 @@
         }
 
         // Hazard Editor Component
-        function HazardEditor({ hazard, onSave, onClose, allAnalysisData, allStates, settings }) {
+        function HazardEditor({ hazard, onSave, onClose, allAnalysisData, allStates, settings, operatingStates, operatingStateData }) {
             const { hazardId, hazardName, stateId } = hazard;
             const key = `${hazardId}_${stateId}`;
             
@@ -1362,7 +1363,7 @@
             // Get available states to copy from
             const getAvailableStates = () => {
                 const available = [];
-                DEFAULT_OPERATING_STATES.forEach(state => {
+                operatingStates.forEach(state => {
                     const testKey = `${hazardId}_${state.id}`;
                     if (state.id !== stateId && allAnalysisData[testKey] && allAnalysisData[testKey].applicableEvents?.length > 0) {
                         available.push(state);
@@ -1396,7 +1397,7 @@
             };
 
             const getDefaultDescription = (hazardName) => {
-                return `<h1>${hazardName} Hazard</h1><br><h1>Hazard Description</h1><br><p></p><h1>Assumptions</h1><br><p></p><h1>Requirements</h1><br><p></p><h1>Uncertainty Discussion</h1><br><p></p><h1>References</h1><br><p></p>`;
+                return '';
             };
 
             const handleAddEvent = () => {
@@ -1520,7 +1521,12 @@
                 onClose();
             };
 
-            const currentState = DEFAULT_OPERATING_STATES.find(s => s.id === stateId);
+            const currentState = operatingStates.find(s => s.id === stateId);
+            const getStateDisplayName = (sid) => {
+                const osd = operatingStateData?.[sid];
+                const base = operatingStates.find(s => s.id === sid);
+                return osd?.name || base?.name || sid;
+            };
             const isReadOnly = useInfoFrom !== '';
             const sourceData = useInfoFrom ? allAnalysisData[`${hazardId}_${useInfoFrom}`] : null;
             const displayEvents = isReadOnly && sourceData ? sourceData.applicableEvents : applicableEvents;
@@ -1550,7 +1556,7 @@
                                             ))}
                                         </div>
                                     )}
-                                    <div><strong>Operating State:</strong> {currentState?.id} - {currentState?.name}</div>
+                                    <div><strong>Operating State:</strong> {currentState?.id} - {getStateDisplayName(stateId)}</div>
                                 </div>
                             </div>
 
@@ -1567,7 +1573,7 @@
                                         <option value="">-- Enter new information --</option>
                                         {availableStates.map(state => (
                                             <option key={state.id} value={state.id}>
-                                                {state.id} - {state.name}
+                                                {state.id} - {getStateDisplayName(state.id)}
                                             </option>
                                         ))}
                                     </select>
@@ -1665,7 +1671,7 @@
                                                                 >
                                                                     <option value="frequency">Frequency of occurrence</option>
                                                                     <option value="prob-per-opportunity">Probability per Opportunity</option>
-                                                                    <option value="hazard-curve">Hazard Curve</option>
+                                                                    <option value="hazard-curve">Magnitude versus Frequency Hazard Curve</option>
                                                                     <option value="nureg-2169-fire">NUREG-2169 Fire Ignition</option>
                                                                     <option value="screened-low-freq">Screened due to low frequency</option>
                                                                     <option value="screened-low-consequence">Screened due to low consequence</option>
@@ -1922,7 +1928,7 @@
                                                                     
                                                                     <div>
                                                                         <div className="flex justify-between items-center mb-1">
-                                                                            <label className="block text-xs font-medium">Hazard Curve Data:</label>
+                                                                            <label className="block text-xs font-medium">Magnitude vs. Frequency Curve Data:</label>
                                                                             <button
                                                                                 onClick={() => {
                                                                                     const paste = prompt('Paste two-column data (tab-separated):\nColumn 1: Hazard Magnitude\nColumn 2: Hazard Frequency');
@@ -2250,7 +2256,7 @@
                                                                                     return 'Probability per Opportunity';
                                                                                 }
                                                                             })()
-                                                                        ) : event.occurrenceModel === 'hazard-curve' ? 'Hazard Curve' :
+                                                                        ) : event.occurrenceModel === 'hazard-curve' ? 'Magnitude vs. Frequency Hazard Curve' :
                                                                           event.occurrenceModel === 'nureg-2169-fire' ? (() => {
                                                                               const selections = event.fireIgnitionSelections || {};
                                                                               const selectedItems = NUREG2169_FIRE_IGNITION_DATA.filter(item => selections[item.bin]);
@@ -2349,7 +2355,7 @@
                                                                     
                                                                     {event.occurrenceModel === 'hazard-curve' && (
                                                                         <div className="border rounded p-3 bg-green-50">
-                                                                            <div className="font-medium text-sm mb-2">Hazard Curve Details</div>
+                                                                            <div className="font-medium text-sm mb-2">Magnitude vs. Frequency Hazard Curve Details</div>
                                                                             <div className="text-xs space-y-1">
                                                                                 <div><strong>Magnitude Units:</strong> {event.hazardMagnitudeUnits || 'Not specified'}</div>
                                                                                 <div><strong>Frequency Units:</strong> {event.hazardFrequencyUnits || '/yr'}</div>
@@ -2527,6 +2533,8 @@
             const [localList, setLocalList] = useState(JSON.parse(JSON.stringify(hazardList))); // Deep clone
             const [editingNode, setEditingNode] = useState(null);
             const [expandedNodes, setExpandedNodes] = useState(new Set());
+            const [showAddForm, setShowAddForm] = useState(hazardList.length === 0); // Auto-show if starting fresh
+            const [newHazard, setNewHazard] = useState({ level1: '', level2: '', level3: '', level4: '' });
 
             const toggleExpand = (nodeId) => {
                 const newExpanded = new Set(expandedNodes);
@@ -2607,6 +2615,98 @@
                 }
             };
 
+            // Get the next available HAZ-N id across the entire tree
+            const getNextHazId = (nodes) => {
+                let maxId = 0;
+                const walk = (list) => {
+                    list.forEach(n => {
+                        const m = n.id.match(/^HAZ-(\d+)$/);
+                        if (m) { const v = parseInt(m[1], 10); if (v > maxId) maxId = v; }
+                        if (n.children) walk(n.children);
+                    });
+                };
+                walk(nodes);
+                return maxId + 1;
+            };
+
+            // Add a new hazard using the 4-level quick entry form
+            const handleAddHazard = () => {
+                const l1 = newHazard.level1.trim();
+                const l2 = newHazard.level2.trim();
+                const l3 = newHazard.level3.trim();
+                const l4 = newHazard.level4.trim();
+
+                if (!l1) { alert('Please enter at least a Level 1 (General Hazard Category).'); return; }
+
+                let nextId = getNextHazId(localList);
+                const updatedList = JSON.parse(JSON.stringify(localList));
+
+                // Find or create Level 1
+                let level1Node = updatedList.find(n => n.name.toLowerCase() === l1.toLowerCase());
+                if (!level1Node) {
+                    level1Node = { id: `HAZ-${nextId++}`, name: l1, children: [] };
+                    updatedList.push(level1Node);
+                }
+                if (!level1Node.children) level1Node.children = [];
+
+                if (l2) {
+                    // Find or create Level 2
+                    let level2Node = level1Node.children.find(n => n.name.toLowerCase() === l2.toLowerCase());
+                    if (!level2Node) {
+                        level2Node = { id: `HAZ-${nextId++}`, name: l2, children: [] };
+                        level1Node.children.push(level2Node);
+                    }
+                    if (!level2Node.children) level2Node.children = [];
+
+                    if (l3) {
+                        // Find or create Level 3
+                        let level3Node = level2Node.children.find(n => n.name.toLowerCase() === l3.toLowerCase());
+                        if (!level3Node) {
+                            level3Node = { id: `HAZ-${nextId++}`, name: l3, children: [] };
+                            level2Node.children.push(level3Node);
+                        }
+                        if (!level3Node.children) level3Node.children = [];
+
+                        if (l4) {
+                            // Check for duplicate Level 4
+                            const exists = level3Node.children.find(n => n.name.toLowerCase() === l4.toLowerCase());
+                            if (!exists) {
+                                level3Node.children.push({ id: `HAZ-${nextId++}`, name: l4, children: [] });
+                            }
+                        }
+                    }
+                }
+
+                setLocalList(updatedList);
+
+                // Expand the newly added path so it's visible
+                const newExpanded = new Set(expandedNodes);
+                if (level1Node) newExpanded.add(level1Node.id);
+                updatedList.forEach(n => {
+                    if (n.name.toLowerCase() === l1.toLowerCase()) {
+                        newExpanded.add(n.id);
+                        if (l2 && n.children) {
+                            n.children.forEach(c => {
+                                if (c.name.toLowerCase() === l2.toLowerCase()) {
+                                    newExpanded.add(c.id);
+                                    if (l3 && c.children) {
+                                        c.children.forEach(d => {
+                                            if (d.name.toLowerCase() === l3.toLowerCase()) {
+                                                newExpanded.add(d.id);
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+                setExpandedNodes(newExpanded);
+
+                // Clear only the lowest levels so the user can keep adding under the same category
+                setNewHazard(prev => ({ ...prev, level3: '', level4: '' }));
+            };
+
             const handleSave = () => {
                 onSave(localList);
                 onClose();
@@ -2616,6 +2716,8 @@
                 const hasChildren = node.children && node.children.length > 0;
                 const isExpanded = expandedNodes.has(node.id);
                 const isEditing = editingNode && editingNode.id === node.id;
+                const levelLabels = ['Category', 'Group', 'Type', 'Event'];
+                const levelLabel = level < levelLabels.length ? levelLabels[level] : '';
 
                 return (
                     <div key={node.id}>
@@ -2642,7 +2744,10 @@
                                     autoFocus
                                 />
                             ) : (
-                                <span className="flex-1">{node.name}</span>
+                                <span className="flex-1">
+                                    {node.name}
+                                    {levelLabel && <span className="ml-2 text-xs text-gray-400">({levelLabel})</span>}
+                                </span>
                             )}
                             
                             <div className="flex gap-1">
@@ -2699,22 +2804,108 @@
 
             return (
                 <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '800px', backgroundColor: '#ffffff', color: '#111827' }}>
+                    <div className="modal-content" style={{ maxWidth: '900px', backgroundColor: '#ffffff', color: '#111827' }}>
                         <div className="p-4">
-                            <h2 className="text-xl font-bold mb-4">Modify Hazard List</h2>
+                            <h2 className="text-xl font-bold mb-3">{localList.length === 0 && hazardList.length === 0 ? 'Start Hazard List' : 'Modify Hazard List'}</h2>
                             
-                            <div className="mb-4 text-sm text-gray-600">
-                                <p><strong>Edit:</strong> Change the hazard name</p>
-                                <p><strong>Hide:</strong> Hide the hazard from the main view (can be shown later)</p>
-                                <p><strong>Remove:</strong> Permanently delete the hazard and all its children</p>
+                            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                                <p className="font-semibold mb-1">Hazard List Hierarchy</p>
+                                <p className="text-gray-700 mb-2">The hazard list is organized into four levels:</p>
+                                <div className="ml-2 text-gray-600" style={{ lineHeight: '1.6' }}>
+                                    <div><strong>Level 1:</strong> General Hazard Category <span className="text-gray-400 italic">(e.g., Internal Hazards)</span></div>
+                                    <div style={{ paddingLeft: '20px' }}><strong>Level 2:</strong> Hazard Group <span className="text-gray-400 italic">(e.g., Internal Fire)</span></div>
+                                    <div style={{ paddingLeft: '40px' }}><strong>Level 3:</strong> Hazard Type <span className="text-gray-400 italic">(e.g., Building X Fires)</span></div>
+                                    <div style={{ paddingLeft: '60px' }}><strong>Level 4:</strong> Hazard Event <span className="text-gray-400 italic">(e.g., Fire in Electrical Cabinet #1)</span></div>
+                                </div>
                             </div>
 
-                            <div className="border rounded p-2 max-h-[500px] overflow-y-auto mb-4">
+                            {/* Add Hazard Form */}
+                            <div className="mb-3 p-3 bg-gray-50 border rounded">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="font-semibold text-sm">Add Hazard</span>
+                                    {!showAddForm && (
+                                        <button
+                                            onClick={() => setShowAddForm(true)}
+                                            className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                                        >
+                                            + Add Hazard
+                                        </button>
+                                    )}
+                                </div>
+                                {showAddForm && (
+                                    <div>
+                                        <div className="grid grid-cols-2 gap-2 mb-2">
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-0.5">Level 1: General Hazard Category *</label>
+                                                <input
+                                                    type="text"
+                                                    value={newHazard.level1}
+                                                    onChange={(e) => setNewHazard(prev => ({ ...prev, level1: e.target.value }))}
+                                                    className="w-full border rounded px-2 py-1.5 text-sm"
+                                                    placeholder="e.g., Internal Hazards"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-0.5">Level 2: Hazard Group</label>
+                                                <input
+                                                    type="text"
+                                                    value={newHazard.level2}
+                                                    onChange={(e) => setNewHazard(prev => ({ ...prev, level2: e.target.value }))}
+                                                    className="w-full border rounded px-2 py-1.5 text-sm"
+                                                    placeholder="e.g., Internal Fire"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-0.5">Level 3: Hazard Type</label>
+                                                <input
+                                                    type="text"
+                                                    value={newHazard.level3}
+                                                    onChange={(e) => setNewHazard(prev => ({ ...prev, level3: e.target.value }))}
+                                                    className="w-full border rounded px-2 py-1.5 text-sm"
+                                                    placeholder="e.g., Building X Fires"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-0.5">Level 4: Hazard Event</label>
+                                                <input
+                                                    type="text"
+                                                    value={newHazard.level4}
+                                                    onChange={(e) => setNewHazard(prev => ({ ...prev, level4: e.target.value }))}
+                                                    className="w-full border rounded px-2 py-1.5 text-sm"
+                                                    placeholder="e.g., Fire in Electrical Cabinet #1"
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddHazard(); }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleAddHazard}
+                                                className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                                            >
+                                                Add Hazard
+                                            </button>
+                                            <button
+                                                onClick={() => setShowAddForm(false)}
+                                                className="px-3 py-1.5 border text-sm rounded hover:bg-gray-100"
+                                            >
+                                                Hide Form
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-gray-400 mt-1">Existing parent levels are reused automatically. Press Enter in the last field to add quickly.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mb-3 text-sm text-gray-600">
+                                <p><strong>Edit:</strong> Change the hazard name &nbsp;|&nbsp; <strong>Hide:</strong> Hide from the main view &nbsp;|&nbsp; <strong>Remove:</strong> Permanently delete the hazard and all its children</p>
+                            </div>
+
+                            <div className="border rounded p-2 max-h-[400px] overflow-y-auto mb-4">
                                 {localList.length > 0 ? (
                                     localList.map(node => renderNode(node, 0))
                                 ) : (
                                     <div className="text-center text-gray-500 py-4">
-                                        No hazards in list
+                                        No hazards in list. Use the Add Hazard form above to create your first hazard.
                                     </div>
                                 )}
                             </div>
@@ -2740,8 +2931,14 @@
         }
 
         // Settings Modal Component
-        function SettingsModal({ settings, onSave, onClose }) {
-            const [localSettings, setLocalSettings] = useState(settings);
+        function SettingsModal({ settings, onSave, onClose, operatingStates }) {
+            const [localSettings, setLocalSettings] = useState(() => {
+                // Initialize local defaults from settings, falling back to current operatingStates
+                return {
+                    ...settings,
+                    defaultOperatingStates: settings.defaultOperatingStates || JSON.parse(JSON.stringify(operatingStates))
+                };
+            });
 
             const handleChange = (key, value) => {
                 setLocalSettings(prev => ({ ...prev, [key]: value }));
@@ -2915,26 +3112,98 @@
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">Operating State Colors:</label>
-                                    <div className="space-y-2">
-                                        {DEFAULT_OPERATING_STATES.map(state => (
-                                            <div key={state.id} className="flex items-center gap-3">
-                                                <span className="text-sm font-medium w-32">{state.id}:</span>
+                                    <label className="block text-sm font-medium mb-1">Default Operating States for New Projects:</label>
+                                    <p className="text-xs text-gray-500 mb-2">These defaults are used when starting a new project. Changes here do not affect the current project's operating states.</p>
+                                    <div className="space-y-2 mb-2">
+                                        {(localSettings.defaultOperatingStates || []).map((state, index) => (
+                                            <div key={state.id + '-' + index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
                                                 <input
                                                     type="color"
-                                                    value={localSettings.stateColors?.[state.id] || state.color}
-                                                    onChange={(e) => handleColorChange(state.id, e.target.value)}
-                                                    className="w-16 h-8 border rounded cursor-pointer"
+                                                    value={state.color}
+                                                    onChange={(e) => {
+                                                        const updated = [...localSettings.defaultOperatingStates];
+                                                        updated[index] = { ...updated[index], color: e.target.value };
+                                                        handleChange('defaultOperatingStates', updated);
+                                                    }}
+                                                    className="w-8 h-8 border rounded cursor-pointer flex-shrink-0"
+                                                    title="Default color"
                                                 />
-                                                <span className="text-sm text-gray-600">{state.name}</span>
+                                                <input
+                                                    type="text"
+                                                    value={state.id}
+                                                    onChange={(e) => {
+                                                        const updated = [...localSettings.defaultOperatingStates];
+                                                        updated[index] = { ...updated[index], id: e.target.value };
+                                                        handleChange('defaultOperatingStates', updated);
+                                                    }}
+                                                    className="w-20 border rounded px-2 py-1 text-sm font-semibold"
+                                                    title="State ID"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={state.name}
+                                                    onChange={(e) => {
+                                                        const updated = [...localSettings.defaultOperatingStates];
+                                                        updated[index] = { ...updated[index], name: e.target.value };
+                                                        handleChange('defaultOperatingStates', updated);
+                                                    }}
+                                                    className="flex-1 border rounded px-2 py-1 text-sm"
+                                                    placeholder="State name"
+                                                    title="State name"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={state.description}
+                                                    onChange={(e) => {
+                                                        const updated = [...localSettings.defaultOperatingStates];
+                                                        updated[index] = { ...updated[index], description: e.target.value };
+                                                        handleChange('defaultOperatingStates', updated);
+                                                    }}
+                                                    className="flex-1 border rounded px-2 py-1 text-xs"
+                                                    placeholder="Description"
+                                                    title="Description"
+                                                />
+                                                {(localSettings.defaultOperatingStates || []).length > 1 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            const updated = localSettings.defaultOperatingStates.filter((_, i) => i !== index);
+                                                            handleChange('defaultOperatingStates', updated);
+                                                        }}
+                                                        className="px-2 py-1 text-red-600 hover:bg-red-100 rounded flex-shrink-0"
+                                                        title="Remove default state"
+                                                    >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                                    </button>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
+                                    <button
+                                        onClick={() => {
+                                            const current = localSettings.defaultOperatingStates || [];
+                                            let maxNum = 0;
+                                            current.forEach(s => {
+                                                const m = s.id.match(/^FOS-(\d+)$/);
+                                                if (m) { const n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+                                            });
+                                            const nextId = `FOS-${maxNum + 1}`;
+                                            const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+                                            handleChange('defaultOperatingStates', [...current, {
+                                                id: nextId,
+                                                name: 'New Operating State',
+                                                description: 'Enter description',
+                                                color: randomColor
+                                            }]);
+                                        }}
+                                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                    >
+                                        + Add Default State
+                                    </button>
                                 </div>
 
                                 {/* Hazard Categorization Settings */}
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">Show Hazard Categorization:</label>
+                                    <label className="block text-sm font-medium mb-2">Show Hazard Categorization in Reports:</label>
                                     <div className="flex gap-2 mb-3">
                                         {[
                                             { value: true, label: 'Yes' },
@@ -3016,7 +3285,7 @@
                                                             className="px-2 py-1 text-red-600 hover:bg-red-100 rounded"
                                                             title="Remove category"
                                                         >
-                                                            \u2715
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                                                         </button>
                                                     </div>
                                                 ))}
@@ -3100,8 +3369,9 @@
         }
 
         // Operating State Editor Modal Component
-        function OperatingStateEditor({ stateId, stateData, defaultState, onSave, onClose }) {
+        function OperatingStateEditor({ stateId, stateData, defaultState, onSave, onClose, stateColor, onColorChange, onRenameState }) {
             const editorRef = useRef(null);
+            const [localStateId, setLocalStateId] = useState(stateId);
             const [name, setName] = useState(stateData?.name || defaultState.name);
             const [description, setDescription] = useState(stateData?.description || defaultState.description);
             const [extendedDescription, setExtendedDescription] = useState(stateData?.extendedDescription || '');
@@ -3130,7 +3400,16 @@
 
             const handleSave = () => {
                 const editorContent = editorRef.current ? editorRef.current.innerHTML : extendedDescription;
-                onSave(stateId, {
+                const newId = localStateId.trim();
+                if (!newId) {
+                    alert('Operating State ID cannot be empty.');
+                    return;
+                }
+                // If ID changed, trigger rename
+                if (newId !== stateId && onRenameState) {
+                    onRenameState(stateId, newId);
+                }
+                onSave(newId, {
                     name,
                     description,
                     extendedDescription: editorContent
@@ -3145,15 +3424,37 @@
                             <h2 className="text-xl font-bold mb-4">Edit Operating State: {stateId}</h2>
                             
                             <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Name</label>
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        className="w-full border rounded px-3 py-2"
-                                        placeholder="Operating state name"
-                                    />
+                                <div className="flex gap-4">
+                                    <div style={{ width: '120px' }}>
+                                        <label className="block text-sm font-medium mb-1">State ID</label>
+                                        <input
+                                            type="text"
+                                            value={localStateId}
+                                            onChange={(e) => setLocalStateId(e.target.value)}
+                                            className="w-full border rounded px-3 py-2"
+                                            placeholder="e.g., FOS-1"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium mb-1">Name</label>
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            className="w-full border rounded px-3 py-2"
+                                            placeholder="Operating state name"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Color</label>
+                                        <input
+                                            type="color"
+                                            value={stateColor || defaultState?.color || '#93c5fd'}
+                                            onChange={(e) => { if (onColorChange) onColorChange(stateId, e.target.value); }}
+                                            className="w-16 h-10 border rounded cursor-pointer"
+                                            title="Column header color"
+                                        />
+                                    </div>
                                 </div>
                                 
                                 <div>
@@ -3234,6 +3535,7 @@
         function App() {
             const [facilityName, setFacilityName] = useState('');
             const [extendedDescription, setExtendedDescription] = useState('');
+            const [operatingStates, setOperatingStates] = useState([...DEFAULT_OPERATING_STATES]);
             const [operatingSchedule, setOperatingSchedule] = useState({
                 periodYears: 1,
                 periods: [{ stateId: 'FOS-1', startDay: 0, endDay: 365 }]
@@ -3252,6 +3554,9 @@
             const [showScheduleEditor, setShowScheduleEditor] = useState(false);
             const [showSettings, setShowSettings] = useState(false);
             const [showHazardPlot, setShowHazardPlot] = useState(false);
+            const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+            const [showReportPreview, setShowReportPreview] = useState(false);
+            const [reportPreviewHTML, setReportPreviewHTML] = useState('');
             const [settings, setSettings] = useState({ 
                 background: 'grey',
                 fontSize: 'medium',
@@ -3323,7 +3628,8 @@
                                 maxFrequency: 1e0
                             },
                             showHazardCategorization: loadedSettings.showHazardCategorization !== undefined ? loadedSettings.showHazardCategorization : true,
-                            hazardCategories: loadedSettings.hazardCategories || defaultCategories
+                            hazardCategories: loadedSettings.hazardCategories || defaultCategories,
+                            defaultOperatingStates: loadedSettings.defaultOperatingStates || [...DEFAULT_OPERATING_STATES]
                         });
                     }
                 } catch (err) {
@@ -3341,6 +3647,7 @@
                     facilityName,
                     extendedDescription,
                     operatingSchedule,
+                    operatingStates,
                     operatingStateData,
                     hazardList,
                     hazardStates,
@@ -3352,7 +3659,7 @@
                 } else if (!lastSavedState) {
                     setLastSavedState(currentState);
                 }
-            }, [facilityName, extendedDescription, operatingSchedule, operatingStateData, hazardList, hazardStates, hazardAnalysisData]);
+            }, [facilityName, extendedDescription, operatingSchedule, operatingStates, operatingStateData, hazardList, hazardStates, hazardAnalysisData]);
 
             // Add beforeunload listener to warn about unsaved changes
             useEffect(() => {
@@ -3498,7 +3805,7 @@
                     return analysisData.applicableEvents;
                 };
                 
-                DEFAULT_OPERATING_STATES.forEach(state => {
+                operatingStates.forEach(state => {
                     const key = `${hazardId}_${state.id}`;
                     const stateValue = hazardStates[key];
                     const analysisData = hazardAnalysisData[key];
@@ -3846,7 +4153,7 @@
                                 const initStates = (nodes) => {
                                     nodes.forEach(node => {
                                         if (!node.children || node.children.length === 0) {
-                                            DEFAULT_OPERATING_STATES.forEach(state => {
+                                            operatingStates.forEach(state => {
                                                 const key = `${node.id}_${state.id}`;
                                                 // Only initialize if not already set
                                                 if (!hazardStates[key]) {
@@ -3955,19 +4262,18 @@
                                 periodYears: 1,
                                 periods: [{ stateId: 'FOS-1', startDay: 0, endDay: 365 }]
                             });
-                            if (data.operatingStateData) {
-                                setOperatingStateData(data.operatingStateData);
+                            setOperatingStateData(data.operatingStateData || {});
+                            // Load project operating states; fall back to settings defaults, then hardcoded defaults
+                            if (data.operatingStates && Array.isArray(data.operatingStates) && data.operatingStates.length > 0) {
+                                setOperatingStates(data.operatingStates);
+                            } else {
+                                const defaultStates = settings.defaultOperatingStates || [...DEFAULT_OPERATING_STATES];
+                                setOperatingStates(JSON.parse(JSON.stringify(defaultStates)));
                             }
-                            if (data.hazardList) {
-                                setHazardList(data.hazardList);
-                                window.currentHazardList = data.hazardList; // Store globally for breadcrumb
-                            }
-                            if (data.hazardStates) {
-                                setHazardStates(data.hazardStates);
-                            }
-                            if (data.hazardAnalysisData) {
-                                setHazardAnalysisData(data.hazardAnalysisData);
-                            }
+                            setHazardList(data.hazardList || []);
+                            window.currentHazardList = data.hazardList || [];
+                            setHazardStates(data.hazardStates || {});
+                            setHazardAnalysisData(data.hazardAnalysisData || {});
                             // Track loaded file name
                             setLoadedFileName(file.name);
                         } catch (err) {
@@ -3984,6 +4290,7 @@
                     facilityName,
                     extendedDescription,
                     operatingSchedule,
+                    operatingStates,
                     operatingStateData,
                     hazardList,
                     hazardStates,
@@ -4016,7 +4323,7 @@
                 
                 // First, collect all the dependent states from the current data
                 const dependentKeys = [];
-                DEFAULT_OPERATING_STATES.forEach(otherState => {
+                operatingStates.forEach(otherState => {
                     if (otherState.id !== stateId) {
                         const otherKey = `${hazardId}_${otherState.id}`;
                         const otherData = hazardAnalysisData[otherKey];
@@ -4067,19 +4374,34 @@
                 const hasChildren = node.children && node.children.length > 0;
                 
                 if (hasChildren) {
+                    const isCollapsed = collapsedGroups.has(node.id);
+                    const toggleCollapse = (e) => {
+                        e.stopPropagation();
+                        setCollapsedGroups(prev => {
+                            const next = new Set(prev);
+                            if (next.has(node.id)) {
+                                next.delete(node.id);
+                            } else {
+                                next.add(node.id);
+                            }
+                            return next;
+                        });
+                    };
                     return (
                         <div key={node.id}>
-                            <div className="flex border-b" style={{ backgroundColor: '#f9fafb' }}>
-                                <div className="flex-shrink-0 py-1 px-2 font-semibold" style={{ width: `${hazardColumnWidth}px`, paddingLeft: `${level * 20 + 8}px` }}>
+                            <div className="flex border-b cursor-pointer hover:bg-gray-100" style={{ backgroundColor: '#f9fafb' }} onClick={toggleCollapse}>
+                                <div className="flex-shrink-0 py-1 px-2 font-semibold flex items-center" style={{ width: `${hazardColumnWidth}px`, paddingLeft: `${level * 20 + 8}px` }}>
+                                    <span style={{ display: 'inline-block', width: '16px', fontSize: '10px', color: '#6b7280', marginRight: '4px', textAlign: 'center', transition: 'transform 0.15s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>{'\u25BC'}</span>
                                     {node.name}
                                 </div>
                                 <div className="w-32 py-1 px-2 border-l flex-shrink-0"></div>
-                                {DEFAULT_OPERATING_STATES.map(state => (
+                                {operatingStates.map(state => (
                                     <div key={state.id} className="w-32 py-1 px-2 border-l flex-shrink-0"></div>
                                 ))}
+                                <div className="w-8 border-l flex-shrink-0"></div>
                                 <div className="flex-1 min-w-48 py-1 px-2 border-l flex-shrink-0"></div>
                             </div>
-                            {node.children.map(child => renderHazardRow(child, level + 1))}
+                            {!isCollapsed && node.children.map(child => renderHazardRow(child, level + 1))}
                         </div>
                     );
                 } else {
@@ -4088,7 +4410,7 @@
                     // Collect notes from hazard analysis data (supporting information)
                     const getHazardNotes = () => {
                         const notes = [];
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${node.id}_${state.id}`;
                             const stateValue = hazardStates[key];
                             const analysisData = hazardAnalysisData[key];
@@ -4130,7 +4452,7 @@
                                         formatFrequency(frequency)
                                 ) : ''}
                             </div>
-                            {DEFAULT_OPERATING_STATES.map(state => {
+                            {operatingStates.map(state => {
                                 const key = `${node.id}_${state.id}`;
                                 const stateValue = hazardStates[key] || 'unanalyzed';
                                 return (
@@ -4145,6 +4467,7 @@
                                     </div>
                                 );
                             })}
+                            <div className="w-8 border-l flex-shrink-0"></div>
                             <div className="flex-1 min-w-48 py-1 px-2 border-l flex-shrink-0 text-xs text-gray-600 overflow-hidden" title={hazardNotes}>
                                 <span className="line-clamp-2">{hazardNotes}</span>
                             </div>
@@ -4255,7 +4578,7 @@
                 };
                 
                 leafHazards.forEach(({ hazard, path }) => {
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const key = `${hazard.id}_${state.id}`;
                         const stateValue = hazardStates[key];
                         const analysisData = getEffectiveEvents(hazard.id, state.id);
@@ -4405,7 +4728,7 @@
                 };
                 
                 leafHazards.forEach(({ hazard, path }) => {
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const key = `${hazard.id}_${state.id}`;
                         const stateValue = hazardStates[key];
                         const analysisData = getEffectiveEvents(hazard.id, state.id);
@@ -4575,7 +4898,7 @@
                     if (settings.stateColors && settings.stateColors[stateId]) {
                         return settings.stateColors[stateId];
                     }
-                    const state = DEFAULT_OPERATING_STATES.find(s => s.id === stateId);
+                    const state = operatingStates.find(s => s.id === stateId);
                     return state ? state.color : '#e5e7eb';
                 };
                 
@@ -4755,6 +5078,34 @@
                     return;
                 }
 
+                const reportHTML = await buildReportHTML();
+
+                // Create blob and download
+                const blob = new Blob(['\ufeff', reportHTML], {
+                    type: 'application/msword'
+                });
+                
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `Hazard-Analysis-${facilityName.replace(/\s+/g, '-')}.doc`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const previewReport = async () => {
+                if (!facilityName) {
+                    alert('Please enter a facility name before previewing the report.');
+                    return;
+                }
+
+                const reportHTML = await buildReportHTML();
+                setReportPreviewHTML(reportHTML);
+                setShowReportPreview(true);
+            };
+
+            const buildReportHTML = async () => {
+
                 // Helper function to strip font-family styles from HTML content
                 const stripFontFamily = (html) => {
                     if (!html) return html;
@@ -4766,7 +5117,7 @@
                 const createOperatingStateInfoHTML = () => {
                     let stateInfoHTML = '<div style="margin: 6px 0;">';
                     
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const customData = operatingStateData[state.id];
                         const displayName = customData?.name || state.name;
                         const displayDescription = customData?.description || state.description;
@@ -4792,7 +5143,7 @@
                     let timelineHTML = '<div style="margin: 6px 0; line-height: 1.8;">';
                     
                     operatingSchedule.periods.forEach((period, index) => {
-                        const state = DEFAULT_OPERATING_STATES.find(s => s.id === period.stateId);
+                        const state = operatingStates.find(s => s.id === period.stateId);
                         const startDay = Math.floor(period.startDay);
                         const endDay = Math.floor(period.endDay);
                         
@@ -4830,22 +5181,20 @@
                     // Helper function to get category for a frequency
                     const getHazardCategory = (frequency) => {
                         if (frequency === null || frequency === undefined) return '';
+                        // Handle range objects from hazard curves - use max frequency for categorization
+                        let freq = frequency;
+                        if (typeof frequency === 'object' && frequency.isRange) {
+                            freq = frequency.max;
+                        }
+                        if (typeof freq !== 'number' || isNaN(freq)) return '';
                         const categories = settings.hazardCategories || [];
                         for (const cat of categories) {
                             const low = cat.lowBound || 0;
-                            const high = cat.highBound === Infinity ? Number.MAX_VALUE : (cat.highBound || 0);
-                            if (frequency > low && frequency <= high) {
+                            // Infinity becomes null after JSON.stringify/parse, so treat null as Infinity
+                            const high = (cat.highBound === Infinity || cat.highBound === null || cat.highBound === undefined) ? Number.MAX_VALUE : (cat.highBound || 0);
+                            if (freq >= low && freq <= high) {
                                 return cat.name;
                             }
-                            // Handle edge case for lowest category (frequency exactly at low bound)
-                            if (frequency === low && low === 0) {
-                                return cat.name;
-                            }
-                        }
-                        // Check if frequency is higher than highest category
-                        const highestCat = categories.find(c => c.highBound === Infinity);
-                        if (highestCat && frequency > highestCat.lowBound) {
-                            return highestCat.name;
                         }
                         return '';
                     };
@@ -4856,8 +5205,10 @@
                     if (settings.showHazardCategorization) {
                         tableHTML += '<th>Categorization</th>';
                     }
-                    DEFAULT_OPERATING_STATES.forEach(state => {
-                        tableHTML += `<th>${state.name}</th>`;
+                    operatingStates.forEach(state => {
+                        const customData = operatingStateData[state.id];
+                        const displayName = customData?.name || state.name;
+                        tableHTML += `<th>${state.id}<br><span style="font-weight:normal;font-size:8pt;">${displayName}</span></th>`;
                     });
                     tableHTML += '</tr></thead><tbody>';
 
@@ -4877,7 +5228,7 @@
                     
                     leafHazards.forEach(hazard => {
                         let hasIncluded = false;
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             if (hazardStates[key] === 'included') {
                                 hasIncluded = true;
@@ -4889,7 +5240,7 @@
                             let hasHazardCurve = false;
                             let hazardCurveHTML = '';
                             
-                            DEFAULT_OPERATING_STATES.forEach(state => {
+                            operatingStates.forEach(state => {
                                 const key = `${hazard.id}_${state.id}`;
                                 const analysisData = hazardAnalysisData[key];
                                 
@@ -4918,11 +5269,11 @@
                             
                             // Insert hazard curve table or frequency
                             if (hasHazardCurve) {
-                                tableHTML += `<td style="padding: 2px;">${hazardCurveHTML}</td>`;
+                                tableHTML += `<td style="padding: 2px; text-align: center;">${hazardCurveHTML}</td>`;
                                 // For hazard curves, show categorization based on highest frequency if enabled
                                 if (settings.showHazardCategorization) {
                                     let maxFreq = 0;
-                                    DEFAULT_OPERATING_STATES.forEach(state => {
+                                    operatingStates.forEach(state => {
                                         const key = `${hazard.id}_${state.id}`;
                                         const analysisData = hazardAnalysisData[key];
                                         if (analysisData && analysisData.applicableEvents) {
@@ -4939,7 +5290,18 @@
                                     tableHTML += `<td style="text-align: center;">${getHazardCategory(maxFreq)}</td>`;
                                 }
                             } else {
-                                tableHTML += `<td>${frequency !== null ? formatFrequency(frequency) : ''}</td>`;
+                                // Determine frequency units from events
+                                let freqUnits = '/yr';
+                                operatingStates.forEach(state => {
+                                    const key = `${hazard.id}_${state.id}`;
+                                    const ad = hazardAnalysisData[key];
+                                    if (ad && ad.applicableEvents) {
+                                        ad.applicableEvents.forEach(ev => {
+                                            if (ev.occurrenceModel === 'frequency' && ev.frequencyUnits) freqUnits = ev.frequencyUnits;
+                                        });
+                                    }
+                                });
+                                tableHTML += `<td style="text-align: center;">${frequency !== null ? (formatFrequency(frequency) + ' ' + freqUnits) : ''}</td>`;
                                 // Add categorization column if enabled
                                 if (settings.showHazardCategorization) {
                                     const category = getHazardCategory(frequency);
@@ -4947,7 +5309,7 @@
                                 }
                             }
                             
-                            DEFAULT_OPERATING_STATES.forEach(state => {
+                            operatingStates.forEach(state => {
                                 const key = `${hazard.id}_${state.id}`;
                                 const stateValue = hazardStates[key] || 'unanalyzed';
                                 
@@ -5024,26 +5386,46 @@
                             const componentInfo = componentCount > 1 ? `, ${componentCount} components` : '';
                             const propInfo = propagationFactor !== 1 ? `, prop. factor ${propagationFactor}` : '';
                             eventHTML += `<p><strong>Occurrence:</strong> NUREG-2169 Fire Ignition - ${formatFrequency(finalMean)} /yr (${selectedItems.length} ignition sources selected${componentInfo}${propInfo})</p>`;
+                        } else if (event.occurrenceModel === 'hazard-curve') {
+                            eventHTML += '<p><strong>Occurrence:</strong> Magnitude versus Frequency Hazard Curve</p>';
+                            if (event.hazardCurveData && event.hazardCurveData.length > 0) {
+                                const magUnits = event.hazardMagnitudeUnits ? ` (${event.hazardMagnitudeUnits})` : '';
+                                const freqUnits = event.hazardFrequencyUnits || '/yr';
+                                eventHTML += '<table style="width: 80%; font-size: 8pt; margin: 6px 0; border-collapse: collapse;">';
+                                eventHTML += `<thead><tr><th style="padding: 3px; border: 1px solid #ccc; text-align: center;">Magnitude${magUnits}</th><th style="padding: 3px; border: 1px solid #ccc; text-align: center;">Frequency (${freqUnits})</th></tr></thead><tbody>`;
+                                event.hazardCurveData.forEach(row => {
+                                    if (row.magnitude || row.frequency) {
+                                        eventHTML += `<tr><td style="padding: 2px; border: 1px solid #ccc; text-align: center;">${row.magnitude || ''}</td><td style="padding: 2px; border: 1px solid #ccc; text-align: center;">${row.frequency || ''}</td></tr>`;
+                                    }
+                                });
+                                eventHTML += '</tbody></table>';
+                            }
                         } else {
                             eventHTML += `<p><strong>Occurrence:</strong> ${event.occurrenceModel}</p>`;
                         }
 
                         if (event.description) {
-                            // Strip out all header tags from supporting information and remove font-family
-                            const cleanedDescription = stripFontFamily(event.description)
-                                .replace(/<h1[^>]*>/gi, '<p><strong>')
-                                .replace(/<\/h1>/gi, '</strong></p>')
-                                .replace(/<h2[^>]*>/gi, '<p><strong>')
-                                .replace(/<\/h2>/gi, '</strong></p>')
-                                .replace(/<h3[^>]*>/gi, '<p><strong>')
-                                .replace(/<\/h3>/gi, '</strong></p>')
-                                .replace(/<h4[^>]*>/gi, '<p><strong>')
-                                .replace(/<\/h4>/gi, '</strong></p>')
-                                .replace(/<h5[^>]*>/gi, '<p><strong>')
-                                .replace(/<\/h5>/gi, '</strong></p>')
-                                .replace(/<h6[^>]*>/gi, '<p><strong>')
-                                .replace(/<\/h6>/gi, '</strong></p>');
-                            eventHTML += `<div style="margin-top: 10px;"><strong>Supporting Information:</strong><div>${cleanedDescription}</div></div>`;
+                            // Check if description has actual text content
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = event.description;
+                            const textContent = (tempDiv.textContent || tempDiv.innerText || '').trim();
+                            if (textContent) {
+                                // Strip out all header tags from supporting information and remove font-family
+                                const cleanedDescription = stripFontFamily(event.description)
+                                    .replace(/<h1[^>]*>/gi, '<p><strong>')
+                                    .replace(/<\/h1>/gi, '</strong></p>')
+                                    .replace(/<h2[^>]*>/gi, '<p><strong>')
+                                    .replace(/<\/h2>/gi, '</strong></p>')
+                                    .replace(/<h3[^>]*>/gi, '<p><strong>')
+                                    .replace(/<\/h3>/gi, '</strong></p>')
+                                    .replace(/<h4[^>]*>/gi, '<p><strong>')
+                                    .replace(/<\/h4>/gi, '</strong></p>')
+                                    .replace(/<h5[^>]*>/gi, '<p><strong>')
+                                    .replace(/<\/h5>/gi, '</strong></p>')
+                                    .replace(/<h6[^>]*>/gi, '<p><strong>')
+                                    .replace(/<\/h6>/gi, '</strong></p>');
+                                eventHTML += `<div style="margin-top: 10px;"><strong>Supporting Information:</strong><div>${cleanedDescription}</div></div>`;
+                            }
                         }
                         eventHTML += '</div>';
                         return eventHTML;
@@ -5055,7 +5437,7 @@
                         // Value: { sourceStateId, stateIds: [], analysisData }
                         const infoGroups = {};
                         
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             const stateValue = hazardStates[key];
                             const analysisData = hazardAnalysisData[key];
@@ -5088,7 +5470,7 @@
                             
                             // Get state names for display
                             const stateNames = stateIds.map(sid => {
-                                const state = DEFAULT_OPERATING_STATES.find(s => s.id === sid);
+                                const state = operatingStates.find(s => s.id === sid);
                                 const customData = operatingStateData[sid];
                                 return customData?.name || state?.name || sid;
                             });
@@ -5105,7 +5487,6 @@
                             }
 
                             if (analysisData.applicableEvents && analysisData.applicableEvents.length > 0) {
-                                detailsHTML += '<h4>Applicable Events:</h4>';
                                 analysisData.applicableEvents.forEach(event => {
                                     detailsHTML += renderEventDetails(event);
                                 });
@@ -5151,7 +5532,7 @@
 
                     leafHazards.forEach(({ hazard, path }) => {
                         let allScreened = true;
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             if (hazardStates[key] !== 'screened') {
                                 allScreened = false;
@@ -5164,7 +5545,7 @@
                             
                             // Collect screening info from any state (they should all be screened)
                             let screeningDetails = [];
-                            DEFAULT_OPERATING_STATES.forEach(state => {
+                            operatingStates.forEach(state => {
                                 const key = `${hazard.id}_${state.id}`;
                                 const analysisData = hazardAnalysisData[key];
                                 if (analysisData && analysisData.applicableEvents) {
@@ -5185,21 +5566,27 @@
                                 screeningDetails.forEach(detail => {
                                     screenedHTML += `<li><strong>${detail.type}</strong>`;
                                     if (detail.info) {
-                                        // Strip out all header tags from supporting information
-                                        const cleanedInfo = detail.info
-                                            .replace(/<h1[^>]*>/gi, '<p><strong>')
-                                            .replace(/<\/h1>/gi, '</strong></p>')
-                                            .replace(/<h2[^>]*>/gi, '<p><strong>')
-                                            .replace(/<\/h2>/gi, '</strong></p>')
-                                            .replace(/<h3[^>]*>/gi, '<p><strong>')
-                                            .replace(/<\/h3>/gi, '</strong></p>')
-                                            .replace(/<h4[^>]*>/gi, '<p><strong>')
-                                            .replace(/<\/h4>/gi, '</strong></p>')
-                                            .replace(/<h5[^>]*>/gi, '<p><strong>')
-                                            .replace(/<\/h5>/gi, '</strong></p>')
-                                            .replace(/<h6[^>]*>/gi, '<p><strong>')
-                                            .replace(/<\/h6>/gi, '</strong></p>');
-                                        screenedHTML += `<br/><span style="margin-left: 10px;">${cleanedInfo}</span>`;
+                                        // Check if description has actual text content
+                                        const tempDiv = document.createElement('div');
+                                        tempDiv.innerHTML = detail.info;
+                                        const textContent = (tempDiv.textContent || tempDiv.innerText || '').trim();
+                                        if (textContent) {
+                                            // Strip HTML tags for inline display
+                                            const cleanedInfo = detail.info
+                                                .replace(/<h[1-6][^>]*>/gi, '')
+                                                .replace(/<\/h[1-6]>/gi, ' ')
+                                                .replace(/<br\s*\/?>/gi, ' ')
+                                                .replace(/<p[^>]*>/gi, '')
+                                                .replace(/<\/p>/gi, ' ')
+                                                .replace(/<div[^>]*>/gi, '')
+                                                .replace(/<\/div>/gi, ' ')
+                                                .replace(/<[^>]+>/g, '')
+                                                .replace(/\s+/g, ' ')
+                                                .trim();
+                                            if (cleanedInfo) {
+                                                screenedHTML += `: ${cleanedInfo}`;
+                                            }
+                                        }
                                     }
                                     screenedHTML += '</li>';
                                 });
@@ -5238,7 +5625,7 @@
                     let hasUnanalyzed = false;
 
                     leafHazards.forEach(({ hazard, path }) => {
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             if (!hazardStates[key] || hazardStates[key] === 'unanalyzed') {
                                 hasUnanalyzed = true;
@@ -5278,7 +5665,7 @@
                         // Group states by their source of information
                         const infoGroups = {};
                         
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             const stateValue = hazardStates[key];
                             const analysisData = hazardAnalysisData[key];
@@ -5323,7 +5710,7 @@
                                         if (validData.length > 0) {
                                             // Get state names for display
                                             const stateNames = stateIds.map(sid => {
-                                                const state = DEFAULT_OPERATING_STATES.find(s => s.id === sid);
+                                                const state = operatingStates.find(s => s.id === sid);
                                                 const customData = operatingStateData[sid];
                                                 return customData?.name || state?.name || sid;
                                             });
@@ -5562,7 +5949,7 @@
                         // Group states by their source of information
                         const infoGroups = {};
                         
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             const stateValue = hazardStates[key];
                             const analysisData = hazardAnalysisData[key];
@@ -5608,7 +5995,7 @@
                                             
                                             // Get state names for display
                                             const stateNames = stateIds.map(sid => {
-                                                const state = DEFAULT_OPERATING_STATES.find(s => s.id === sid);
+                                                const state = operatingStates.find(s => s.id === sid);
                                                 const customData = operatingStateData[sid];
                                                 return customData?.name || state?.name || sid;
                                             });
@@ -5661,7 +6048,7 @@
                     });
                     
                     if (!hasFireHazards) {
-                        fireHTML = '<p><em>No NUREG-2169 fire ignition hazards defined.</em></p>';
+                        fireHTML = '';
                     }
                     
                     return fireHTML;
@@ -5671,7 +6058,7 @@
                 const createHazardProbabilitiesHTML = () => {
                     let tableHTML = '<table><thead><tr>';
                     tableHTML += '<th>Potential Hazards</th>';
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const customData = operatingStateData[state.id];
                         const displayName = customData?.name || state.name;
                         tableHTML += `<th>${state.id}<br/>${displayName}</th>`;
@@ -5696,7 +6083,7 @@
                     const stateDurations = {};
                     // Count number of periods for each operating state
                     const statePeriodCounts = {};
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         stateDurations[state.id] = 0;
                         statePeriodCounts[state.id] = 0;
                     });
@@ -5711,7 +6098,7 @@
                     
                     leafHazards.forEach(hazard => {
                         let hasIncluded = false;
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             if (hazardStates[key] === 'included') {
                                 hasIncluded = true;
@@ -5722,7 +6109,7 @@
                             tableHTML += '<tr>';
                             tableHTML += `<td>${hazard.name}</td>`;
                             
-                            DEFAULT_OPERATING_STATES.forEach(state => {
+                            operatingStates.forEach(state => {
                                 const key = `${hazard.id}_${state.id}`;
                                 const stateValue = hazardStates[key];
                                 let analysisData = hazardAnalysisData[key];
@@ -5854,6 +6241,8 @@
                                     } else {
                                         tableHTML += '<td style="text-align: center;">-</td>';
                                     }
+                                } else if (stateValue === 'screened') {
+                                    tableHTML += '<td style="text-align: center;">na</td>';
                                 } else {
                                     tableHTML += '<td style="text-align: center;">-</td>';
                                 }
@@ -5970,20 +6359,20 @@
             height: auto;
         }
         .hazard-details {
-            font-size: 7pt;
+            font-size: 8pt;
             line-height: 1.0;
         }
         .hazard-details h3 {
-            font-size: 8pt;
+            font-size: 9pt;
         }
         .hazard-details h4 {
-            font-size: 7pt;
+            font-size: 8pt;
         }
         .hazard-details h2 {
-            font-size: 6pt;
+            font-size: 7pt;
         }
         .hazard-details p {
-            font-size: 7pt;
+            font-size: 8pt;
             line-height: 1.0;
         }
         .hazard-details div {
@@ -5991,13 +6380,13 @@
             margin: 10px;
         }
         .hazard-details div h1 {
-            font-size: 7pt;
+            font-size: 8pt;
         }
         .hazard-details div h2 {
-            font-size: 6.5pt;
+            font-size: 7.5pt;
         }
         .hazard-details div h3 {
-            font-size: 6pt;
+            font-size: 7pt;
         }
         .footer {
             margin-top: 40px;
@@ -6038,8 +6427,7 @@
     <h2>Hazard Curves</h2>
     ${createHazardCurvesHTML()}
     
-    <h2>Fire Hazards</h2>
-    ${createFireHazardsHTML()}
+    ${(() => { const fireContent = createFireHazardsHTML(); return fireContent.trim() ? '<h2>Fire Hazards</h2>\n    ' + fireContent : ''; })()}
     
     <h2>Screened Hazards</h2>
     ${createScreenedHazardsHTML()}
@@ -6048,24 +6436,14 @@
     ${createUnanalyzedHazardsHTML()}
     
     <div class="footer">
-        <p><strong>KUREAS-HA v1.0</strong> | Hazard Analysis</p>
+        <p><strong>KUREAS-HA v1.1</strong> | Hazard Analysis</p>
         <p>Curtis Lee Smith - ${new Date().getFullYear()}</p>
         <p>Generated: ${new Date().toLocaleString()}</p>
     </div>
 </body>
 </html>`;
 
-                // Create blob and download
-                const blob = new Blob(['\ufeff', reportHTML], {
-                    type: 'application/msword'
-                });
-                
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.download = `Hazard-Analysis-${facilityName.replace(/\s+/g, '-')}.doc`;
-                link.href = url;
-                link.click();
-                URL.revokeObjectURL(url);
+                return reportHTML;
             };
 
             // Export to Markdown
@@ -6086,7 +6464,7 @@
 
                 // Operating States Section
                 markdown += `## Facility Operating States\n\n`;
-                DEFAULT_OPERATING_STATES.forEach(state => {
+                operatingStates.forEach(state => {
                     const customData = operatingStateData[state.id];
                     const displayName = customData?.name || state.name;
                     const displayDescription = customData?.description || state.description;
@@ -6113,7 +6491,7 @@
                     markdown += `| Start Day | End Day | Operating State |\n`;
                     markdown += `|-----------|---------|----------------|\n`;
                     operatingSchedule.periods.forEach(period => {
-                        const state = DEFAULT_OPERATING_STATES.find(s => s.id === period.stateId);
+                        const state = operatingStates.find(s => s.id === period.stateId);
                         const customData = operatingStateData[period.stateId];
                         const stateName = customData?.name || (state ? state.name : period.stateId);
                         markdown += `| ${period.startDay} | ${period.endDay} | ${period.stateId} - ${stateName} |\n`;
@@ -6142,7 +6520,7 @@
                 
                 leafHazards.forEach(({ hazard, path }) => {
                     let hasIncluded = false;
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const key = `${hazard.id}_${state.id}`;
                         if (hazardStates[key] === 'included') {
                             hasIncluded = true;
@@ -6157,7 +6535,7 @@
                 markdown += `\n## Detailed Information\n\n`;
 
                 leafHazards.forEach(({ hazard, path }) => {
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const key = `${hazard.id}_${state.id}`;
                         const stateValue = hazardStates[key];
                         const analysisData = hazardAnalysisData[key];
@@ -6244,7 +6622,7 @@
                 const leafHazards = collectLeafHazards(hazardList);
                 
                 leafHazards.forEach(({ hazard, path }) => {
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const key = `${hazard.id}_${state.id}`;
                         const stateValue = hazardStates[key];
                         const analysisData = hazardAnalysisData[key];
@@ -6425,20 +6803,18 @@
                 // Helper function to get category for a frequency
                 const getHazardCategory = (frequency) => {
                     if (frequency === null || frequency === undefined) return '';
+                    let freq = frequency;
+                    if (typeof frequency === 'object' && frequency.isRange) {
+                        freq = frequency.max;
+                    }
+                    if (typeof freq !== 'number' || isNaN(freq)) return '';
                     const categories = settings.hazardCategories || [];
                     for (const cat of categories) {
                         const low = cat.lowBound || 0;
-                        const high = cat.highBound === Infinity ? Number.MAX_VALUE : (cat.highBound || 0);
-                        if (frequency > low && frequency <= high) {
+                        const high = (cat.highBound === Infinity || cat.highBound === null || cat.highBound === undefined) ? Number.MAX_VALUE : (cat.highBound || 0);
+                        if (freq >= low && freq <= high) {
                             return cat.name;
                         }
-                        if (frequency === low && low === 0) {
-                            return cat.name;
-                        }
-                    }
-                    const highestCat = categories.find(c => c.highBound === Infinity);
-                    if (highestCat && frequency > highestCat.lowBound) {
-                        return highestCat.name;
                     }
                     return '';
                 };
@@ -6462,7 +6838,7 @@
                 if (settings.showHazardCategorization) {
                     headers.push('Categorization');
                 }
-                DEFAULT_OPERATING_STATES.forEach(state => {
+                operatingStates.forEach(state => {
                     const customData = operatingStateData[state.id];
                     const displayName = customData?.name || state.name;
                     headers.push(`${state.id} - ${displayName}`);
@@ -6472,7 +6848,7 @@
                 const rows = [];
                 leafHazards.forEach(hazard => {
                     let hasIncluded = false;
-                    DEFAULT_OPERATING_STATES.forEach(state => {
+                    operatingStates.forEach(state => {
                         const key = `${hazard.id}_${state.id}`;
                         if (hazardStates[key] === 'included') {
                             hasIncluded = true;
@@ -6486,7 +6862,7 @@
                         // Check for hazard curve
                         let hasHazardCurve = false;
                         let maxFreq = 0;
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             const analysisData = hazardAnalysisData[key];
                             if (analysisData && analysisData.applicableEvents) {
@@ -6514,7 +6890,7 @@
                             }
                         }
                         
-                        DEFAULT_OPERATING_STATES.forEach(state => {
+                        operatingStates.forEach(state => {
                             const key = `${hazard.id}_${state.id}`;
                             const stateValue = hazardStates[key] || 'unanalyzed';
                             row.push(stateValue);
@@ -6563,7 +6939,7 @@
                 >
                     {/* Header */}
                     <div className="bg-blue-600 text-white p-2 flex items-center justify-between">
-                        <h1 className="text-lg font-bold">KUREAS-HA</h1><span className="text-sm opacity-90"> v1.0 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>Hazard Analysis Module</strong></span>
+                        <h1 className="text-lg font-bold">KUREAS-HA</h1><span className="text-sm opacity-90"> v1.1 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>Hazard Analysis Module</strong></span>
                         <div className="flex gap-2">
                             <button
                                 onClick={handleLoadHA}
@@ -6579,7 +6955,7 @@
                                 Save HA
                             </button>
                             <button
-                                onClick={generateReport}
+                                onClick={previewReport}
                                 className="px-3 py-1 bg-blue-900 text-white text-sm rounded hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={!hasData}
                             >
@@ -6618,15 +6994,15 @@
                     >
                         <div className="p-4 space-y-3">
                             <div className="flex gap-4">
-                                {/* Facility Name - 20% width */}
+                                {/* Facility or Project Name - 20% width */}
                                 <div style={{ width: '20%' }}>
-                                    <label className="block text-sm font-medium mb-1">Facility Name:</label>
+                                    <label className="block text-sm font-medium mb-1">Facility or Project Name:</label>
                                     <input
                                         type="text"
                                         value={facilityName}
                                         onChange={(e) => setFacilityName(e.target.value)}
                                         className="w-full border rounded px-3 py-2"
-                                        placeholder="Enter facility name"
+                                        placeholder="Enter facility or project name"
                                     />
                                 </div>
 
@@ -6644,7 +7020,7 @@
 
                             <div className="pb-2">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <label className="text-sm font-medium">Anticipated Schedule:</label>
+                                    <label className="text-sm font-medium">Planned Operational Timeline:</label>
                                     <button
                                         onClick={() => setShowScheduleEditor(true)}
                                         className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
@@ -6655,6 +7031,7 @@
                                 <OperatingScheduleDisplay 
                                     schedule={operatingSchedule} 
                                     stateColors={settings.stateColors}
+                                    operatingStates={operatingStates}
                                 />
                             </div>
                         </div>
@@ -6669,7 +7046,7 @@
                         style={{ height: `${100 - paneAHeight}vh` }}
                     >
                         <div className="p-2 border-b bg-gray-50">
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
                                 <button
                                     onClick={handleLoadHazardList}
                                     className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -6679,11 +7056,10 @@
                                 </button>
                                 <button
                                     onClick={() => setShowModifyHazardList(true)}
-                                    className="px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
                                     style={{ fontSize: '0.75rem' }}
-                                    disabled={!hasData}
                                 >
-                                    Modify Hazard List
+                                    {hazardList.length > 0 ? 'Modify Hazard List' : 'Start Hazard List'}
                                 </button>
                             </div>
                         </div>
@@ -6691,12 +7067,12 @@
                         <div className="flex-1 overflow-auto" style={{ lineHeight: '1.3' }}>{/* Removed text-sm to inherit font size */}
                             {visibleHazardList.length === 0 ? (
                                 <div className="p-8 text-center text-gray-500">
-                                    To begin, either (1) load a Hazard Assessment project file (click 'Load HA') or (2) load a hazard list (click 'Load Hazard List').
+                                    To begin, either (1) load a Hazard Assessment [Load HA] project file, (2) load a hazard list (click 'Load Hazard List'), or (3) start a new hazard list (click 'Start Hazard List').
                                 </div>
                             ) : (
                                 <div>
                                     {/* Header Row */}
-                                    <div className="flex border-b font-semibold sticky top-0">
+                                    <div className="flex border-b font-semibold sticky top-0" style={{ zIndex: 5 }}>
                                         <div className="flex-shrink-0 py-1 px-2 bg-blue-100" style={{ width: `${hazardColumnWidth}px` }}>
                                             Potential Hazards
                                         </div>
@@ -6704,24 +7080,95 @@
                                             Frequency
                                             <div className="text-xs font-normal">(/yr)</div>
                                         </div>
-                                        {DEFAULT_OPERATING_STATES.map(state => {
+                                        {operatingStates.map((state, stateIndex) => {
                                             const stateColor = settings.stateColors?.[state.id] || state.color;
                                             const customData = operatingStateData[state.id];
                                             const displayName = customData?.name || state.name;
                                             const displayDescription = customData?.description || state.description;
+                                            const isFirst = stateIndex === 0;
+                                            const isLast = stateIndex === operatingStates.length - 1;
                                             return (
                                                 <div 
                                                     key={state.id} 
-                                                    className="w-32 py-1 px-2 border-l text-center flex-shrink-0 cursor-pointer hover:opacity-80"
+                                                    className="w-32 border-l flex-shrink-0 relative"
                                                     style={{ backgroundColor: stateColor }}
-                                                    title={`${displayDescription}\n\nClick to edit`}
-                                                    onClick={() => setEditingOperatingState(state.id)}
                                                 >
-                                                    {state.id}
-                                                    <div className="text-xs font-normal">{displayName}</div>
+                                                    {/* Top icon row: move arrows and delete */}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1px 2px 0 2px', height: '16px' }}>
+                                                        <div style={{ display: 'flex', gap: '1px' }}>
+                                                            {!isFirst && (
+                                                                <span
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const newStates = [...operatingStates];
+                                                                        [newStates[stateIndex - 1], newStates[stateIndex]] = [newStates[stateIndex], newStates[stateIndex - 1]];
+                                                                        setOperatingStates(newStates);
+                                                                    }}
+                                                                    style={{ cursor: 'pointer', fontSize: '10px', opacity: 0.6, padding: '0 2px', lineHeight: '14px' }}
+                                                                    title="Move left"
+                                                                >{'\u25C0'}</span>
+                                                            )}
+                                                            {!isLast && (
+                                                                <span
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const newStates = [...operatingStates];
+                                                                        [newStates[stateIndex], newStates[stateIndex + 1]] = [newStates[stateIndex + 1], newStates[stateIndex]];
+                                                                        setOperatingStates(newStates);
+                                                                    }}
+                                                                    style={{ cursor: 'pointer', fontSize: '10px', opacity: 0.6, padding: '0 2px', lineHeight: '14px' }}
+                                                                    title="Move right"
+                                                                >{'\u25B6'}</span>
+                                                            )}
+                                                        </div>
+                                                        {operatingStates.length > 1 && (
+                                                            <span
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (confirm(`Remove "${state.id}: ${displayName}" from this project?`)) {
+                                                                        setOperatingStates(operatingStates.filter((_, i) => i !== stateIndex));
+                                                                    }
+                                                                }}
+                                                                style={{ cursor: 'pointer', fontSize: '10px', color: '#991b1b', opacity: 0.7, padding: '0 2px', lineHeight: '14px' }}
+                                                                title={`Remove ${state.id}`}
+                                                            >{'\u2715'}</span>
+                                                        )}
+                                                    </div>
+                                                    {/* Main clickable area for editing */}
+                                                    <div
+                                                        className="text-center cursor-pointer hover:opacity-80 px-2 pb-1"
+                                                        title={`${displayDescription}\n\nClick to edit`}
+                                                        onClick={() => setEditingOperatingState(state.id)}
+                                                    >
+                                                        {state.id}
+                                                        <div className="text-xs font-normal">{displayName}</div>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
+                                        {/* Add FOS button positioned as a column header */}
+                                        <div className="w-8 border-l flex-shrink-0 flex items-center justify-center bg-gray-50" title="Add a new Facility Operating State">
+                                            <button
+                                                onClick={() => {
+                                                    let maxNum = 0;
+                                                    operatingStates.forEach(s => {
+                                                        const m = s.id.match(/^FOS-(\d+)$/);
+                                                        if (m) { const n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+                                                    });
+                                                    const nextId = `FOS-${maxNum + 1}`;
+                                                    const colors = ['#93c5fd','#fca5a5','#fde047','#c4b5fd','#86efac','#fdba74','#f9a8d4','#67e8f9'];
+                                                    const color = colors[operatingStates.length % colors.length];
+                                                    setOperatingStates([...operatingStates, {
+                                                        id: nextId,
+                                                        name: 'New State',
+                                                        description: 'Click column header to edit',
+                                                        color: color
+                                                    }]);
+                                                }}
+                                                style={{ fontSize: '16px', lineHeight: '1', color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', padding: '2px' }}
+                                                title="Add FOS"
+                                            >+</button>
+                                        </div>
                                         <div className="flex-1 min-w-48 py-1 px-2 border-l text-center flex-shrink-0 bg-gray-100">
                                             Notes
                                         </div>
@@ -6749,6 +7196,7 @@
                             schedule={operatingSchedule}
                             onSave={setOperatingSchedule}
                             onClose={() => setShowScheduleEditor(false)}
+                            operatingStates={operatingStates}
                         />
                     )}
 
@@ -6756,7 +7204,8 @@
                         <SettingsModal 
                             settings={settings}
                             onSave={handleSaveSettings}
-                            onClose={() => setShowSettings(false)} 
+                            onClose={() => setShowSettings(false)}
+                            operatingStates={operatingStates}
                         />
                     )}
 
@@ -6776,6 +7225,8 @@
                             allAnalysisData={hazardAnalysisData}
                             allStates={hazardStates}
                             settings={settings}
+                            operatingStates={operatingStates}
+                            operatingStateData={operatingStateData}
                         />
                     )}
 
@@ -6783,7 +7234,63 @@
                         <OperatingStateEditor
                             stateId={editingOperatingState}
                             stateData={operatingStateData[editingOperatingState]}
-                            defaultState={DEFAULT_OPERATING_STATES.find(s => s.id === editingOperatingState)}
+                            defaultState={operatingStates.find(s => s.id === editingOperatingState)}
+                            stateColor={settings.stateColors?.[editingOperatingState] || (operatingStates.find(s => s.id === editingOperatingState) || {}).color}
+                            onColorChange={(sid, color) => {
+                                const newColors = { ...settings.stateColors, [sid]: color };
+                                const newSettings = { ...settings, stateColors: newColors };
+                                setSettings(newSettings);
+                                try { localStorage.setItem('KUREAS_HA_settings', JSON.stringify(newSettings)); } catch(e) {}
+                            }}
+                            onRenameState={(oldId, newId) => {
+                                if (oldId === newId) return;
+                                // Check for duplicate
+                                if (operatingStates.some(s => s.id === newId)) {
+                                    alert(`An operating state with ID "${newId}" already exists.`);
+                                    return;
+                                }
+                                // Update operatingStates array
+                                setOperatingStates(prev => prev.map(s => s.id === oldId ? { ...s, id: newId } : s));
+                                // Migrate operatingStateData
+                                setOperatingStateData(prev => {
+                                    const updated = { ...prev };
+                                    if (updated[oldId]) { updated[newId] = updated[oldId]; delete updated[oldId]; }
+                                    return updated;
+                                });
+                                // Migrate hazardStates keys (hazardId_stateId)
+                                setHazardStates(prev => {
+                                    const updated = {};
+                                    Object.entries(prev).forEach(([key, val]) => {
+                                        const newKey = key.replace(`_${oldId}`, `_${newId}`);
+                                        updated[newKey] = val;
+                                    });
+                                    return updated;
+                                });
+                                // Migrate hazardAnalysisData keys
+                                setHazardAnalysisData(prev => {
+                                    const updated = {};
+                                    Object.entries(prev).forEach(([key, val]) => {
+                                        const newKey = key.replace(`_${oldId}`, `_${newId}`);
+                                        // Also update useInfoFrom references inside the data
+                                        const newVal = val && val.useInfoFrom === oldId ? { ...val, useInfoFrom: newId } : val;
+                                        updated[newKey] = newVal;
+                                    });
+                                    return updated;
+                                });
+                                // Migrate operatingSchedule periods
+                                setOperatingSchedule(prev => ({
+                                    ...prev,
+                                    periods: (prev.periods || []).map(p => p.stateId === oldId ? { ...p, stateId: newId } : p)
+                                }));
+                                // Migrate settings.stateColors
+                                const newColors = { ...settings.stateColors };
+                                if (newColors[oldId]) { newColors[newId] = newColors[oldId]; delete newColors[oldId]; }
+                                const newSettings = { ...settings, stateColors: newColors };
+                                setSettings(newSettings);
+                                try { localStorage.setItem('KUREAS_HA_settings', JSON.stringify(newSettings)); } catch(e) {}
+                                // Update the editing reference
+                                setEditingOperatingState(newId);
+                            }}
                             onSave={(stateId, data) => {
                                 setOperatingStateData(prev => ({
                                     ...prev,
@@ -6809,6 +7316,16 @@
                                     <h2 className="text-xl font-bold mb-4">Export Hazard Data</h2>
                                     
                                     <div className="space-y-3 mb-6">
+                                        <button
+                                            onClick={() => { generateReport(); setShowExportModal(false); }}
+                                            className="w-full px-4 py-3 bg-indigo-700 text-white rounded hover:bg-indigo-800 text-left"
+                                        >
+                                            <div className="font-semibold">Export Report to .doc Format</div>
+                                            <div className="text-sm text-indigo-200 mt-1">
+                                                Creates a .doc report file with full hazard analysis details
+                                            </div>
+                                        </button>
+                                        
                                         <button
                                             onClick={exportToMarkdown}
                                             className="w-full px-4 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 text-left"
@@ -6848,6 +7365,66 @@
                                             Cancel
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showReportPreview && (
+                        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+                            <div style={{
+                                background: 'white',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+                                width: '90vw',
+                                maxWidth: '1100px',
+                                height: '90vh',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                color: '#111827'
+                            }}>
+                                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                    <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>Report Preview</h2>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button
+                                            onClick={() => { generateReport(); }}
+                                            style={{ padding: '6px 16px', backgroundColor: '#4338ca', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}
+                                            onMouseOver={(e) => e.target.style.backgroundColor = '#3730a3'}
+                                            onMouseOut={(e) => e.target.style.backgroundColor = '#4338ca'}
+                                        >
+                                            Download .doc
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const printWindow = window.open('', '_blank');
+                                                if (printWindow) {
+                                                    printWindow.document.write(reportPreviewHTML);
+                                                    printWindow.document.close();
+                                                    setTimeout(() => printWindow.print(), 500);
+                                                }
+                                            }}
+                                            style={{ padding: '6px 16px', backgroundColor: '#1e40af', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}
+                                            onMouseOver={(e) => e.target.style.backgroundColor = '#1e3a8a'}
+                                            onMouseOut={(e) => e.target.style.backgroundColor = '#1e40af'}
+                                        >
+                                            Print
+                                        </button>
+                                        <button
+                                            onClick={() => setShowReportPreview(false)}
+                                            style={{ padding: '6px 16px', backgroundColor: '#6b7280', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}
+                                            onMouseOver={(e) => e.target.style.backgroundColor = '#4b5563'}
+                                            onMouseOut={(e) => e.target.style.backgroundColor = '#6b7280'}
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                                <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+                                    <iframe
+                                        srcDoc={reportPreviewHTML}
+                                        style={{ width: '100%', height: '100%', border: 'none' }}
+                                        title="Report Preview"
+                                    />
                                 </div>
                             </div>
                         </div>
