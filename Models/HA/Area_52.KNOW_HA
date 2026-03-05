@@ -1,0 +1,360 @@
+{
+  "facilityName": "Area 52",
+  "extendedDescription": "<h2><span style=\"font-weight: normal;\"><span style=\"font-size: 12px;\">Area 52 is the sister facility to Area 51.</span></span></h2>",
+  "operatingSchedule": {
+    "periodYears": 1,
+    "periods": [
+      {
+        "stateId": "FOS-1",
+        "startDay": 0,
+        "endDay": 151
+      },
+      {
+        "stateId": "FOS-2",
+        "startDay": 151,
+        "endDay": 182
+      },
+      {
+        "stateId": "FOS-1",
+        "startDay": 182,
+        "endDay": 365
+      }
+    ]
+  },
+  "operatingStates": [
+    {
+      "id": "FOS-1",
+      "name": "Power Operations",
+      "description": "Test operations including operator training",
+      "color": "#93c5fd"
+    },
+    {
+      "id": "FOS-2",
+      "name": "Shutdown",
+      "description": "Non-testing period while reactor is in safe shutdown",
+      "color": "#fca5a5"
+    }
+  ],
+  "operatingStateData": {
+    "FOS-1": {
+      "name": "Normal Operations",
+      "description": "The facility is operating as planned.",
+      "extendedDescription": ""
+    },
+    "FOS-2": {
+      "name": "Shutdown",
+      "description": "The facility is shutdown for National UFO Month (in July).",
+      "extendedDescription": ""
+    }
+  },
+  "hazardList": [
+    {
+      "id": "HAZ-1",
+      "name": "Internal Hazards",
+      "children": [
+        {
+          "id": "HAZ-2",
+          "name": "Internal Fire",
+          "children": [
+            {
+              "id": "HAZ-3",
+              "name": "Area 52 Fire",
+              "children": [
+                {
+                  "id": "HAZ-4",
+                  "name": "Fire in UFO #1",
+                  "children": []
+                },
+                {
+                  "id": "HAZ-5",
+                  "name": "Fire in UFO #2",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "HAZ-6",
+          "name": "Explosions",
+          "children": [
+            {
+              "id": "HAZ-7",
+              "name": "Hydrogen Leak",
+              "children": [
+                {
+                  "id": "HAZ-8",
+                  "name": "Hydrogen Detonation",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "HAZ-9",
+              "name": "Chemical X Leak",
+              "children": [
+                {
+                  "id": "HAZ-10",
+                  "name": "Chemical X Explosion",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "HAZ-11",
+      "name": "External Hazards",
+      "children": [
+        {
+          "id": "HAZ-12",
+          "name": "Ground Motion",
+          "children": [
+            {
+              "id": "HAZ-13",
+              "name": "Seismic",
+              "children": [
+                {
+                  "id": "HAZ-14",
+                  "name": "Earthquake",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "HAZ-15",
+          "name": "External Fire",
+          "children": [
+            {
+              "id": "HAZ-16",
+              "name": "Brush Fire",
+              "children": [
+                {
+                  "id": "HAZ-17",
+                  "name": "Fire around Area 52",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "hazardStates": {
+    "HAZ-14_FOS-1": "included",
+    "HAZ-14_FOS-2": "included",
+    "HAZ-10_FOS-1": "screened",
+    "HAZ-10_FOS-2": "screened",
+    "HAZ-17_FOS-1": "included",
+    "HAZ-17_FOS-2": "included",
+    "HAZ-8_FOS-1": "included",
+    "HAZ-8_FOS-2": "screened"
+  },
+  "hazardAnalysisData": {
+    "HAZ-14_FOS-1": {
+      "useInfoFrom": "",
+      "applicableEvents": [
+        {
+          "id": 1772653705971,
+          "name": "Earthquake",
+          "eventDescription": "There is an earthquake.",
+          "occurrenceModel": "hazard-curve",
+          "frequencyDistribution": "cni",
+          "gammaShape": "",
+          "gammaScale": "",
+          "pointEstimate": "",
+          "frequencyUnits": "/yr",
+          "opportunitiesPerPeriod": "",
+          "probabilityDistribution": "cni",
+          "betaShape": "",
+          "betaScale": "",
+          "probLognormalMean": "",
+          "probLognormalEF": "",
+          "probCniMean": "",
+          "probPointEstimate": "",
+          "hazardCurveRows": "3",
+          "hazardCurveData": [
+            {
+              "magnitude": "0.1",
+              "frequency": "0.1"
+            },
+            {
+              "magnitude": "0.5",
+              "frequency": "0.01"
+            },
+            {
+              "magnitude": "1.0",
+              "frequency": "0.001"
+            }
+          ],
+          "hazardFrequencyUnits": "/yr",
+          "hazardMagnitudeUnits": "g",
+          "fireIgnitionSelections": {},
+          "fireIgnitionComponentCount": 1,
+          "fireIgnitionPropagationFactor": 1,
+          "restorationModel": "none",
+          "description": "<h1><span style=\"font-weight: normal;\"><span style=\"font-size: 11px;\">The facility may experience an earthquake. The chance of seeing an earthquake is captured by using a \"hazard curve.\"</span></span></h1><p></p>"
+        }
+      ],
+      "status": "included"
+    },
+    "HAZ-14_FOS-2": {
+      "useInfoFrom": "FOS-1",
+      "applicableEvents": [],
+      "status": "included"
+    },
+    "HAZ-10_FOS-1": {
+      "useInfoFrom": "",
+      "applicableEvents": [
+        {
+          "id": 1772654059928,
+          "name": "Chemical X Explosion",
+          "eventDescription": "The top secret chemical X leaks then explodes",
+          "occurrenceModel": "screened-low-freq",
+          "frequencyDistribution": "cni",
+          "gammaShape": "",
+          "gammaScale": "",
+          "pointEstimate": "",
+          "frequencyUnits": "/yr",
+          "opportunitiesPerPeriod": "",
+          "probabilityDistribution": "cni",
+          "betaShape": "",
+          "betaScale": "",
+          "probLognormalMean": "",
+          "probLognormalEF": "",
+          "probCniMean": "",
+          "probPointEstimate": "",
+          "hazardCurveRows": 5,
+          "hazardCurveData": [],
+          "hazardFrequencyUnits": "/yr",
+          "hazardMagnitudeUnits": "",
+          "fireIgnitionSelections": {},
+          "fireIgnitionComponentCount": 1,
+          "fireIgnitionPropagationFactor": 1,
+          "restorationModel": "none",
+          "description": "<h1><span style=\"font-size: 11px;\">Not enough of the chemical X is stored to cause an explosion.</span></h1><p></p>"
+        }
+      ],
+      "status": "screened"
+    },
+    "HAZ-10_FOS-2": {
+      "useInfoFrom": "FOS-1",
+      "applicableEvents": [],
+      "status": "screened"
+    },
+    "HAZ-17_FOS-1": {
+      "useInfoFrom": "",
+      "applicableEvents": [
+        {
+          "id": 1772654233740,
+          "name": "Fire around Area 52",
+          "eventDescription": "The brush and trees around Area 52 catch fire.",
+          "occurrenceModel": "frequency",
+          "frequencyDistribution": "cni",
+          "gammaShape": "",
+          "gammaScale": "",
+          "pointEstimate": "",
+          "frequencyUnits": "/yr",
+          "opportunitiesPerPeriod": "",
+          "probabilityDistribution": "cni",
+          "betaShape": "",
+          "betaScale": "",
+          "probLognormalMean": "",
+          "probLognormalEF": "",
+          "probCniMean": "",
+          "probPointEstimate": "",
+          "hazardCurveRows": 5,
+          "hazardCurveData": [],
+          "hazardFrequencyUnits": "/yr",
+          "hazardMagnitudeUnits": "",
+          "fireIgnitionSelections": {},
+          "fireIgnitionComponentCount": 1,
+          "fireIgnitionPropagationFactor": 1,
+          "restorationModel": "none",
+          "description": "<h1><span style=\"font-weight: normal;\"><span style=\"font-size: 11px;\">The facility is surrounded by heavy brush and trees that may pose a fire hazard.</span></span></h1><p></p>",
+          "cniMean": "0.02"
+        }
+      ],
+      "status": "included"
+    },
+    "HAZ-17_FOS-2": {
+      "useInfoFrom": "FOS-1",
+      "applicableEvents": [],
+      "status": "included"
+    },
+    "HAZ-8_FOS-1": {
+      "useInfoFrom": "",
+      "applicableEvents": [
+        {
+          "id": 1772654431274,
+          "name": "Hydrogen Detonation",
+          "eventDescription": "Stored hydrogen leaks then detonates.",
+          "occurrenceModel": "frequency",
+          "frequencyDistribution": "cni",
+          "gammaShape": "",
+          "gammaScale": "",
+          "pointEstimate": "",
+          "frequencyUnits": "/yr",
+          "opportunitiesPerPeriod": "",
+          "probabilityDistribution": "cni",
+          "betaShape": "",
+          "betaScale": "",
+          "probLognormalMean": "",
+          "probLognormalEF": "",
+          "probCniMean": "",
+          "probPointEstimate": "",
+          "hazardCurveRows": 5,
+          "hazardCurveData": [],
+          "hazardFrequencyUnits": "/yr",
+          "hazardMagnitudeUnits": "",
+          "fireIgnitionSelections": {},
+          "fireIgnitionComponentCount": 1,
+          "fireIgnitionPropagationFactor": 1,
+          "restorationModel": "none",
+          "description": "<h1><span style=\"font-weight: normal;\"><span style=\"font-size: 11px;\">Hydrogen is stored during operation, thus this hazard may occur.</span></span></h1><p></p>",
+          "cniMean": "0.0005"
+        }
+      ],
+      "status": "included"
+    },
+    "HAZ-8_FOS-2": {
+      "useInfoFrom": "",
+      "applicableEvents": [
+        {
+          "id": 1772654485127,
+          "name": "Hydrogen Detonation",
+          "eventDescription": "",
+          "occurrenceModel": "screened-not-applicable",
+          "frequencyDistribution": "cni",
+          "gammaShape": "",
+          "gammaScale": "",
+          "pointEstimate": "",
+          "frequencyUnits": "/yr",
+          "opportunitiesPerPeriod": "",
+          "probabilityDistribution": "cni",
+          "betaShape": "",
+          "betaScale": "",
+          "probLognormalMean": "",
+          "probLognormalEF": "",
+          "probCniMean": "",
+          "probPointEstimate": "",
+          "hazardCurveRows": 5,
+          "hazardCurveData": [],
+          "hazardFrequencyUnits": "/yr",
+          "hazardMagnitudeUnits": "",
+          "fireIgnitionSelections": {},
+          "fireIgnitionComponentCount": 1,
+          "fireIgnitionPropagationFactor": 1,
+          "restorationModel": "none",
+          "description": "<h1><span style=\"font-weight: normal;\"><span style=\"font-size: 11px;\">Hydrogen is not stored during shutdown conditions, thus this hazard is not applicable during FOS-2.</span></span></h1><p></p>"
+        }
+      ],
+      "status": "screened"
+    }
+  }
+}
