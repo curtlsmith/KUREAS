@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<!--
+    KUREAS-FTL Module Walkthrough Guide
+    Developed by Curtis Lee Smith and Claude.ai
+    MIT License - Copyright (c) 2024-2026 Curtis Lee Smith
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KUREAS-FTL Walkthrough Guide</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEzUlEQVR4AcRXSUxUWRQ9r4oZmZpBpGkGATdudKUrh5hoXLgEosbExKEdAJV2ionzEDXRxKgxNmgjLETAGIdoTEx04caliImhAYONAgKFNHSoiaq+99f313/1XxVVHZP+4f733rn3vnv+rffvv9jwP18agcrKSv+PliraUyXmOPzsGgGetLW1gaW1uRl/HDmCxj170FhXBx6bz59HW2urpmebiEJ2zRcuoKGmBg27d+P3Xbs04XXTmTPGHhyTxSDAC/j9cH/+jD+3bkXnsmXoXL4c71auxJdr1+BzuTSTiLeZGTieP8c73bdzxQrNv2vVKvQSIe/4uMVdJsBqIgGfD5IwxrpI4vXC8ewZerdtg2tgIGhpsyF18WJUUGbTliwJ4vrMSkBXxDTowXu2b4eLMmj4UvD0pUux4M4dzFm0yIDNEysBIcz6wDxSBjj406fg4O7BwYA93yl4Jv0UC5qakLJwISNKsRJQmqlBPwUfe/IE3XRm3ENDQSMKnrV6Ncpv30ZSRUUQV8wkAn4yEELOgD/M0/s8How9fKg9uXdkhDz1Pwr+07p1KG9oQFJpqQ6GHyQC4c1kjRb8wQP07tgBT0jw3MpKlN+4gcTCQtkpzEoiIIQAZ8Fsy/kwZ4HT7rh/H930fntGRw1TQU+et2kT5l+9ioR58wx8tolEYDZjP6V9lApWz86d8I6NBc0peD69fvMvXUJ8bm4Qj2JmISCEnAV+ei0LHPzePe3Jvd++GVsLux0FtbUopuoXl51t4NFOLARUjn63G19bWtBDafdOTARNiGze5s0oPnUKcRkZQTyGmZUAbSoEP7O+C70Fw1RI+vbuxczkpA7qA+n+fv0azo8fdSD2wUpAsYdvehp8+BQqOLu78enkSfltUBmGwaIiEMZXg/mMOB4/xtDNm+CfSgNjuMVEwJaUhNLLl1HR2Ah7aqoRhrPzhfBx+hLyF9VQRDGJmgAHL6G+oIC+8TlVVZi7ZYu0vYc+tf1Hj2L6wwcJn21hJWA+gLq3FvzcOeRT5RMJCbCnpaGADmXo5/Wft2/x6fRpeB0ORHtZCSg88zZuxFz64NgSEw1tUkkJiujwxefkGBhPRjs6MNzUFPV5UBMIyYJITgao4HAAQ8gmgzqegn37IOLiDJir5cDFi5h49Qp+bmwMjXqiJqC2taCckXzKTNbatZLOMzyM/mPH4Orrk3DVwqYCLRgVHGEBA0B8Xh6K6PAll5UFAP0++eYN/qJMzJgrp64zD9ERMHso5tzz/Xz4MOwpKZJ2pKUFX+/ehY9KuaQwLX4IAT4DufRq5qxfD9DZgH75nE4MnD2LKcoGKIs6LA1qArSJEHLSueJJniELe3o6Cg8exBzqgM0kuEPuP34czv5+qPZQE8B/u5LLy/ELnYe4zExpg4mXLzF45Qp8U1MSzgslASHUPQE7RBRqTLLWrAkULHo1uUsCYSxDt25hjNo4SoO0hYWAPTNT26D4xAkUsVCxyaYmkyug5BlmYaOaUVhfj7Lr17U+gYsVS+GhQ2AioW4GgSo6RCwbqLWqpf9w9nd14cD79zhA46/UXldTNWR9NLKBGpe6Fy9QT6V5f2cnWH6jec2jR6iqrgbv8Z2IRqC9vV1I0tEh2gj7LpKO8FjWkWyZxL8AAAD//4MEZNkAAAAGSURBVAMAE0k4X2fO1c4AAAAASUVORK5CYII=" type="image/png">
+    <style>
+        .flex{display:flex}.fixed{position:fixed}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:.5rem}.gap-4{gap:1rem}.h-full{height:100%}.top-0{top:0}.left-0{left:0}.right-0{right:0}.z-50{z-index:50}.p-3{padding:.75rem}.px-3{padding-left:.75rem;padding-right:.75rem}.py-1{padding-top:.25rem;padding-bottom:.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.font-bold{font-weight:700}.text-white{color:#fff}.bg-blue-600{background-color:#2563eb}.bg-blue-900{background-color:#1e3a8a}.opacity-90{opacity:.9}.rounded{border-radius:.25rem}.shadow-lg{box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1)}.hover\:bg-blue-800:hover{background-color:#1e40af}
+        *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Oxygen','Ubuntu','Cantarell','Fira Sans','Droid Sans','Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;background:#f8fafc;color:#1e293b}
+        @media print{.no-print{display:none!important}.page-break{page-break-before:always}body{background:#fff}.main-content{max-width:100%;padding:0 20px}}
+        html{scroll-behavior:smooth}
+        .main-content{max-width:820px;margin:0 auto;padding:32px 48px 80px 48px}
+        .guide-section{margin-bottom:48px}
+        .guide-section h2{font-size:24px;font-weight:700;color:#1e40af;border-bottom:2px solid #dbeafe;padding-bottom:8px;margin-bottom:20px}
+        .guide-section h3{font-size:18px;font-weight:600;color:#1e293b;margin:24px 0 12px 0}
+        .guide-section h4{font-size:15px;font-weight:600;color:#334155;margin:16px 0 8px 0}
+        .guide-section p{line-height:1.7;margin-bottom:12px;color:#334155}
+        .callout{border-radius:8px;padding:16px 20px;margin:16px 0;font-size:14px;line-height:1.6}
+        .callout-info{background:#eff6ff;border-left:4px solid #3b82f6;color:#1e40af}
+        .callout-tip{background:#f0fdf4;border-left:4px solid #22c55e;color:#166534}
+        .callout-warn{background:#fefce8;border-left:4px solid #eab308;color:#854d0e}
+        .callout strong{display:block;margin-bottom:4px}
+        .step-box{display:flex;gap:16px;margin:16px 0;padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:8px}
+        .step-number{flex-shrink:0;width:36px;height:36px;background:#2563eb;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+        .step-content{flex:1}.step-content p{margin:0}.step-content strong{color:#1e293b}
+        .guide-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+        .guide-table th{background:#1e40af;color:#fff;text-align:left;padding:10px 14px;font-weight:600;font-size:13px}
+        .guide-table th:first-child{border-radius:6px 0 0 0}.guide-table th:last-child{border-radius:0 6px 0 0}
+        .guide-table td{padding:10px 14px;border-bottom:1px solid #e2e8f0}
+        .guide-table tr:nth-child(even) td{background:#f8fafc}
+        .guide-table code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px;color:#be185d}
+        kbd{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;padding:2px 6px;font-family:inherit;font-size:12px;box-shadow:0 1px 0 #94a3b8}
+        @media(max-width:700px){.main-content{padding:20px 24px 60px 24px}}
+    </style>
+</head>
+<body>
+
+<header class="bg-blue-600 text-white p-3 shadow-lg fixed top-0 left-0 right-0 z-50 no-print" style="height:56px;">
+    <div class="flex items-center justify-between h-full">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg font-bold">KUREAS-FTL</h1>
+            <span class="text-sm opacity-90">Module Walkthrough Guide &mdash; v1.1</span>
+        </div>
+        <button onclick="window.print()" class="px-3 py-1 bg-blue-900 text-white text-sm rounded hover:bg-blue-800">Print</button>
+    </div>
+</header>
+<div style="height:56px"></div>
+
+<div class="main-content">
+
+    <div style="margin-bottom:48px;padding:40px 0 32px 0;border-bottom:3px solid #1e40af;">
+        <h1 style="font-size:32px;font-weight:800;color:#1e40af;margin:0 0 8px 0;">KUREAS-FTL Module Walkthrough</h1>
+        <p style="font-size:16px;color:#64748b;margin:0 0 12px 0;">Fault Tree Logic Editor &mdash; Step-by-step practical exercises</p>
+        <p style="font-size:13px;color:#94a3b8;margin:0;">v1.1 &bull; Curtis Lee Smith and Claude.ai &bull; MIT License</p>
+    </div>
+
+    <!-- EXERCISE 1 -->
+    <div class="guide-section" id="ex1">
+        <h2>Exercise 1: Importing a SAPHIRE Fault Tree Model</h2>
+        <p>In this exercise you will load an existing SAPHIRE fault tree model with all its companion files and explore the resulting visualization.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Open KUREAS-FTL.html</strong> in your browser. You will see the &ldquo;Open Fault Tree and Related File(s)&rdquo; upload screen.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Multi-select your SAPHIRE files.</strong> Click the file input and select all companion files at once: the <code>.FTL</code> file (required), plus <code>.BED</code> (descriptions), <code>.BEI</code> (probabilities), <code>.GTD</code> (gate types), and <code>.FTC</code> (cut sets). Hold <kbd>Ctrl</kbd> (or <kbd>Cmd</kbd> on Mac) to select multiple files.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Explore the canvas.</strong> The fault tree renders on an interactive canvas. Use the <strong>mouse wheel</strong> to zoom in/out, <strong>click and drag</strong> to pan, and <strong>click any node</strong> to select it. The status bar at the bottom shows navigation hints.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Switch between trees.</strong> If the model contains multiple fault trees, use the tree selector dropdown in the toolbar to switch between them. Each tree has its own top event and logic structure.</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Expand Transfer gates.</strong> Transfer gates (shown with a triangle symbol) reference other fault trees. Click on a Transfer gate to see where it links. KUREAS-FTL automatically resolves these references to display the complete logic.</p></div></div>
+
+        <div class="step-box"><div class="step-number">6</div><div class="step-content"><p><strong>Save as a KUREAS project.</strong> Click <strong>Save FTL</strong> to save the imported model as a <code>.KNOW_FTL</code> file. This native format preserves all data and allows faster loading next time.</p></div></div>
+
+        <div class="callout callout-info"><strong>About .KNOW_FTL files</strong> Unlike the SAPHIRE MAR-D format which splits data across multiple files, the <code>.KNOW_FTL</code> format stores everything &mdash; tree logic, descriptions, probabilities, notes, and change history &mdash; in a single JSON file.</div>
+    </div>
+
+    <!-- EXERCISE 2 -->
+    <div class="guide-section" id="ex2">
+        <h2>Exercise 2: Building a Fault Tree from Scratch</h2>
+        <p>This exercise walks you through creating a new fault tree project and building logic manually.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Start a new project.</strong> On the upload screen, click the purple <strong>Start New Project</strong> button. Enter a project name when prompted (e.g., <code>PUMP SYSTEM</code>). You will see an empty canvas.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Add the first fault tree.</strong> Click <strong>New FT</strong> in the toolbar. Enter the top event name (e.g., <code>PUMP-SYS-FAIL</code>), select a gate type (OR), and optionally add a description. The top gate appears on the canvas.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Add child gates.</strong> Click the top gate to select it, then click <strong>New Gate</strong>. Enter the gate name (e.g., <code>TRAIN-A-FAIL</code>), select AND as the type, and add a description. Repeat to add <code>TRAIN-B-FAIL</code> as another AND gate under the top OR gate.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Add basic events.</strong> Select <code>TRAIN-A-FAIL</code> and click <strong>New BE</strong>. Enter the event name (e.g., <code>PUMP-A-FTS</code> for &ldquo;Pump A Fails to Start&rdquo;), a description, and a probability (e.g., <code>3E-3</code>). Add another basic event <code>VALVE-A-FTO</code> (Valve A Fails to Open, probability <code>1E-3</code>).</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Complete Train B.</strong> Select <code>TRAIN-B-FAIL</code> and add basic events <code>PUMP-B-FTS</code> (3E-3) and <code>VALVE-B-FTO</code> (1E-3). Your tree now represents a two-train redundant pump system where both trains must fail (OR of two AND gates).</p></div></div>
+
+        <div class="step-box"><div class="step-number">6</div><div class="step-content"><p><strong>Review probabilities.</strong> Open <strong>Settings</strong> and set <strong>Show Probability</strong> to &ldquo;2 Digits (1.23E-5)&rdquo; to display calculated probabilities on every node in the tree.</p></div></div>
+
+        <div class="callout callout-tip"><strong>Checkpoint</strong> Save your project as a <code>.KNOW_FTL</code> file. Your two-train pump system tree should show the correct Boolean logic with probabilities propagated through the gates.</div>
+    </div>
+
+    <!-- EXERCISE 3 -->
+    <div class="guide-section" id="ex3">
+        <h2>Exercise 3: Editing Nodes and Using Scope-Aware Changes</h2>
+        <p>This exercise demonstrates editing existing nodes, handling shared events, and using undo.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Edit a basic event.</strong> Click on <code>PUMP-A-FTS</code> to open the edit panel. Change the probability to <code>5E-3</code> and add a note: &ldquo;Updated per latest plant data.&rdquo; Click <strong>Apply</strong>. Notice the probability updates on the canvas.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Undo the change.</strong> Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (or click the <strong>Undo</strong> button). The probability reverts to 3E-3. Press Ctrl+Z again to verify multi-level undo works. Redo by making the change again.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Create a shared basic event.</strong> Add a new basic event under <code>TRAIN-A-FAIL</code> called <code>POWER-LOSS</code> (probability 1E-4). Then add another basic event under <code>TRAIN-B-FAIL</code> with the same name <code>POWER-LOSS</code>. KUREAS-FTL recognizes this as a shared event &mdash; changing it in one location affects both.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Test scope-aware editing.</strong> Click the <code>POWER-LOSS</code> event under Train A and change its probability to <code>2E-4</code>. A scope dialog appears asking: apply to this instance only, or to all instances? Select <strong>All instances</strong>. Verify that the probability updates in both locations.</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>View the change log.</strong> Click <strong>View Changes</strong> in the toolbar. The change log shows every edit you have made, with timestamps, old values, and new values. This provides a complete audit trail for QA review.</p></div></div>
+
+        <div class="callout callout-warn"><strong>Name conflicts</strong> KUREAS-FTL prevents you from giving a basic event and a gate the same name. If you try to rename a basic event to a name already used by a gate, you will see a conflict warning.</div>
+    </div>
+
+    <!-- EXERCISE 4 -->
+    <div class="guide-section" id="ex4">
+        <h2>Exercise 4: Using Floating Windows and Cut Sets</h2>
+        <p>This exercise covers the Basic Event List and Cut Sets floating windows.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Open the Basic Event List.</strong> Look for the BE List button in the toolbar. A draggable, resizable floating window appears listing all basic events in the project with their descriptions and probabilities.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Edit from the list.</strong> Click any event in the BE List to expand its editor. Change the description or probability directly in the floating window. Changes propagate to the canvas immediately.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Drag-and-drop.</strong> From the BE List, drag an event name and drop it onto a gate on the canvas. This adds the basic event as a child of that gate &mdash; useful for quickly connecting existing events to new logic.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>View cut sets.</strong> If cut set data was loaded from a <code>.FTC</code> file, the Cut Sets floating window shows each minimal cut set with its probability contribution, sorted from highest to lowest. The window header shows the total fault tree probability.</p></div></div>
+
+        <div class="callout callout-tip"><strong>Floating window tips</strong> Both windows can be dragged by their title bar, resized from the edges, and minimized. They stay on top of the canvas so you can reference them while editing.</div>
+    </div>
+
+    <!-- EXERCISE 5 -->
+    <div class="guide-section" id="ex5">
+        <h2>Exercise 5: Exporting and Reporting</h2>
+        <p>This exercise covers all output options.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Export to SAPHIRE.</strong> Click <strong>Export</strong>. Select format = <strong>SAPHIRE MAR-D (.FTL)</strong>. Check the trees you want to include. Click <strong>Export</strong>. The downloaded <code>.FTL</code> file can be loaded directly into SAPHIRE.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Export to OpenPSA.</strong> Click <strong>Export</strong> again and select <strong>OpenPSA MEF (.xml)</strong>. This generates an XML file conforming to the Open Probabilistic Safety Assessment Model Exchange Format, which can be imported into other PSA tools that support the standard.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Export selected trees.</strong> Click <strong>Export</strong> and select <strong>KUREAS-FTL (.KNOW_FTL)</strong>. Uncheck some trees to export only a subset. The resulting <code>.KNOW_FTL</code> file contains only the selected trees and their referenced basic events.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Generate a report.</strong> Click <strong>Report</strong>. Select which trees to include, the output format (Word .doc or Markdown), and whether to include cut sets. Set a cut set display limit if the model is large. Click <strong>Generate</strong>. The report includes tree diagrams rendered as images, event listings, and probability calculations.</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Customize the view for screenshots.</strong> Before generating reports, open <strong>Settings</strong> and configure the visual style: try different backgrounds (engineering green paper is popular for print), color modes, and line styles. Reports capture the tree exactly as it appears on the canvas.</p></div></div>
+
+        <div class="callout callout-info"><strong>Report preferences are saved</strong> Your report format, tree selection, and header options are saved in browser localStorage and restored next time you open the Report dialog.</div>
+    </div>
+
+    <div style="border-top:2px solid #e2e8f0;padding-top:24px;margin-top:48px;color:#94a3b8;font-size:13px;">
+        <p>KUREAS-FTL Walkthrough Guide v1.1 &bull; &copy; 2024&ndash;2026 Curtis Lee Smith &bull; MIT License &bull; Developed by Curtis Lee Smith and Claude.ai</p>
+    </div>
+</div>
+</body>
+</html>

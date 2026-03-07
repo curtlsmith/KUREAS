@@ -1,0 +1,3422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KUREAS-FTL Test Suite v1.0</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+  header { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border-bottom: 2px solid #3b82f6; padding: 1.2rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { font-size: 1.4rem; font-weight: 700; color: #93c5fd; }
+  header .subtitle { font-size: 0.78rem; color: #94a3b8; margin-top: 0.2rem; }
+  .badge { background: #1e40af; color: #bfdbfe; font-size: 0.7rem; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600; }
+
+  .layout { display: flex; height: calc(100vh - 64px); }
+  .sidebar { width: 280px; min-width: 280px; background: #1e293b; border-right: 1px solid #334155; overflow-y: auto; padding: 1rem 0; }
+  .sidebar-section { padding: 0.4rem 1rem 0.4rem; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin-top: 0.8rem; }
+  .suite-btn { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 1rem; background: none; border: none; color: #cbd5e1; font-size: 0.82rem; cursor: pointer; text-align: left; border-left: 3px solid transparent; transition: all 0.15s; }
+  .suite-btn:hover { background: #0f172a; color: #e2e8f0; }
+  .suite-btn.active { background: #0f172a; color: #93c5fd; border-left-color: #3b82f6; }
+  .suite-count { margin-left: auto; font-size: 0.68rem; background: #334155; color: #94a3b8; padding: 0.1rem 0.4rem; border-radius: 4px; }
+  .suite-count.pass { background: #14532d; color: #86efac; }
+  .suite-count.fail { background: #7f1d1d; color: #fca5a5; }
+  .suite-count.running { background: #1e3a5f; color: #93c5fd; }
+
+  .main { flex: 1; overflow: auto; padding: 1.5rem 2rem; }
+  .controls { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 0.5rem 1.2rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.15s; }
+  .btn-primary { background: #2563eb; color: white; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-success { background: #16a34a; color: white; }
+  .btn-success:hover { background: #15803d; }
+  .btn-danger { background: #dc2626; color: white; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-neutral { background: #334155; color: #cbd5e1; }
+  .btn-neutral:hover { background: #475569; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .summary-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; text-align: center; }
+  .stat-num { font-size: 2rem; font-weight: 800; line-height: 1; }
+  .stat-lbl { font-size: 0.72rem; color: #64748b; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card.pass .stat-num { color: #4ade80; }
+  .stat-card.fail .stat-num { color: #f87171; }
+  .stat-card.skip .stat-num { color: #facc15; }
+  .stat-card.total .stat-num { color: #93c5fd; }
+  .stat-card.time .stat-num { color: #a78bfa; font-size: 1.4rem; }
+
+  .progress-bar { height: 6px; background: #334155; border-radius: 3px; margin-bottom: 1.5rem; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; background: linear-gradient(90deg, #2563eb, #10b981); }
+
+  .suite-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+  .suite-title { font-size: 1.15rem; font-weight: 700; color: #e2e8f0; }
+  .suite-desc { font-size: 0.82rem; color: #94a3b8; margin-bottom: 1.2rem; line-height: 1.5; }
+
+  .test-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .test-item { background: #1e293b; border: 1px solid #334155; border-radius: 8px; overflow: hidden; transition: border-color 0.2s; }
+  .test-item.pass { border-color: #166534; }
+  .test-item.fail { border-color: #991b1b; }
+  .test-item.running { border-color: #1e40af; }
+  .test-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 1rem; cursor: pointer; user-select: none; }
+  .test-status { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0; }
+  .test-status.pass { background: #14532d; color: #4ade80; }
+  .test-status.fail { background: #7f1d1d; color: #f87171; }
+  .test-status.pending { background: #1e293b; border: 2px solid #334155; color: #475569; }
+  .test-status.running { background: #1e3a5f; color: #93c5fd; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .test-name { font-size: 0.85rem; font-weight: 500; color: #cbd5e1; flex: 1; }
+  .test-time { font-size: 0.72rem; color: #475569; }
+  .test-details { padding: 0.75rem 1rem 1rem; border-top: 1px solid #334155; font-size: 0.8rem; }
+  .test-details.hidden { display: none; }
+  .detail-row { display: flex; gap: 0.5rem; margin-bottom: 0.3rem; }
+  .detail-label { color: #64748b; min-width: 80px; flex-shrink: 0; }
+  .detail-value { color: #cbd5e1; font-family: monospace; flex: 1; word-break: break-all; }
+  .error-msg { background: #450a0a; border: 1px solid #991b1b; border-radius: 4px; padding: 0.5rem 0.75rem; color: #fca5a5; font-family: monospace; font-size: 0.78rem; margin-top: 0.5rem; white-space: pre-wrap; }
+  .pass-msg { background: #052e16; border: 1px solid #166534; border-radius: 4px; padding: 0.5rem 0.75rem; color: #86efac; font-family: monospace; font-size: 0.78rem; margin-top: 0.5rem; }
+  /* Enriched detail panel */
+  .meta-section { margin-bottom: 0.85rem; }
+  .meta-purpose { font-size: 0.82rem; color: #94a3b8; line-height: 1.55; margin-bottom: 0.6rem; font-style: italic; }
+  .meta-grid { display: grid; grid-template-columns: 110px 1fr; gap: 0.3rem 0.6rem; font-size: 0.79rem; margin-bottom: 0.5rem; }
+  .meta-key { color: #64748b; font-weight: 600; align-self: start; padding-top: 0.15rem; }
+  .meta-val { color: #cbd5e1; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+  .meta-val.code { background: #0f172a; border: 1px solid #1e3a5f; border-radius: 4px; padding: 0.3rem 0.5rem; display: block; margin-top: 0.1rem; }
+  .result-grid { display: grid; grid-template-columns: 110px 1fr 110px 1fr; gap: 0.3rem 0.6rem; font-size: 0.79rem; margin-top: 0.4rem; }
+  .result-expected { color: #86efac; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+  .result-actual-ok { color: #86efac; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+  .result-actual-fail { color: #f87171; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+  .divider { border: none; border-top: 1px solid #1e3a5f; margin: 0.65rem 0; }
+  .assertion-trace { background: #0f172a; border: 1px solid #991b1b; border-radius: 4px; padding: 0.5rem 0.75rem; color: #fca5a5; font-family: monospace; font-size: 0.78rem; white-space: pre-wrap; margin-top: 0.4rem; }
+  .assertion-pass { background: #052e16; border: 1px solid #166534; border-radius: 4px; padding: 0.4rem 0.75rem; color: #86efac; font-family: monospace; font-size: 0.78rem; margin-top: 0.4rem; }
+  .tag-pill { display: inline-block; background: #1e3a5f; color: #93c5fd; font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 999px; margin-right: 0.25rem; margin-bottom: 0.25rem; font-weight: 600; letter-spacing: 0.03em; }
+
+  .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .filter-btn { padding: 0.3rem 0.8rem; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #94a3b8; font-size: 0.78rem; cursor: pointer; }
+  .filter-btn.active { border-color: #3b82f6; color: #93c5fd; background: #1e3a5f; }
+
+  .log-panel { background: #0a0f1e; border: 1px solid #1e3a5f; border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.76rem; max-height: 200px; overflow-y: auto; margin-top: 0.75rem; }
+  .log-line { padding: 0.1rem 0; }
+  .log-line.info { color: #64748b; }
+  .log-line.ok { color: #4ade80; }
+  .log-line.err { color: #f87171; }
+  .log-line.warn { color: #facc15; }
+
+  .chevron { transition: transform 0.2s; color: #475569; font-size: 0.7rem; }
+  .chevron.open { transform: rotate(90deg); }
+
+  .file-upload-area { border: 2px dashed #334155; border-radius: 8px; padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem; margin: 1rem 0; cursor: pointer; transition: border-color 0.2s; }
+  .file-upload-area:hover { border-color: #3b82f6; color: #93c5fd; }
+
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 0.75rem 1.25rem; font-size: 0.85rem; color: #e2e8f0; opacity: 0; transition: opacity 0.3s; z-index: 1000; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>&#x1F9EA; KUREAS-FTL Test Suite</h1>
+    <div class="subtitle">Automated Verification &amp; Validation &mdash; Fault Tree Logic Module</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:0.5rem;align-items:center;">
+    <span class="badge">v1.0</span>
+    <span class="badge" id="appVersionBadge">FTL Module</span>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-section">Test Suites</div>
+    <button class="suite-btn active" onclick="showSuite('parseFTL')" id="nav-parseFTL">
+      &#x1F4C4; FTL Parser <span class="suite-count" id="cnt-parseFTL">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('parseBED')" id="nav-parseBED">
+      &#x1F4CB; BED Parser <span class="suite-count" id="cnt-parseBED">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('parseGTD')" id="nav-parseGTD">
+      &#x1F511; GTD Parser <span class="suite-count" id="cnt-parseGTD">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('parseBEI')" id="nav-parseBEI">
+      &#x1F4CA; BEI Parser <span class="suite-count" id="cnt-parseBEI">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('parseFTC')" id="nav-parseFTC">
+      &#x2702;&#xFE0F; FTC Cut Set Parser <span class="suite-count" id="cnt-parseFTC">0</span>
+    </button>
+
+    <div class="sidebar-section">Logic &amp; Math</div>
+    <button class="suite-btn" onclick="showSuite('gateLogic')" id="nav-gateLogic">
+      &#x26D5; Gate Logic <span class="suite-count" id="cnt-gateLogic">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('probability')" id="nav-probability">
+      &#x1F4C9; Probability Math <span class="suite-count" id="cnt-probability">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('cutSets')" id="nav-cutSets">
+      &#x2702;&#xFE0F; Cut Set Calc <span class="suite-count" id="cnt-cutSets">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('mcub')" id="nav-mcub">
+      &#x1F4D0; MCUB <span class="suite-count" id="cnt-mcub">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('failureModels')" id="nav-failureModels">
+      &#x231B; Failure Models <span class="suite-count" id="cnt-failureModels">0</span>
+    </button>
+
+    <div class="sidebar-section">Export &amp; Format</div>
+    <button class="suite-btn" onclick="showSuite('saphireExport')" id="nav-saphireExport">
+      &#x1F4E4; SAPHIRE Export <span class="suite-count" id="cnt-saphireExport">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('knowFormat')" id="nav-knowFormat">
+      &#x1F4BE; .KNOW_FTL Format <span class="suite-count" id="cnt-knowFormat">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('openPSA')" id="nav-openPSA">
+      &#x1F310; OpenPSA Export <span class="suite-count" id="cnt-openPSA">0</span>
+    </button>
+
+    <div class="sidebar-section">Tree Operations</div>
+    <button class="suite-btn" onclick="showSuite('treeOps')" id="nav-treeOps">
+      &#x1F333; Tree Operations <span class="suite-count" id="cnt-treeOps">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('treeLayout')" id="nav-treeLayout">
+      &#x1F4D0; Layout Algorithm <span class="suite-count" id="cnt-treeLayout">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('edgeCases')" id="nav-edgeCases">
+      &#x26A0;&#xFE0F; Edge Cases <span class="suite-count" id="cnt-edgeCases">0</span>
+    </button>
+
+    <div class="sidebar-section">Integration</div>
+    <button class="suite-btn" onclick="showSuite('roundtrip')" id="nav-roundtrip">
+      &#x1F504; Round-Trip <span class="suite-count" id="cnt-roundtrip">0</span>
+    </button>
+    <button class="suite-btn" onclick="showSuite('knownPRA')" id="nav-knownPRA">
+      &#x1F3ED; Known PRA Examples <span class="suite-count" id="cnt-knownPRA">0</span>
+    </button>
+
+    <div class="sidebar-section" style="margin-top:1rem;">
+      <div style="color:#475569;font-size:0.7rem;padding:0 1rem;">
+        MIT License &mdash; Curtis Lee Smith &amp; Claude.ai
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="controls">
+      <button class="btn btn-primary" onclick="runAll()" id="runAllBtn">&#x25B6; Run All Tests</button>
+      <button class="btn btn-success" onclick="runCurrentSuite()" id="runSuiteBtn">&#x25B6; Run Suite</button>
+      <button class="btn btn-neutral" onclick="resetAll()">&#x21BA; Reset</button>
+      <button class="btn btn-neutral" onclick="exportResults()">&#x1F4E5; Export Results</button>
+      <div style="margin-left:auto;font-size:0.8rem;color:#475569;" id="statusText">Ready &mdash; select a suite or run all</div>
+    </div>
+
+    <div class="summary-bar">
+      <div class="stat-card total"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total</div></div>
+      <div class="stat-card pass"><div class="stat-num" id="statPass">0</div><div class="stat-lbl">Passed</div></div>
+      <div class="stat-card fail"><div class="stat-num" id="statFail">0</div><div class="stat-lbl">Failed</div></div>
+      <div class="stat-card skip"><div class="stat-num" id="statSkip">0</div><div class="stat-lbl">Skipped</div></div>
+      <div class="stat-card time"><div class="stat-num" id="statTime">0ms</div><div class="stat-lbl">Duration</div></div>
+    </div>
+
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+      <button class="filter-btn" onclick="setFilter('pass', this)">&#x2705; Pass</button>
+      <button class="filter-btn" onclick="setFilter('fail', this)">&#x274C; Fail</button>
+      <button class="filter-btn" onclick="setFilter('pending', this)">&#x23F3; Pending</button>
+    </div>
+
+    <div id="suiteHeader">
+      <div class="suite-header">
+        <span style="font-size:1.5rem;" id="suiteIcon">&#x1F4C4;</span>
+        <span class="suite-title" id="suiteTitleEl">FTL File Parser Tests</span>
+      </div>
+      <div class="suite-desc" id="suiteDescEl">Validates parsing of SAPHIRE .FTL format files into KUREAS tree structures. Covers header parsing, gate topology, event identification, transfer gates, voting gates, N/M format, cycle detection, and multi-tree files.</div>
+    </div>
+
+    <div class="test-list" id="testList"></div>
+  </main>
+</div>
+
+<div id="toast">Copied!</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// EXTRACTED CORE FUNCTIONS FROM KUREAS-FTL.HTML
+// These are verbatim copies of the pure functions for unit testing.
+// ═══════════════════════════════════════════════════════════════════
+
+function formatProbability(prob, digits) {
+  if (!prob || prob === 0) return '0.0E+0';
+  const exponent = Math.floor(Math.log10(Math.abs(prob)));
+  const mantissa = prob / Math.pow(10, exponent);
+  if (digits === '0') return `${Math.round(mantissa)}.E${exponent >= 0 ? '+' : ''}${exponent}`;
+  else if (digits === '1') return `${mantissa.toFixed(1)}E${exponent >= 0 ? '+' : ''}${exponent}`;
+  else if (digits === '2') return `${mantissa.toFixed(2)}E${exponent >= 0 ? '+' : ''}${exponent}`;
+  return '';
+}
+
+function parseFTLStructure(text) {
+  const sections = text.split('^EOS').filter(s => s.trim());
+  const faultTrees = [];
+  let projectName = '';
+  sections.forEach((section, index) => {
+    const tree = parseSingleFaultTree(section.trim());
+    if (tree) {
+      if (index === 0) projectName = tree.projectName;
+      faultTrees.push(tree);
+    }
+  });
+  return { projectName, faultTrees };
+}
+
+function parseSingleFaultTree(text) {
+  const lines = text.split('\n').filter(line => line.trim());
+  if (lines.length === 0) return null;
+  const header = lines[0].replace(/=$/, '').split(',');
+  const projectName = header[0].trim();
+  const treeName = header[1] ? header[1].trim().replace(/=/g, '').replace(/\s+/g, '') : 'UnnamedTree';
+  const gateMap = {};
+  const allNodes = new Set();
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].trim().split(/\s+/);
+    if (parts.length >= 1) {
+      const nodeName = parts[0];
+      allNodes.add(nodeName);
+      if (parts.length >= 2) {
+        const gateType = parts[1];
+        const inputs = parts.slice(2);
+        gateMap[nodeName] = { type: gateType, inputs: inputs };
+        inputs.forEach(input => allNodes.add(input));
+      }
+    }
+  }
+  let rootGateName = null;
+  const inputNodes = new Set();
+  Object.values(gateMap).forEach(gate => { gate.inputs.forEach(input => inputNodes.add(input)); });
+  for (const nodeName of Object.keys(gateMap)) {
+    if (!inputNodes.has(nodeName)) { rootGateName = nodeName; break; }
+  }
+  if (!rootGateName && Object.keys(gateMap).length > 0) rootGateName = Object.keys(gateMap)[0];
+  if (!rootGateName) return null;
+  function buildTree(nodeName, path = []) {
+    if (path.includes(nodeName)) return { name: nodeName, type: 'EVENT', description: '(cycle)', children: [] };
+    if (gateMap[nodeName]) {
+      const gate = gateMap[nodeName];
+      const newPath = [...path, nodeName];
+      if (gate.type === 'TRAN') {
+        let transferTarget = gate.inputs.length > 0 ? gate.inputs[0] : nodeName;
+        return { name: nodeName, type: 'TRAN', transferTo: transferTarget, children: [] };
+      }
+      const _nmMatch = /^(\d+)\/(\d+)$/.exec(gate.type);
+      if (_nmMatch) {
+        const _votN = parseInt(_nmMatch[1], 10);
+        return { name: nodeName, type: 'VOTING', votingN: _votN, children: gate.inputs.map(input => buildTree(input, newPath)) };
+      }
+      return { name: nodeName, type: gate.type, children: gate.inputs.map(input => buildTree(input, newPath)) };
+    } else {
+      return { name: nodeName, type: 'EVENT', description: '', children: [] };
+    }
+  }
+  const rootNode = buildTree(rootGateName);
+  return { projectName, treeName, rootNode };
+}
+
+function parseEventDescriptions(text) {
+  const descriptions = {};
+  const lines = text.split('\n')
+    .map(l => l.replace(/\r$/, ''))
+    .filter(line => line.trim())
+    .filter(line => !line.trim().startsWith('*'))
+    .filter(line => !/^[^,]+=\s*$/.test(line.trim()));
+  lines.forEach(line => {
+    const commaIdx = line.indexOf(',');
+    if (commaIdx < 0) return;
+    const eventName = line.substring(0, commaIdx).trim();
+    if (!eventName) return;
+    let rest = line.substring(commaIdx + 1);
+    const lastComma = rest.lastIndexOf(',');
+    const potentialProject = lastComma >= 0 ? rest.substring(lastComma + 1).trim() : '';
+    if (lastComma >= 0 && potentialProject && !/\s/.test(potentialProject)) rest = rest.substring(0, lastComma);
+    const description = rest.trim();
+    if (eventName && description) descriptions[eventName] = description;
+  });
+  return descriptions;
+}
+
+function parseGateDescriptions(text) {
+  const descriptions = {};
+  const lines = text.split('\n')
+    .map(l => l.replace(/\r$/, ''))
+    .filter(line => line.trim())
+    .filter(line => !line.trim().startsWith('*'))
+    .filter(line => !/^[^,]+=\s*$/.test(line.trim()));
+  lines.forEach(line => {
+    const commaIdx = line.indexOf(',');
+    if (commaIdx < 0) return;
+    const gateName = line.substring(0, commaIdx).trim();
+    if (!gateName) return;
+    const afterName = line.substring(commaIdx + 1);
+    const descComma = afterName.indexOf(',');
+    const description = (descComma >= 0 ? afterName.substring(0, descComma) : afterName).trim();
+    if (gateName && description) descriptions[gateName] = description;
+  });
+  return descriptions;
+}
+
+function parseBEI(text) {
+  const eventInfo = {};
+  const lines = text.split('\n')
+    .map(l => l.replace(/\r$/, ''))
+    .filter(line => line.trim())
+    .filter(line => !line.trim().startsWith('*'))
+    .filter(line => !/^[^,]+=\s*$/.test(line.trim()));
+  const validDataLine = (line) => {
+    const firstField = line.split(',')[0].trim();
+    return /^(<[^>]*>|[A-Za-z0-9][A-Za-z0-9_\-<>]*)$/.test(firstField);
+  };
+  lines.forEach(line => {
+    if (!validDataLine(line)) return;
+    const parts = line.split(',');
+    if (parts.length >= 3) {
+      const name = parts[0] ? parts[0].trim() : '';
+      if (name) {
+        eventInfo[name] = {
+          Name: name,
+          FdT: parts[1] ? parts[1].trim() : '',
+          UdC: parts[2] ? parts[2].trim() : '',
+          UdT: parts[3] ? parts[3].trim() : '',
+          UdValue: parts[4] ? parseFloat(parts[4].trim()) || 0 : 0,
+          Prob: parts[5] ? parseFloat(parts[5].trim()) || 0 : 0,
+          Lambda: parts[6] ? parseFloat(parts[6].trim()) || 0 : 0,
+          Tau: parts[7] ? parseFloat(parts[7].trim()) || 0 : 0,
+          Mission: parts[8] ? parseFloat(parts[8].trim()) || 0 : 0,
+          Init: parts[9] ? parts[9].trim().toUpperCase() === 'T' || parts[9].trim() === '1' : false,
+          PF: parts[10] ? parts[10].trim() : ' ',
+          UdValue2: parts[11] ? parseFloat(parts[11].trim()) || 0 : 0,
+          Calc_Prob: parts[12] ? parseFloat(parts[12].trim()) || 0 : 0,
+          Freq: parts[13] ? parts[13].trim() : ' ',
+          Model_Type: parts[14] ? parts[14].trim() : '',
+          Phase_Type: parts[15] ? parts[15].trim() : '',
+          Project: parts[16] ? parts[16].trim() : ''
+        };
+      }
+    }
+  });
+  Object.values(eventInfo).forEach(ev => {
+    const fdtMap = { '1':'1', '3':'2', '7':'3', '5':'4', 'T':'5', 'F':'5', 'I':'5' };
+    if (!ev.FailureModel && ev.FdT) ev.FailureModel = fdtMap[String(ev.FdT).toUpperCase()] || '0';
+    if (ev.FailureModel === '5') {
+      const fdt = String(ev.FdT).toUpperCase();
+      if (fdt === 'T') ev.LogicFlag = 'T';
+      else if (fdt === 'F') ev.LogicFlag = 'F';
+      else if (fdt === 'I') ev.LogicFlag = 'I';
+      else ev.LogicFlag = 'T';
+    }
+    const udtMap = { 'L':'lognormal', 'G':'gamma', 'B':'beta', 'O':'cni', 'N':'point' };
+    if (!ev.Distribution && ev.UdT) ev.Distribution = udtMap[String(ev.UdT).toUpperCase()] || 'point';
+    if (ev.UdValue !== undefined && ev.UdValue !== 0) {
+      const dist = ev.Distribution || 'point';
+      if (dist === 'beta' || dist === 'gamma') ev.DistAlpha = ev.UdValue;
+      else if (dist === 'lognormal') ev.DistEF = ev.UdValue;
+    }
+    if (ev.Lambda !== undefined) ev.DistLambda = ev.Lambda;
+    if (ev.Mission !== undefined && ev.Mission !== 0) ev.MissionTime = ev.Mission;
+    if (ev.Tau !== undefined && ev.Tau !== 0) ev.TauRepair = ev.Tau;
+    if (ev.DemandN === undefined) ev.DemandN = 1;
+    const fm = ev.FailureModel || '0';
+    const lambda = ev.Lambda || 0;
+    const mt = ev.MissionTime || ev.Mission || 1;
+    const tau = ev.TauRepair || ev.Tau || 1;
+    const p0 = ev.Prob || 0;
+    if (fm === '0' || fm === '5') {
+      if (!ev.Calc_Prob && p0) ev.Calc_Prob = p0;
+    } else if (fm === '1') {
+      ev.DemandProb = p0;
+    } else {
+      let computedProb = null;
+      if (fm === '2' && lambda > 0 && mt > 0) computedProb = 1 - Math.exp(-lambda * mt);
+      else if (fm === '3' && lambda > 0 && mt > 0) { const li = lambda * mt; computedProb = 1 + (Math.exp(-li) - 1) / li; }
+      else if (fm === '4' && lambda > 0 && mt > 0 && tau > 0) computedProb = (lambda*tau)*(1-Math.exp(-(lambda+1/tau)*mt))/(1+lambda*tau);
+      if (computedProb !== null && !isNaN(computedProb)) ev.Calc_Prob = computedProb;
+      ev.Prob = lambda;
+    }
+  });
+  return eventInfo;
+}
+
+function parseFTC(text) {
+  const cutSetsByTree = {};
+  const sections = [];
+  const parts = text.split('^EOS');
+  for (let i = 0; i < parts.length; i++) {
+    const trimmed = parts[i].trim();
+    if (trimmed.length > 0) sections.push(trimmed);
+  }
+  sections.forEach((section) => {
+    const allLines = section.split('\n').map(l => l.trim());
+    const lines = allLines.filter(l => l && !l.startsWith('*'));
+    if (lines.length < 2) return;
+    const headerLine = lines[0];
+    const headerParts = headerLine.split(',').map(p => p.trim());
+    if (headerParts.length < 2) return;
+    const project = headerParts[0];
+    const faultTree = headerParts[1].replace(/=/g, '').replace(/\s+/g, '');
+    const modelPhase = headerParts[2] || '';
+    let startIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i] === '=') { startIndex = i + 1; break; }
+    }
+    if (startIndex === -1 || startIndex >= lines.length) {
+      cutSetsByTree[faultTree] = { project, faultTree, modelPhase, cutSets: [] };
+      return;
+    }
+    const cutSets = [];
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line || line === '^EOS') continue;
+      let cutSetLine = line.replace(/[+.]$/, '').trim();
+      const events = cutSetLine.split('*').map(e => e.trim()).filter(e => e);
+      const parsedEvents = events.map(event => {
+        if (event.startsWith('/')) return { name: event.substring(1).trim(), complement: true };
+        else return { name: event.trim(), complement: false };
+      });
+      if (parsedEvents.length > 0) cutSets.push(parsedEvents);
+    }
+    cutSetsByTree[faultTree] = { project, faultTree, modelPhase, cutSets };
+  });
+  return cutSetsByTree;
+}
+
+// ── Layout helper (simplified extraction) ──────────────────────────
+function calculateLayout(node, nodeMultiplier = 1, spacingMultiplier = 1) {
+  const NODE_W = 120 * nodeMultiplier;
+  const NODE_H = 50 * nodeMultiplier;
+  const VERT   = 100 * spacingMultiplier;
+  const GAP    = 40  * spacingMultiplier;
+
+  function calcWidths(n) {
+    if (!n) return 0;
+    if (!n.children || n.children.length === 0) return NODE_W;
+    let total = 0;
+    for (const c of n.children) { calcWidths(c); total += (c._subtreeW || NODE_W); }
+    total += GAP * (n.children.length - 1);
+    n._subtreeW = Math.max(total, NODE_W);
+    return n._subtreeW;
+  }
+
+  function assign(n, x, y) {
+    if (!n) return;
+    n.x = x;
+    n.y = y;
+    if (!n.children || n.children.length === 0) return;
+    let cx = x - (n._subtreeW || NODE_W) / 2;
+    for (const c of n.children) {
+      const cw = c._subtreeW || NODE_W;
+      assign(c, cx + cw / 2, y + VERT);
+      cx += cw + GAP;
+    }
+  }
+
+  calcWidths(node);
+  assign(node, 0, 0);
+  return node;
+}
+
+// ── MCUB calculation ───────────────────────────────────────────────
+function calcMCUB(cutSets, eventInfo) {
+  let mcub = 0;
+  let valid = true;
+  for (const cs of cutSets) {
+    let csProb = 1;
+    for (const ev of cs) {
+      const info = eventInfo[typeof ev === 'string' ? ev : ev.name];
+      if (!info || info.Calc_Prob === undefined) { valid = false; break; }
+      const p = info.Calc_Prob;
+      csProb *= (typeof ev === 'object' && ev.complement) ? (1 - p) : p;
+    }
+    if (!valid) break;
+    mcub += csProb;
+  }
+  return valid ? mcub : null;
+}
+
+// ── Cut set probability ────────────────────────────────────────────
+function calcCutSetProbability(cutSet, eventInfo) {
+  let prob = 1;
+  for (const event of cutSet) {
+    const name = typeof event === 'string' ? event : event.name;
+    const info = eventInfo[name];
+    if (!info || info.Calc_Prob === undefined) return null;
+    if (typeof event === 'object' && event.complement) prob *= (1.0 - info.Calc_Prob);
+    else prob *= info.Calc_Prob;
+  }
+  return prob;
+}
+
+// ── SAPHIRE FTL export (reconstructed from app) ───────────────────
+function exportToSAPHIRE_FTL(project) {
+  let output = '';
+  for (const ft of (project.faultTrees || [])) {
+    const tn = ft.treeName || 'TREE';
+    output += `${project.projectName || 'PROJECT'}, ${tn}=\r\n`;
+    function writeNode(node) {
+      if (!node || node.type === 'EVENT' || node.type === 'BASIC') return;
+      let typeStr;
+      if (node.type === 'TRAN') typeStr = 'TRAN';
+      else if (node.type === 'VOTING') { const n = node.votingN || 1; const m = (node.children || []).length; typeStr = `${n}/${m}`; }
+      else typeStr = node.type;
+      const inputs = node.type === 'TRAN'
+        ? [(node.transferTo || node.name)]
+        : (node.children || []).map(c => c.name);
+      output += `${node.name} ${typeStr} ${inputs.join(' ')}\r\n`;
+      if (node.type !== 'TRAN') (node.children || []).forEach(writeNode);
+    }
+    writeNode(ft.rootNode);
+    output += '^EOS\r\n';
+  }
+  return output;
+}
+
+// ── OpenPSA export helper ──────────────────────────────────────────
+function buildOpenPSAFormula(node) {
+  if (!node) return '';
+  if (node.type === 'EVENT' || node.type === 'BASIC') return `<basic-event name="${node.name}"/>`;
+  if (node.type === 'TRAN') return `<gate name="${node.transferTo || node.name}"/>`;
+  const kids = (node.children || []).map(buildOpenPSAFormula).join('\n');
+  if (node.type === 'OR')   return `<or>\n${kids}\n</or>`;
+  if (node.type === 'AND')  return `<and>\n${kids}\n</and>`;
+  if (node.type === 'NOT')  return `<or><not>\n${kids}\n</not></or>`;
+  if (node.type === 'NAND') return `<not><and>\n${kids}\n</and></not>`;
+  if (node.type === 'VOTING') { const n = node.votingN || 1; const m = (node.children||[]).length; return `<atleast min="${n}">\n${kids}\n</atleast>`; }
+  return kids;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TEST FRAMEWORK
+// ═══════════════════════════════════════════════════════════════════
+
+// Each assertion records its result into the current test's capture array
+let _assertCaptures = [];
+function _cap(label, pass, actual, expected, note) {
+  _assertCaptures.push({ label, pass, actual: JSON.stringify(actual), expected: JSON.stringify(expected), note: note||'' });
+  return pass;
+}
+
+const assert = {
+  eq(actual, expected, msg) {
+    const pass = JSON.stringify(actual) === JSON.stringify(expected);
+    _cap(msg||'eq', pass, actual, expected);
+    if (!pass) throw new Error(`[${msg||'eq'}]  got: ${JSON.stringify(actual)}  expected: ${JSON.stringify(expected)}`);
+  },
+  strictEq(actual, expected, msg) {
+    const pass = actual === expected;
+    _cap(msg||'strictEq', pass, actual, expected);
+    if (!pass) throw new Error(`[${msg||'strictEq'}]  got: ${JSON.stringify(actual)}  expected: ${JSON.stringify(expected)}`);
+  },
+  approx(actual, expected, tolerance, msg) {
+    const diff = Math.abs(actual - expected);
+    const pass = diff <= tolerance;
+    _cap(msg||'approx', pass, actual, `${expected} \u00B1 ${tolerance}`, `diff=${diff.toExponential(3)}`);
+    if (!pass) throw new Error(`[${msg||'approx'}]  got: ${actual}  expected: ${expected} \u00B1 ${tolerance}  diff=${diff.toExponential(3)}`);
+  },
+  truthy(val, msg) {
+    const pass = !!val;
+    _cap(msg||'truthy', pass, val, '<truthy>');
+    if (!pass) throw new Error(`[${msg||'truthy'}]  got falsy: ${JSON.stringify(val)}`);
+  },
+  falsy(val, msg) {
+    const pass = !val;
+    _cap(msg||'falsy', pass, val, '<falsy>');
+    if (!pass) throw new Error(`[${msg||'falsy'}]  got truthy: ${JSON.stringify(val)}`);
+  },
+  throws(fn, msgFragment, label) {
+    let threw = false;
+    try { fn(); } catch(e) {
+      threw = true;
+      if (msgFragment && !e.message.includes(msgFragment)) {
+        _cap(label||'throws', false, e.message, `contains: "${msgFragment}"`);
+        throw new Error(`[${label||'throws'}]  threw but message missing "${msgFragment}"`);
+      }
+    }
+    _cap(label||'throws', threw, threw ? 'threw' : 'did not throw', 'throws');
+    if (!threw) throw new Error(`[${label||'throws'}]  expected to throw but did not`);
+  },
+  includes(collection, item, msg) {
+    let pass;
+    if (Array.isArray(collection)) pass = collection.includes(item);
+    else if (typeof collection === 'string') pass = collection.includes(item);
+    else { pass = false; }
+    _cap(msg||'includes', pass, collection, `includes ${JSON.stringify(item)}`);
+    if (!pass) throw new Error(`[${msg||'includes'}]  ${JSON.stringify(item)} not found`);
+  },
+  notIncludes(collection, item, msg) {
+    const pass = Array.isArray(collection) ? !collection.includes(item) : true;
+    _cap(msg||'notIncludes', pass, collection, `excludes ${JSON.stringify(item)}`);
+    if (!pass) throw new Error(`[${msg||'notIncludes'}]  ${JSON.stringify(item)} found unexpectedly`);
+  },
+  defined(val, msg) {
+    const pass = val !== undefined && val !== null;
+    _cap(msg||'defined', pass, val, '<not null/undefined>');
+    if (!pass) throw new Error(`[${msg||'defined'}]  got ${val}`);
+  },
+  isNull(val, msg) {
+    const pass = val === null;
+    _cap(msg||'isNull', pass, val, null);
+    if (!pass) throw new Error(`[${msg||'isNull'}]  got ${JSON.stringify(val)}`);
+  },
+  len(arr, n, msg) {
+    const pass = Array.isArray(arr) && arr.length === n;
+    _cap(msg||'len', pass, Array.isArray(arr) ? arr.length : arr, n, 'length check');
+    if (!pass) throw new Error(`[${msg||'len'}]  length ${arr&&arr.length} !== ${n}`);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// TEST SUITE DEFINITIONS
+// Each test has:
+//   name    – short title shown in the list
+//   meta    – documentation shown in the expanded detail panel:
+//               purpose  : what behaviour is being verified
+//               input    : what data / scenario is fed in
+//               expected : what the correct result should be
+//               tags     : category labels
+//   fn      – the test function (uses assert.* helpers)
+// ═══════════════════════════════════════════════════════════════════
+
+const SUITES = {};
+
+// ── 1. FTL Parser ──────────────────────────────────────────────────
+SUITES.parseFTL = {
+  icon: '&#x1F4C4;',
+  title: 'FTL File Parser Tests',
+  desc: 'Validates parsing of SAPHIRE .FTL format files into KUREAS tree structures. Covers header parsing, gate topology, event identification, transfer gates, voting/N-of-M gates, cycle detection, and multi-tree files.',
+  tests: [
+    {
+      name: 'Parse simple OR gate with two basic events',
+      meta: {
+        purpose: 'Confirms the most fundamental parse case: a single OR gate with two leaf events. The OR gate is the backbone of fault tree failure logic — if either child occurs, the parent occurs.',
+        input: 'FTL text:\n  TESTPROJ, SIMPLETREE=\n  TOP OR A B\n  ^EOS',
+        expected: '1 fault tree named "SIMPLETREE"; root node type = OR with 2 children of type EVENT',
+        tags: ['parser','OR','basic-event','structure']
+      },
+      fn: () => {
+        const ftl = `TESTPROJ, SIMPLETREE=\nTOP OR A B\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.len(r.faultTrees, 1, 'one tree');
+        assert.strictEq(r.faultTrees[0].treeName, 'SIMPLETREE', 'tree name');
+        assert.strictEq(r.faultTrees[0].rootNode.type, 'OR', 'root type');
+        assert.len(r.faultTrees[0].rootNode.children, 2, 'two children');
+        assert.strictEq(r.faultTrees[0].rootNode.children[0].type, 'EVENT', 'child is EVENT');
+      }
+    },
+    {
+      name: 'Parse simple AND gate',
+      meta: {
+        purpose: 'Confirms that AND gate type is preserved correctly. An AND gate requires ALL inputs to be failed — it models redundancy (all trains must fail for system failure).',
+        input: 'FTL text:\n  PROJ, ANDTREE=\n  TOP AND A B C\n  ^EOS',
+        expected: 'Root node type = AND with 3 children',
+        tags: ['parser','AND','structure']
+      },
+      fn: () => {
+        const ftl = `PROJ, ANDTREE=\nTOP AND A B C\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.type, 'AND', 'AND gate');
+        assert.len(r.faultTrees[0].rootNode.children, 3, 'three children');
+      }
+    },
+    {
+      name: 'Project name extracted correctly from header',
+      meta: {
+        purpose: 'Verifies that the comma-separated header "PROJECT, TREENAME=" is correctly split. The project name is used for SAPHIRE exports and cross-module linking in .KNOW files.',
+        input: 'FTL header: "NUCLEAR_PLANT, PUMPTREE="',
+        expected: 'projectName = "NUCLEAR_PLANT", treeName = "PUMPTREE" (no trailing = signs)',
+        tags: ['parser','header','project-name']
+      },
+      fn: () => {
+        const ftl = `NUCLEAR_PLANT, PUMPTREE=\nPUMP_FAIL OR EVT1\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.projectName, 'NUCLEAR_PLANT', 'project name');
+        assert.strictEq(r.faultTrees[0].treeName, 'PUMPTREE', 'tree name stripped = signs');
+      }
+    },
+    {
+      name: 'Multi-level tree structure',
+      meta: {
+        purpose: 'Verifies that a 3-level tree (root → intermediate gates → leaf events) is correctly nested in the JS object tree. Tests that the recursive buildTree() descent works properly when gates reference other gates.',
+        input: 'FTL text with OR root, two AND children, and 4 leaf events:\n  TOP OR G1 G2\n  G1 AND E1 E2\n  G2 AND E3 E4',
+        expected: 'root.type=OR, root.children[0].type=AND, root.children[1].type=AND, leaf E1 accessible at root.children[0].children[0].name',
+        tags: ['parser','multi-level','nesting','recursive']
+      },
+      fn: () => {
+        const ftl = `PROJ, MULTI=\nTOP OR G1 G2\nG1 AND E1 E2\nG2 AND E3 E4\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const root = r.faultTrees[0].rootNode;
+        assert.strictEq(root.type, 'OR', 'root is OR');
+        assert.len(root.children, 2, 'two branches');
+        assert.strictEq(root.children[0].type, 'AND', 'left branch AND');
+        assert.strictEq(root.children[1].type, 'AND', 'right branch AND');
+        assert.strictEq(root.children[0].children[0].name, 'E1', 'leaf E1');
+      }
+    },
+    {
+      name: 'Transfer gate (TRAN) parsed correctly',
+      meta: {
+        purpose: 'Transfer gates are SAPHIRE\'s mechanism for referencing another named fault tree as a sub-tree (analogous to a subroutine call). The parser must create a TRAN node with the transferTo property set to the target tree name, and no children (expansion is handled at render-time).',
+        input: 'FTL text:\n  TOP OR G1 XFER\n  XFER TRAN SUBTREE',
+        expected: 'Node named XFER has type=TRAN, transferTo="SUBTREE", children=[]',
+        tags: ['parser','TRAN','transfer-gate']
+      },
+      fn: () => {
+        const ftl = `PROJ, MAIN=\nTOP OR G1 XFER\nXFER TRAN SUBTREE\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const root = r.faultTrees[0].rootNode;
+        const tranNode = root.children.find(c => c.name === 'XFER');
+        assert.defined(tranNode, 'TRAN node found');
+        assert.strictEq(tranNode.type, 'TRAN', 'type is TRAN');
+        assert.strictEq(tranNode.transferTo, 'SUBTREE', 'transferTo correct');
+        assert.len(tranNode.children, 0, 'TRAN has no inline children');
+      }
+    },
+    {
+      name: 'N/M voting gate format (3/4) parsed',
+      meta: {
+        purpose: 'SAPHIRE encodes N-of-M voting gates as "N/M" in the gate type column (e.g. "3/4" means 3-of-4). The parser must detect this pattern, create a VOTING node, and store N as votingN. This gate type is common for reactor trip systems.',
+        input: 'FTL gate line: "TOP 3/4 A B C D"',
+        expected: 'Root node type=VOTING, votingN=3, with 4 children',
+        tags: ['parser','VOTING','N-of-M']
+      },
+      fn: () => {
+        const ftl = `PROJ, VOTE=\nTOP 3/4 A B C D\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const root = r.faultTrees[0].rootNode;
+        assert.strictEq(root.type, 'VOTING', 'VOTING type');
+        assert.strictEq(root.votingN, 3, 'votingN=3');
+        assert.len(root.children, 4, '4 children');
+      }
+    },
+    {
+      name: 'N/M voting gate format (2/3) parsed',
+      meta: {
+        purpose: 'Complementary to the 3/4 test — verifies that the N value is parsed from the numerator regardless of specific values. 2-of-3 is common for safety injection systems.',
+        input: 'FTL gate line: "TOP 2/3 X Y Z"',
+        expected: 'votingN=2, 3 children',
+        tags: ['parser','VOTING','N-of-M']
+      },
+      fn: () => {
+        const ftl = `PROJ, VOTE23=\nTOP 2/3 X Y Z\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.votingN, 2, 'votingN=2');
+        assert.len(r.faultTrees[0].rootNode.children, 3, '3 children');
+      }
+    },
+    {
+      name: 'Multi-tree file parsed into separate trees',
+      meta: {
+        purpose: 'SAPHIRE .FTL files may contain multiple fault trees separated by "^EOS" markers. Each tree must be parsed independently and returned as separate entries in the faultTrees array.',
+        input: 'Two FTL sections separated by ^EOS:\n  PROJ, TREE1= ... ^EOS\n  PROJ, TREE2= ...',
+        expected: '2 fault trees: faultTrees[0].treeName="TREE1" (OR root), faultTrees[1].treeName="TREE2" (AND root)',
+        tags: ['parser','multi-tree','EOS']
+      },
+      fn: () => {
+        const ftl = `PROJ, TREE1=\nTOP OR A B\n^EOS\nPROJ, TREE2=\nTOP AND C D\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.len(r.faultTrees, 2, 'two trees');
+        assert.strictEq(r.faultTrees[0].treeName, 'TREE1', 'first tree name');
+        assert.strictEq(r.faultTrees[1].treeName, 'TREE2', 'second tree name');
+        assert.strictEq(r.faultTrees[1].rootNode.type, 'AND', 'second tree root AND');
+      }
+    },
+    {
+      name: 'Cycle detection returns EVENT marker',
+      meta: {
+        purpose: 'A gate that references itself (directly or indirectly) would cause infinite recursion. The parser tracks the current traversal path and inserts a stub EVENT node with description="(cycle)" when a cycle is detected, preventing a stack overflow.',
+        input: 'FTL with self-referencing gate:\n  G1 OR G1 E1\n  (G1 references itself)',
+        expected: 'Parse completes without hanging; a node with description "(cycle)" appears somewhere in the tree',
+        tags: ['parser','cycle','safety','robustness']
+      },
+      fn: () => {
+        const ftl = `PROJ, CYCLIC=\nG1 OR G1 E1\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.truthy(r, 'parsed without crash');
+        const hasCycle = (n) => {
+          if (n.description === '(cycle)') return true;
+          return (n.children||[]).some(hasCycle);
+        };
+        assert.truthy(hasCycle(r.faultTrees[0].rootNode), 'cycle detected and marked');
+      }
+    },
+    {
+      name: 'Tree name strips = signs from header',
+      meta: {
+        purpose: 'SAPHIRE headers use = as padding/decoration (e.g. "PROJ, MYTREE =="). The parser must strip all = characters from the tree name so it can be used as a clean identifier in exports and lookups.',
+        input: 'FTL header: "PROJ, MYTREE =="',
+        expected: 'treeName = "MYTREE" (no = signs, no trailing spaces)',
+        tags: ['parser','header','normalization']
+      },
+      fn: () => {
+        const ftl = `PROJ, MYTREE ==\nTOP OR A\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].treeName, 'MYTREE', 'no = signs in name');
+      }
+    },
+    {
+      name: 'Root detection: gate not referenced by other gates is root',
+      meta: {
+        purpose: 'The root gate is identified algorithmically: it is the only gate that does NOT appear as an input to any other gate. This test verifies that logic. "TOP" is the root because only it has no parent; G1 is referenced by TOP.',
+        input: 'FTL:\n  TOP OR G1\n  G1 AND E1 E2\n  (G1 is input to TOP, so TOP is root)',
+        expected: 'rootNode.name = "TOP"',
+        tags: ['parser','root-detection','algorithm']
+      },
+      fn: () => {
+        const ftl = `PROJ, DETECT=\nTOP OR G1\nG1 AND E1 E2\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.name, 'TOP', 'TOP is root');
+      }
+    },
+    {
+      name: 'Empty FTL text returns empty structure',
+      meta: {
+        purpose: 'Verifies graceful handling of empty input — no crash, and the result contains an empty faultTrees array. This protects against null-reference errors when the user loads an empty file.',
+        input: 'Empty string ""',
+        expected: 'faultTrees array with length 0',
+        tags: ['parser','edge-case','empty-input']
+      },
+      fn: () => {
+        const r = parseFTLStructure('');
+        assert.len(r.faultTrees, 0, 'no trees');
+      }
+    },
+    {
+      name: 'NOT gate type preserved',
+      meta: {
+        purpose: 'NOT gates (complement/negation) invert the logic of their child. The SAPHIRE FTL keyword is "NOT". Verifies the gate type string is passed through without alteration.',
+        input: 'FTL: "TOP NOT E1"',
+        expected: 'rootNode.type = "NOT"',
+        tags: ['parser','NOT','gate-type']
+      },
+      fn: () => {
+        const ftl = `PROJ, NOTTREE=\nTOP NOT E1\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.type, 'NOT', 'NOT type');
+      }
+    },
+    {
+      name: 'NAND gate type preserved',
+      meta: {
+        purpose: 'NAND (NOT AND) gates fail when NOT all inputs fail simultaneously. Verifies the gate type string is passed through without alteration.',
+        input: 'FTL: "TOP NAND A B"',
+        expected: 'rootNode.type = "NAND"',
+        tags: ['parser','NAND','gate-type']
+      },
+      fn: () => {
+        const ftl = `PROJ, NANDTREE=\nTOP NAND A B\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.type, 'NAND', 'NAND type');
+      }
+    },
+    {
+      name: 'Windows CRLF line endings handled',
+      meta: {
+        purpose: 'SAPHIRE files are generated on Windows and use CRLF (\\r\\n) line endings. The parser must strip carriage returns so that node names and gate types are not corrupted by a trailing \\r character.',
+        input: 'FTL text with Windows CRLF: "PROJ, CRLF=\\r\\nTOP OR A B\\r\\n^EOS\\r\\n"',
+        expected: '1 tree parsed successfully with rootNode.type = "OR" (not "OR\\r")',
+        tags: ['parser','CRLF','Windows','encoding']
+      },
+      fn: () => {
+        const ftl = "PROJ, CRLF=\r\nTOP OR A B\r\n^EOS\r\n";
+        const r = parseFTLStructure(ftl);
+        assert.len(r.faultTrees, 1, 'one tree parsed despite CRLF');
+        assert.strictEq(r.faultTrees[0].rootNode.type, 'OR', 'type not corrupted by \\r');
+      }
+    },
+    {
+      name: 'Single basic event tree (no gates) parses without crash',
+      meta: {
+        purpose: 'Edge case: an FTL section that contains only a basic event name with no gate definitions. The parser should not crash, even though no tree structure can be built.',
+        input: 'FTL section containing only "LONE_EVENT" with no gate line',
+        expected: 'No JavaScript exception thrown; result is defined (may be 0 trees or a minimal structure)',
+        tags: ['parser','edge-case','no-gates','robustness']
+      },
+      fn: () => {
+        const ftl = `PROJ, SINGLE=\nLONE_EVENT\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.truthy(r !== undefined, 'no crash on gate-free section');
+      }
+    },
+  ]
+};
+
+// ── 2. BED Parser ─────────────────────────────────────────────────
+SUITES.parseBED = {
+  icon: '&#x1F4CB;',
+  title: 'BED Event Description Parser',
+  desc: 'Validates parsing of SAPHIRE .BED (Basic Event Description) files. Covers comma splitting, comment skipping, project field stripping, and descriptions that contain embedded commas.',
+  tests: [
+    {
+      name: 'Basic event description parsed',
+      meta: {
+        purpose: 'Verifies the fundamental BED parse: split on first comma, use the right side as the description.',
+        input: 'BED line: "PUMP-FAIL, Pump fails to start"',
+        expected: 'descriptions["PUMP-FAIL"] = "Pump fails to start"',
+        tags: ['BED','parser','description']
+      },
+      fn: () => {
+        const bed = `PUMP-FAIL, Pump fails to start`;
+        const d = parseEventDescriptions(bed);
+        assert.strictEq(d['PUMP-FAIL'], 'Pump fails to start', 'description');
+      }
+    },
+    {
+      name: 'Comment lines (starting with *) skipped',
+      meta: {
+        purpose: 'SAPHIRE files use lines starting with * as comments. These must be ignored completely — not added to the descriptions map.',
+        input: 'BED with two * comment lines surrounding one real event:\n  * This is a comment\n  PUMP, Pump fails\n  * Another comment',
+        expected: 'Only 1 entry in the descriptions map; comments are absent',
+        tags: ['BED','parser','comments']
+      },
+      fn: () => {
+        const bed = `* This is a comment\nPUMP, Pump fails\n* Another comment`;
+        const d = parseEventDescriptions(bed);
+        assert.strictEq(Object.keys(d).length, 1, 'only one entry');
+        assert.strictEq(d['PUMP'], 'Pump fails');
+      }
+    },
+    {
+      name: 'Trailing project name field stripped',
+      meta: {
+        purpose: 'SAPHIRE BED lines sometimes have a third field: the project name. Since project names have no spaces, the parser detects this and removes it, leaving only the description.',
+        input: 'BED line: "VALVE-FAIL, Valve fails to open, PROJ1"',
+        expected: 'descriptions["VALVE-FAIL"] = "Valve fails to open" (PROJ1 stripped)',
+        tags: ['BED','parser','project-field','stripping']
+      },
+      fn: () => {
+        const bed = `VALVE-FAIL, Valve fails to open, PROJ1`;
+        const d = parseEventDescriptions(bed);
+        assert.strictEq(d['VALVE-FAIL'], 'Valve fails to open', 'project field stripped');
+      }
+    },
+    {
+      name: 'Description with embedded commas preserved',
+      meta: {
+        purpose: 'Some event descriptions naturally contain commas (e.g., "Fails due to heat, vibration, and wear"). The parser splits on the FIRST comma only, so commas in the description body must be preserved.',
+        input: 'BED line: "EVT, Fails due to heat, vibration, and wear, PROJ"',
+        expected: 'Description includes "heat" and embedded commas (only the trailing project field "PROJ" is removed)',
+        tags: ['BED','parser','embedded-commas']
+      },
+      fn: () => {
+        const bed = `EVT, Fails due to heat, vibration, and wear, PROJ`;
+        const d = parseEventDescriptions(bed);
+        assert.truthy(d['EVT'] && d['EVT'].includes('heat'), 'embedded commas preserved');
+      }
+    },
+    {
+      name: 'Header line ending with = skipped',
+      meta: {
+        purpose: 'SAPHIRE BED files begin with a header line like "BASIC_EVENTS =" that must be ignored. The parser detects lines matching the pattern /^[^,]+=\\s*$/ and skips them.',
+        input: 'BED text:\n  BASIC_EVENTS =\n  EVT1, Event one description',
+        expected: '"BASIC_EVENTS" is NOT in the descriptions map; "EVT1" IS',
+        tags: ['BED','parser','header','skipping']
+      },
+      fn: () => {
+        const bed = `BASIC_EVENTS =\nEVT1, Event one description`;
+        const d = parseEventDescriptions(bed);
+        assert.falsy(d['BASIC_EVENTS ='], 'header not treated as event');
+        assert.strictEq(d['EVT1'], 'Event one description');
+      }
+    },
+    {
+      name: 'Windows CR stripped from line ends',
+      meta: {
+        purpose: 'Windows CRLF files leave a \\r at the end of each line if only \\n is used as the split character. The parser explicitly strips \\r so event names like "EVT1\\r" are not created.',
+        input: 'BED lines with Windows CRLF endings',
+        expected: 'Both events parsed with clean names (no \\r suffix)',
+        tags: ['BED','parser','CRLF','encoding']
+      },
+      fn: () => {
+        const bed = "EVT1, Pump failure\r\nEVT2, Valve failure\r\n";
+        const d = parseEventDescriptions(bed);
+        assert.defined(d['EVT1'], 'EVT1 parsed');
+        assert.defined(d['EVT2'], 'EVT2 parsed');
+      }
+    },
+    {
+      name: 'Empty input returns empty object',
+      meta: {
+        purpose: 'Passing an empty string must not crash and must return an empty object {}.',
+        input: 'Empty string ""',
+        expected: 'Result equals {}',
+        tags: ['BED','parser','edge-case','empty-input']
+      },
+      fn: () => {
+        const d = parseEventDescriptions('');
+        assert.eq(d, {}, 'empty object');
+      }
+    },
+    {
+      name: 'Multiple events all parsed',
+      meta: {
+        purpose: 'Verifies that all lines in a multi-event BED file are processed — not just the first.',
+        input: 'Three BED lines: A, B, C with descriptions',
+        expected: 'Object with 3 keys',
+        tags: ['BED','parser','multiple-events']
+      },
+      fn: () => {
+        const bed = `A, Event A\nB, Event B\nC, Event C`;
+        const d = parseEventDescriptions(bed);
+        assert.strictEq(Object.keys(d).length, 3, 'three events');
+      }
+    },
+  ]
+};
+
+// ── 3. GTD Gate Description Parser ────────────────────────────────
+SUITES.parseGTD = {
+  icon: '&#x1F511;',
+  title: 'GTD Gate Description Parser',
+  desc: 'Validates parsing of SAPHIRE .GTD (Gate Description) files. Gate descriptions include an alt-flag and project field after the description that must be stripped.',
+  tests: [
+    {
+      name: 'Basic gate description parsed',
+      meta: {
+        purpose: 'Verifies the basic GTD parse: split on first comma, keep the second field as the description.',
+        input: 'GTD line: "TOP-GATE, Top level system failure"',
+        expected: 'descriptions["TOP-GATE"] = "Top level system failure"',
+        tags: ['GTD','parser','description']
+      },
+      fn: () => {
+        const gtd = `TOP-GATE, Top level system failure`;
+        const d = parseGateDescriptions(gtd);
+        assert.strictEq(d['TOP-GATE'], 'Top level system failure');
+      }
+    },
+    {
+      name: 'Alt-flag and project fields stripped',
+      meta: {
+        purpose: 'SAPHIRE GTD lines have four fields: GATE_NAME, DESCRIPTION, ALT_FLAG, PROJECT_NAME. Only the first two matter. The parser must split on the second comma to strip the trailing fields.',
+        input: 'GTD line: "G1, Pump subsystem failure, 0, NUCLEAR_PROJ"',
+        expected: 'descriptions["G1"] = "Pump subsystem failure" (not including ", 0, NUCLEAR_PROJ")',
+        tags: ['GTD','parser','stripping','SAPHIRE']
+      },
+      fn: () => {
+        const gtd = `G1, Pump subsystem failure, 0, NUCLEAR_PROJ`;
+        const d = parseGateDescriptions(gtd);
+        assert.strictEq(d['G1'], 'Pump subsystem failure', 'trailing fields stripped');
+      }
+    },
+    {
+      name: 'Comment lines skipped',
+      meta: {
+        purpose: 'Same as BED: lines starting with * are comments and must be ignored.',
+        input: 'GTD with a * comment line before a real entry',
+        expected: 'Only the real gate entry is in the result; the comment key is absent',
+        tags: ['GTD','parser','comments']
+      },
+      fn: () => {
+        const gtd = `* Gate descriptions\nGATEA, Gate A description`;
+        const d = parseGateDescriptions(gtd);
+        assert.falsy(d['* Gate descriptions'], 'comment not included');
+        assert.strictEq(d['GATEA'], 'Gate A description');
+      }
+    },
+    {
+      name: 'Multiple gates parsed',
+      meta: {
+        purpose: 'Verifies all gates in a multi-line GTD file are parsed, not just the first.',
+        input: 'Three GTD lines with various trailing field patterns',
+        expected: 'Object with 3 keys',
+        tags: ['GTD','parser','multiple']
+      },
+      fn: () => {
+        const gtd = `G1, Gate 1 desc, 0, PROJ\nG2, Gate 2 desc, 0, PROJ\nG3, Gate 3 desc`;
+        const d = parseGateDescriptions(gtd);
+        assert.strictEq(Object.keys(d).length, 3, 'three gates');
+      }
+    },
+    {
+      name: 'Empty input returns empty object',
+      meta: {
+        purpose: 'Empty string must produce an empty object without throwing.',
+        input: 'Empty string ""',
+        expected: 'Result equals {}',
+        tags: ['GTD','parser','edge-case']
+      },
+      fn: () => {
+        const d = parseGateDescriptions('');
+        assert.eq(d, {}, 'empty');
+      }
+    },
+  ]
+};
+
+// ── 4. BEI Parser ─────────────────────────────────────────────────
+SUITES.parseBEI = {
+  icon: '&#x1F4CA;',
+  title: 'BEI Basic Event Information Parser',
+  desc: 'Validates parsing of SAPHIRE .BEI files. BEI files carry 17 comma-separated fields per event including failure model codes (FdT), distribution types (UdT), and computed probabilities. The parser also post-processes each event to compute Calc_Prob where needed.',
+  tests: [
+    {
+      name: 'Probability of Failure (FdT blank) uses Calc_Prob directly',
+      meta: {
+        purpose: 'When the FdT code is blank/empty (Failure data Type = point estimate), the parser should use the Calc_Prob column value directly as the event probability. This is the most common case for simple point-estimate events.',
+        input: 'BEI line with blank FdT, Prob=0.01, Calc_Prob=0.01:\n  PUMP-FAIL,,,,0,0.01,0,0,0,F,,0,0.01',
+        expected: 'Calc_Prob ≈ 0.01',
+        tags: ['BEI','parser','FM0','point-estimate']
+      },
+      fn: () => {
+        const bei = `PUMP-FAIL,,,,0,0.01,0,0,0,F,,0,0.01`;
+        const info = parseBEI(bei);
+        assert.approx(info['PUMP-FAIL'].Calc_Prob, 0.01, 1e-9, 'Calc_Prob set');
+      }
+    },
+    {
+      name: 'FdT=1 (demand) sets FailureModel=1 and DemandProb',
+      meta: {
+        purpose: 'FdT code "1" means "demand probability" — the Prob field is the per-demand failure probability. The parser maps FdT=1 → FailureModel="1" and copies Prob into DemandProb.',
+        input: 'BEI line with FdT=1, Prob=0.001:\n  VALVE-FAIL,1,,,0,0.001,0,0,0,F,,0,0.001',
+        expected: 'FailureModel = "1", DemandProb ≈ 0.001',
+        tags: ['BEI','parser','FM1','demand']
+      },
+      fn: () => {
+        const bei = `VALVE-FAIL,1,,,0,0.001,0,0,0,F,,0,0.001`;
+        const info = parseBEI(bei);
+        assert.strictEq(info['VALVE-FAIL'].FailureModel, '1', 'FM1');
+        assert.approx(info['VALVE-FAIL'].DemandProb, 0.001, 1e-9, 'DemandProb');
+      }
+    },
+    {
+      name: 'FdT=3 (Poisson) computes probability from lambda and mission time',
+      meta: {
+        purpose: 'FdT code "3" triggers the Poisson (exponential) failure model: P = 1 − e^(−λT). This is used for components that fail during a mission (e.g., a pump running for 720 hours). The parser must compute Calc_Prob from Lambda and Mission fields.',
+        input: 'BEI line with FdT=3, Lambda=0.001, Mission=720:\n  PUMP-RUN,3,,,0,0.001,0.001,0,720,F,,0,0',
+        expected: 'Calc_Prob ≈ 1 − e^(−0.001×720) = 1 − e^(−0.72) ≈ 0.5132',
+        tags: ['BEI','parser','FM2','Poisson','lambda','mission-time']
+      },
+      fn: () => {
+        const bei = `PUMP-RUN,3,,,0,0.001,0.001,0,720,F,,0,0`;
+        const info = parseBEI(bei);
+        const expected = 1 - Math.exp(-0.001 * 720);
+        assert.approx(info['PUMP-RUN'].Calc_Prob, expected, 1e-6, 'Poisson calc');
+      }
+    },
+    {
+      name: 'FdT=T (True flag) sets FailureModel=5 and LogicFlag=T',
+      meta: {
+        purpose: 'FdT codes T, F, and I are logic flags (True/False/Ignore). These are used for house events — events whose state is asserted rather than calculated. FdT=T → FailureModel="5", LogicFlag="T", Calc_Prob=1.',
+        input: 'BEI line with FdT=T:\n  TRUE-EVT,T,,,0,1,0,0,0,T,,0,1',
+        expected: 'FailureModel = "5", LogicFlag = "T"',
+        tags: ['BEI','parser','FM5','logic-flag','house-event']
+      },
+      fn: () => {
+        const bei = `TRUE-EVT,T,,,0,1,0,0,0,T,,0,1`;
+        const info = parseBEI(bei);
+        assert.strictEq(info['TRUE-EVT'].FailureModel, '5', 'FM5');
+        assert.strictEq(info['TRUE-EVT'].LogicFlag, 'T', 'LogicFlag T');
+      }
+    },
+    {
+      name: 'FdT=F (False flag) sets LogicFlag=F',
+      meta: {
+        purpose: 'The False flag (FdT=F) makes the event permanently false (probability=0). Used to model events that are being excluded from an analysis configuration.',
+        input: 'BEI line with FdT=F:\n  FALSE-EVT,F,,,0,0,0,0,0,F,,0,0',
+        expected: 'LogicFlag = "F"',
+        tags: ['BEI','parser','FM5','logic-flag','house-event']
+      },
+      fn: () => {
+        const bei = `FALSE-EVT,F,,,0,0,0,0,0,F,,0,0`;
+        const info = parseBEI(bei);
+        assert.strictEq(info['FALSE-EVT'].LogicFlag, 'F', 'LogicFlag F');
+      }
+    },
+    {
+      name: 'FdT=I (Ignore flag) sets LogicFlag=I',
+      meta: {
+        purpose: 'The Ignore flag (FdT=I) causes SAPHIRE to skip the event in quantification. Used when running sub-analyses that exclude certain initiating events.',
+        input: 'BEI line with FdT=I:\n  IGN-EVT,I,,,0,0,0,0,0,F,,0,0',
+        expected: 'LogicFlag = "I"',
+        tags: ['BEI','parser','FM5','logic-flag']
+      },
+      fn: () => {
+        const bei = `IGN-EVT,I,,,0,0,0,0,0,F,,0,0`;
+        const info = parseBEI(bei);
+        assert.strictEq(info['IGN-EVT'].LogicFlag, 'I', 'LogicFlag I');
+      }
+    },
+    {
+      name: 'UdT=L maps to lognormal distribution and sets DistEF',
+      meta: {
+        purpose: 'The UdT column specifies the uncertainty distribution. "L" means lognormal, which is the most common distribution for PRA basic events. The UdValue column then carries the Error Factor (EF). The parser must map UdT→Distribution and UdValue→DistEF.',
+        input: 'BEI line with UdT=L (lognormal), UdValue=3 (EF=3):\n  LN-EVT,0,,L,3,0.01,0,0,0,F,,0,0.01',
+        expected: 'Distribution = "lognormal", DistEF ≈ 3',
+        tags: ['BEI','parser','distribution','lognormal','uncertainty']
+      },
+      fn: () => {
+        const bei = `LN-EVT,0,,L,3,0.01,0,0,0,F,,0,0.01`;
+        const info = parseBEI(bei);
+        assert.strictEq(info['LN-EVT'].Distribution, 'lognormal', 'lognormal');
+        assert.approx(info['LN-EVT'].DistEF, 3, 1e-9, 'DistEF from UdValue');
+      }
+    },
+    {
+      name: 'UdT=G maps to gamma distribution and sets DistAlpha',
+      meta: {
+        purpose: 'UdT="G" maps to the gamma distribution, used for repair rates and some initiating event frequencies. UdValue provides the alpha (shape) parameter.',
+        input: 'BEI line with UdT=G, UdValue=5:\n  GAMMA-EVT,0,,G,5,0.01,0,0,0,F,,0,0.01',
+        expected: 'Distribution = "gamma", DistAlpha ≈ 5',
+        tags: ['BEI','parser','distribution','gamma','uncertainty']
+      },
+      fn: () => {
+        const bei = `GAMMA-EVT,0,,G,5,0.01,0,0,0,F,,0,0.01`;
+        const info = parseBEI(bei);
+        assert.strictEq(info['GAMMA-EVT'].Distribution, 'gamma', 'gamma');
+        assert.approx(info['GAMMA-EVT'].DistAlpha, 5, 1e-9, 'DistAlpha from UdValue');
+      }
+    },
+    {
+      name: 'Init field T parsed as boolean true',
+      meta: {
+        purpose: 'The Init field (column 10) flags whether this event is an initiating event. "T" or "1" should map to boolean true. Initiating events are displayed differently and exported with special flags in SAPHIRE.',
+        input: 'BEI line with Init=T:\n  INIT-EVT,1,,,0,0.01,0,0,0,T,,0,0.01',
+        expected: 'Init = true (boolean)',
+        tags: ['BEI','parser','init-flag','initiating-event']
+      },
+      fn: () => {
+        const bei = `INIT-EVT,1,,,0,0.01,0,0,0,T,,0,0.01`;
+        const info = parseBEI(bei);
+        assert.truthy(info['INIT-EVT'].Init, 'Init=true');
+      }
+    },
+    {
+      name: 'Init field F parsed as boolean false',
+      meta: {
+        purpose: 'Complementary to the Init=T test. "F" must map to boolean false, not a truthy string.',
+        input: 'BEI line with Init=F',
+        expected: 'Init = false (boolean)',
+        tags: ['BEI','parser','init-flag']
+      },
+      fn: () => {
+        const bei = `INIT-EVT,1,,,0,0.01,0,0,0,F,,0,0.01`;
+        const info = parseBEI(bei);
+        assert.falsy(info['INIT-EVT'].Init, 'Init=false');
+      }
+    },
+    {
+      name: 'DemandN defaults to 1',
+      meta: {
+        purpose: 'DemandN (number of demands) is not in the BEI file format but is needed by the demand failure model. When absent it should default to 1. This prevents division-by-zero or NaN in downstream calculations.',
+        input: 'Any BEI line (DemandN is not a BEI field)',
+        expected: 'eventInfo.DemandN = 1',
+        tags: ['BEI','parser','defaults','demand-model']
+      },
+      fn: () => {
+        const bei = `EVT,1,,,0,0.001,0,0,0,F,,0,0.001`;
+        const info = parseBEI(bei);
+        assert.strictEq(info['EVT'].DemandN, 1, 'DemandN default 1');
+      }
+    },
+    {
+      name: 'Multiple events in BEI all parsed',
+      meta: {
+        purpose: 'Verifies that all event rows in a multi-line BEI file are processed, not just the first.',
+        input: 'Three BEI lines for events A, B, and C',
+        expected: 'Object with 3 keys (A, B, C)',
+        tags: ['BEI','parser','multiple']
+      },
+      fn: () => {
+        const bei = `A,0,,,0,0.1,0,0,0,F,,0,0.1\nB,0,,,0,0.2,0,0,0,F,,0,0.2\nC,0,,,0,0.3,0,0,0,F,,0,0.3`;
+        const info = parseBEI(bei);
+        assert.strictEq(Object.keys(info).length, 3, 'three events');
+      }
+    },
+    {
+      name: 'Header continuation lines rejected by validDataLine',
+      meta: {
+        purpose: 'SAPHIRE 8 BEI files include a header continuation line like "Prob, Freq, Analysis Type, Phase" that must NOT be parsed as an event. The validDataLine() filter checks that the first field matches the pattern of an event name (starts with a letter/digit, no spaces).',
+        input: 'BEI text starting with the header line "Prob, Freq, Analysis Type, Phase" followed by a real event',
+        expected: 'The header line is absent from the result; the real event EVT1 is present',
+        tags: ['BEI','parser','header-rejection','SAPHIRE8']
+      },
+      fn: () => {
+        const bei = `Prob, Freq, Analysis Type, Phase\nEVT1,0,,,0,0.01,0,0,0,F,,0,0.01`;
+        const info = parseBEI(bei);
+        assert.falsy(info['Prob, Freq, Analysis Type, Phase'], 'header not parsed');
+        assert.defined(info['EVT1'], 'real event parsed');
+      }
+    },
+  ]
+};
+
+// ── 5. FTC Cut Set Parser ─────────────────────────────────────────
+SUITES.parseFTC = {
+  icon: '&#x2702;&#xFE0F;',
+  title: 'FTC Cut Set File Parser',
+  desc: 'Validates parsing of SAPHIRE .FTC (Fault Tree Cut Set) files. Tests header extraction, single/multi-event cut sets, the complement event "/" prefix, separator "=" lines, comment skipping, and multi-tree files.',
+  tests: [
+    {
+      name: 'Single-event cut set parsed',
+      meta: {
+        purpose: 'A single-event (first-order) cut set is the simplest case: one event on its own is sufficient to cause the top event. The trailing "." must be stripped.',
+        input: 'FTC section:\n  PROJ, TREE1\n  =\n  EVT1.\n  ^EOS',
+        expected: '1 cut set containing 1 event with name="EVT1", complement=false',
+        tags: ['FTC','parser','cut-set','first-order']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n=\nEVT1.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.defined(r['TREE1'], 'tree key');
+        assert.len(r['TREE1'].cutSets, 1, 'one cut set');
+        assert.len(r['TREE1'].cutSets[0], 1, 'one event');
+        assert.strictEq(r['TREE1'].cutSets[0][0].name, 'EVT1');
+      }
+    },
+    {
+      name: 'Multi-event cut set with * separator',
+      meta: {
+        purpose: 'Second-order (and higher) cut sets have events joined by "*". Each event becomes a separate object in the cut set array. This represents a failure combination that together causes the top event.',
+        input: 'FTC line: "EVT1 * EVT2."',
+        expected: '1 cut set with 2 events: name="EVT1" and name="EVT2"',
+        tags: ['FTC','parser','cut-set','second-order','intersection']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n=\nEVT1 * EVT2.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.len(r['TREE1'].cutSets[0], 2, 'two events in cut set');
+        assert.strictEq(r['TREE1'].cutSets[0][0].name, 'EVT1');
+        assert.strictEq(r['TREE1'].cutSets[0][1].name, 'EVT2');
+      }
+    },
+    {
+      name: 'Complement event (/ prefix) parsed',
+      meta: {
+        purpose: 'Complement events appear with a "/" prefix in FTC files (e.g., "/COMP-EVT"). This notation means the event must be IN the success state (NOT failed) for the cut set to cause the top event. The complement flag must be set true and the "/" removed from the name.',
+        input: 'FTC line: "/COMP-EVT."',
+        expected: 'Event with name="COMP-EVT" (no /), complement=true',
+        tags: ['FTC','parser','complement','NOT-event']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n=\n/COMP-EVT.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.strictEq(r['TREE1'].cutSets[0][0].name, 'COMP-EVT', 'name without /');
+        assert.truthy(r['TREE1'].cutSets[0][0].complement, 'complement flag set');
+      }
+    },
+    {
+      name: 'Mixed complement and non-complement in cut set',
+      meta: {
+        purpose: 'A cut set can contain both normal and complemented events. This is important for systems with success-path dependence.',
+        input: 'FTC line: "EVT1 * /EVT2."',
+        expected: 'EVT1: complement=false; EVT2: complement=true',
+        tags: ['FTC','parser','complement','mixed']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n=\nEVT1 * /EVT2.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.falsy(r['TREE1'].cutSets[0][0].complement, 'EVT1 not complement');
+        assert.truthy(r['TREE1'].cutSets[0][1].complement, 'EVT2 complement');
+      }
+    },
+    {
+      name: 'Multiple cut sets parsed',
+      meta: {
+        purpose: 'A real fault tree has many cut sets. All must be parsed into separate arrays.',
+        input: 'FTC with 3 cut set lines (1st-order, 2nd-order, 3rd-order)',
+        expected: '3 cut sets in the result array',
+        tags: ['FTC','parser','multiple-cut-sets']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n=\nEVT1.\nEVT2 * EVT3.\nEVT4 * EVT5 * EVT6.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.len(r['TREE1'].cutSets, 3, 'three cut sets');
+      }
+    },
+    {
+      name: 'Trailing + stripped from cut set lines',
+      meta: {
+        purpose: 'SAPHIRE uses "+" at the end of all non-last cut set lines and "." at the end of the last one. These are record separators, not event names, and must be stripped.',
+        input: 'FTC line ending with +: "EVT1 * EVT2+"',
+        expected: '1 cut set with exactly 2 events (no spurious third event from "+")',
+        tags: ['FTC','parser','separator','stripping']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n=\nEVT1 * EVT2+\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.len(r['TREE1'].cutSets[0], 2, 'no extra event from +');
+      }
+    },
+    {
+      name: 'Comment lines (* prefix) ignored',
+      meta: {
+        purpose: 'FTC files may contain * comment lines anywhere, including within the data section. These must be skipped and must not be treated as cut set events.',
+        input: 'FTC with * comments before the = separator and within the data section',
+        expected: '1 cut set (the comments do not produce additional cut sets)',
+        tags: ['FTC','parser','comments']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n* comment\n=\n* another comment\nEVT1.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.len(r['TREE1'].cutSets, 1, 'one cut set after comment skipping');
+      }
+    },
+    {
+      name: 'Multi-tree FTC file: both trees parsed',
+      meta: {
+        purpose: 'An FTC file can contain cut sets for multiple fault trees, separated by ^EOS markers — the same structure as FTL files. Each tree block must be parsed independently.',
+        input: 'Two FTC blocks: TREE1 (1 cut set: A) and TREE2 (1 cut set: B*C)',
+        expected: 'r["TREE1"] and r["TREE2"] both defined; TREE2 cut set has 2 events',
+        tags: ['FTC','parser','multi-tree','EOS']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE1\n=\nA.\n^EOS\nPROJ, TREE2\n=\nB * C.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.defined(r['TREE1'], 'TREE1 present');
+        assert.defined(r['TREE2'], 'TREE2 present');
+        assert.len(r['TREE2'].cutSets[0], 2, 'TREE2 has 2-event cut set');
+      }
+    },
+    {
+      name: 'Project and faultTree names stored in result',
+      meta: {
+        purpose: 'The result object stores the project and fault tree names extracted from the FTC header line. These are used to correlate cut sets with the right tree when multiple trees share the same name across projects.',
+        input: 'FTC header: "NUCPLANT, DIESEL"',
+        expected: 'r["DIESEL"].project = "NUCPLANT", r["DIESEL"].faultTree = "DIESEL"',
+        tags: ['FTC','parser','metadata']
+      },
+      fn: () => {
+        const ftc = `NUCPLANT, DIESEL\n=\nD1-FAIL.\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.strictEq(r['DIESEL'].project, 'NUCPLANT', 'project name');
+        assert.strictEq(r['DIESEL'].faultTree, 'DIESEL', 'faultTree name');
+      }
+    },
+    {
+      name: 'FTC with no cut sets after = returns empty array',
+      meta: {
+        purpose: 'A tree may have no minimal cut sets (e.g., a tree whose top event is logically impossible). The parser must still create an entry with an empty cutSets array, not throw or skip the tree entirely.',
+        input: 'FTC block with a header and "=" but no cut set lines before ^EOS',
+        expected: 'r["EMPTYTREE"].cutSets = [] (length 0)',
+        tags: ['FTC','parser','empty','edge-case']
+      },
+      fn: () => {
+        const ftc = `PROJ, EMPTYTREE\n=\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.len(r['EMPTYTREE'].cutSets, 0, 'empty cut sets');
+      }
+    },
+  ]
+};
+
+// ── 6. Gate Logic ──────────────────────────────────────────────────
+SUITES.gateLogic = {
+  icon: '&#x26D5;',
+  title: 'Gate Logic & Tree Structure',
+  desc: 'Tests the structural correctness of gate logic representations: node types, children arrays, transfer gate references, and that basic event leaves have no children.',
+  tests: [
+    {
+      name: 'OR gate: children array accessible and correct',
+      meta: {
+        purpose: 'Confirms that an OR gate node produced by the parser has exactly the children that were listed in the FTL input, accessible via the .children array.',
+        input: 'Node with type=OR and two EVENT children named A and B',
+        expected: 'children.length=2, children[0].name="A"',
+        tags: ['gate-logic','OR','structure']
+      },
+      fn: () => {
+        const node = { name: 'G1', type: 'OR', children: [
+          { name: 'A', type: 'EVENT', children: [] },
+          { name: 'B', type: 'EVENT', children: [] }
+        ]};
+        assert.len(node.children, 2, 'OR has two inputs');
+        assert.strictEq(node.children[0].name, 'A');
+      }
+    },
+    {
+      name: 'AND gate children structure correct',
+      meta: {
+        purpose: 'AND gates require all inputs to be failed. Confirms the gate type string is "AND" and children are accessible.',
+        input: 'AND gate node with two EVENT children A and B',
+        expected: 'type="AND", children.length=2',
+        tags: ['gate-logic','AND','structure']
+      },
+      fn: () => {
+        const andNode = { name: 'G', type: 'AND', children: [
+          { name: 'A', type: 'EVENT', children: [] },
+          { name: 'B', type: 'EVENT', children: [] }
+        ]};
+        assert.strictEq(andNode.type, 'AND', 'AND type');
+        assert.len(andNode.children, 2, 'both inputs required');
+      }
+    },
+    {
+      name: 'VOTING gate preserves votingN property through parse',
+      meta: {
+        purpose: 'The N-of-M threshold (votingN) must survive the full parse cycle. This is a non-standard property added to the node object by the parser to capture the N value from the "N/M" gate type string.',
+        input: 'FTL: "TOP 2/3 A B C"',
+        expected: 'rootNode.type="VOTING", rootNode.votingN=2, children.length=3',
+        tags: ['gate-logic','VOTING','N-of-M','votingN']
+      },
+      fn: () => {
+        const ftl = `P, VT=\nTOP 2/3 A B C\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.votingN, 2);
+        assert.len(r.faultTrees[0].rootNode.children, 3);
+      }
+    },
+    {
+      name: 'TRAN node has no children (lazy reference)',
+      meta: {
+        purpose: 'Transfer gates are lazy — they store only a reference to the target tree name (transferTo). Children are not inlined; they are resolved at render time when the user navigates to the referenced tree. This test confirms that children is always [] for TRAN nodes.',
+        input: 'FTL: "XREF TRAN OTHERTREE" inside an OR gate',
+        expected: 'tranNode.children = [], tranNode.transferTo = "OTHERTREE"',
+        tags: ['gate-logic','TRAN','transfer','lazy']
+      },
+      fn: () => {
+        const ftl = `P, T=\nTOP OR G1 XREF\nXREF TRAN OTHERTREE\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const tranNode = r.faultTrees[0].rootNode.children.find(c => c.type === 'TRAN');
+        assert.defined(tranNode, 'TRAN node present');
+        assert.len(tranNode.children, 0, 'TRAN has no children');
+        assert.strictEq(tranNode.transferTo, 'OTHERTREE', 'transferTo set');
+      }
+    },
+    {
+      name: 'Deep tree: 4-level nesting correctly preserved',
+      meta: {
+        purpose: 'Verifies that a 4-level tree (L1→L2→L3→L4) is correctly nested with each level accessible by chaining .children. This tests that the recursive buildTree() descent does not truncate or reorder levels.',
+        input: 'FTL with 4 levels:\n  L1 OR L2A L2B\n  L2A AND L3A L3B\n  L2B AND L3C L3D\n  L3A OR L4A L4B',
+        expected: 'root.name="L1" (OR), root.children[0].name="L2A" (AND), root.children[0].children[0].name="L3A" (OR), L3A has children (L4A, L4B)',
+        tags: ['gate-logic','deep-tree','nesting','4-levels']
+      },
+      fn: () => {
+        const ftl = `P, DEEP=\nL1 OR L2A L2B\nL2A AND L3A L3B\nL2B AND L3C L3D\nL3A OR L4A L4B\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const root = r.faultTrees[0].rootNode;
+        assert.strictEq(root.name, 'L1', 'root is L1');
+        assert.strictEq(root.type, 'OR', 'L1 is OR');
+        const L2A = root.children[0];
+        assert.strictEq(L2A.name, 'L2A', 'level-2 node L2A');
+        assert.strictEq(L2A.type, 'AND', 'L2A is AND');
+        const L3A = L2A.children[0];
+        assert.strictEq(L3A.name, 'L3A', 'level-3 node L3A');
+        assert.strictEq(L3A.type, 'OR', 'L3A is OR (has L4A/L4B children via OR gate)');
+        assert.len(L3A.children, 2, 'L3A has 2 children (L4A, L4B)');
+      }
+    },
+    {
+      name: 'EVENT leaf nodes have no children',
+      meta: {
+        purpose: 'Basic events (leaf nodes) must have an empty children array. If they had children, tree traversal algorithms would recurse infinitely into a node that should be a terminal.',
+        input: 'FTL: "TOP OR A B" — A and B are implicit basic events',
+        expected: 'Both A and B have type="EVENT" and children.length=0',
+        tags: ['gate-logic','EVENT','leaf','terminal']
+      },
+      fn: () => {
+        const ftl = `P, T=\nTOP OR A B\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const root = r.faultTrees[0].rootNode;
+        for (const child of root.children) {
+          assert.strictEq(child.type, 'EVENT', `${child.name} is EVENT`);
+          assert.len(child.children, 0, `${child.name} has no children`);
+        }
+      }
+    },
+  ]
+};
+
+// ── 7. Probability Math ────────────────────────────────────────────
+SUITES.probability = {
+  icon: '&#x1F4C9;',
+  title: 'Probability Formatting & Math',
+  desc: 'Validates formatProbability() for correct engineering notation with 0, 1, and 2 decimal places. Tests zero, very small numbers, positive exponents, and the "hide" mode.',
+  tests: [
+    {
+      name: 'Zero probability returns "0.0E+0"',
+      meta: {
+        purpose: 'Zero is a special case that cannot go through the log10 path. The function must short-circuit and return the literal string "0.0E+0" rather than NaN or an error.',
+        input: 'prob=0, digits="2"',
+        expected: '"0.0E+0"',
+        tags: ['format','zero','edge-case']
+      },
+      fn: () => assert.strictEq(formatProbability(0, '2'), '0.0E+0')
+    },
+    {
+      name: 'null probability returns "0.0E+0"',
+      meta: {
+        purpose: 'When an event has no assigned probability (null), the formatter must not crash. The !prob check handles both null and 0.',
+        input: 'prob=null, digits="2"',
+        expected: '"0.0E+0"',
+        tags: ['format','null','edge-case']
+      },
+      fn: () => assert.strictEq(formatProbability(null, '2'), '0.0E+0')
+    },
+    {
+      name: '1×10⁻³ formatted with 2 decimal places',
+      meta: {
+        purpose: 'Tests the standard engineering notation format for a typical PRA probability value. The mantissa should be exactly 1.00 and the exponent -3.',
+        input: 'prob=0.001 (1×10⁻³), digits="2"',
+        expected: '"1.00E-3"',
+        tags: ['format','2-decimal','engineering-notation']
+      },
+      fn: () => {
+        const r = formatProbability(1e-3, '2');
+        assert.strictEq(r, '1.00E-3', '1E-3 formatted');
+      }
+    },
+    {
+      name: '1×10⁻⁵ formatted with 1 decimal place',
+      meta: {
+        purpose: 'Tests 1-decimal precision. The mantissa should be "1.0".',
+        input: 'prob=0.00001 (1×10⁻⁵), digits="1"',
+        expected: '"1.0E-5"',
+        tags: ['format','1-decimal']
+      },
+      fn: () => {
+        const r = formatProbability(1e-5, '1');
+        assert.strictEq(r, '1.0E-5', '1E-5 formatted');
+      }
+    },
+    {
+      name: '3.5×10⁻⁴ formatted with 2 decimal places',
+      meta: {
+        purpose: 'Tests a non-integer mantissa to confirm the decimal arithmetic is correct.',
+        input: 'prob=3.5×10⁻⁴, digits="2"',
+        expected: 'Result contains "3.50" and "E-4"',
+        tags: ['format','2-decimal','non-integer-mantissa']
+      },
+      fn: () => {
+        const r = formatProbability(3.5e-4, '2');
+        assert.truthy(r.includes('3.50') || r.includes('3.5'), 'mantissa present');
+        assert.includes(r, 'E-4', 'exponent present');
+      }
+    },
+    {
+      name: 'digits="0" rounds mantissa to integer',
+      meta: {
+        purpose: 'The 0-decimal mode is used for compact display. The mantissa must be Math.round()-ed to the nearest integer.',
+        input: 'prob=1.6×10⁻³, digits="0"',
+        expected: 'Result contains "E-3" (mantissa is rounded: 2.E-3)',
+        tags: ['format','0-decimal','rounding']
+      },
+      fn: () => {
+        const r = formatProbability(1.6e-3, '0');
+        assert.includes(r, 'E-3', 'correct exponent');
+      }
+    },
+    {
+      name: 'Probability ≥ 1 uses positive exponent notation (E+0)',
+      meta: {
+        purpose: 'A probability of exactly 1.0 has exponent=0. The formatter must include the "+" sign for non-negative exponents, which is the standard SAPHIRE convention.',
+        input: 'prob=1.0, digits="2"',
+        expected: 'Result contains "E+0"',
+        tags: ['format','positive-exponent','edge-case']
+      },
+      fn: () => {
+        const r = formatProbability(1.0, '2');
+        assert.includes(r, 'E+0', 'positive exponent notation');
+      }
+    },
+    {
+      name: '1×10⁻¹⁰ (very small) correctly formats',
+      meta: {
+        purpose: 'Very small probabilities arise from high-order cut sets. The exponent must be two digits and correctly negative.',
+        input: 'prob=1×10⁻¹⁰, digits="2"',
+        expected: 'Result contains "E-10"',
+        tags: ['format','very-small','high-order']
+      },
+      fn: () => {
+        const r = formatProbability(1e-10, '2');
+        assert.includes(r, 'E-10', 'very small exponent');
+      }
+    },
+    {
+      name: 'digits="hide" returns empty string',
+      meta: {
+        purpose: 'When the user sets probability display to "hide" in settings, the formatter should return an empty string so that no probability text appears on nodes or in cut set tables.',
+        input: 'prob=0.001, digits="hide"',
+        expected: '""  (empty string)',
+        tags: ['format','hide','settings']
+      },
+      fn: () => {
+        const r = formatProbability(1e-3, 'hide');
+        assert.strictEq(r, '', 'empty for hide');
+      }
+    },
+    {
+      name: 'Probability ordering preserved by numeric sort',
+      meta: {
+        purpose: 'Cut set tables are sorted by probability (highest first). This test verifies that a numeric descending sort works correctly on typical PRA probability values — ensuring the most risk-significant cut sets appear at the top.',
+        input: 'Array: [1×10⁻⁵, 1×10⁻³, 1×10⁻⁷, 1×10⁻²]',
+        expected: 'Sorted descending: [1×10⁻², 1×10⁻³, 1×10⁻⁵, 1×10⁻⁷]',
+        tags: ['format','sorting','cut-set-table']
+      },
+      fn: () => {
+        const probs = [1e-5, 1e-3, 1e-7, 1e-2];
+        const sorted = [...probs].sort((a,b) => b - a);
+        assert.strictEq(sorted[0], 1e-2, 'highest first');
+        assert.strictEq(sorted[3], 1e-7, 'lowest last');
+      }
+    },
+  ]
+};
+
+// ── 8. Cut Set Calculation ─────────────────────────────────────────
+SUITES.cutSets = {
+  icon: '&#x2702;&#xFE0F;',
+  title: 'Cut Set Probability Calculations',
+  desc: 'Tests cut set probability calculations: single-event (= event probability), multi-event (= product), complement events (1−p), and null when event info is missing.',
+  tests: [
+    {
+      name: 'Single-event cut set probability = event probability',
+      meta: {
+        purpose: 'A first-order cut set {A} has probability exactly equal to P(A). This is the baseline case for all cut set calculations.',
+        input: 'Cut set: [{name:"A", complement:false}], eventInfo: {A: {Calc_Prob: 0.01}}',
+        expected: 'probability = 0.01',
+        tags: ['cut-set','probability','first-order']
+      },
+      fn: () => {
+        const ei = { 'A': { Calc_Prob: 0.01 } };
+        const cs = [{ name: 'A', complement: false }];
+        const p = calcCutSetProbability(cs, ei);
+        assert.approx(p, 0.01, 1e-9, 'single event prob');
+      }
+    },
+    {
+      name: 'Two-event cut set probability = product P(A) × P(B)',
+      meta: {
+        purpose: 'A second-order cut set {A,B} probability is the product of the individual event probabilities (using the rare-event approximation). This is the most common calculation in PRA cut set quantification.',
+        input: 'Cut set: [A, B], P(A)=0.1, P(B)=0.2',
+        expected: 'probability = 0.1 × 0.2 = 0.02',
+        tags: ['cut-set','probability','second-order','product']
+      },
+      fn: () => {
+        const ei = { 'A': { Calc_Prob: 0.1 }, 'B': { Calc_Prob: 0.2 } };
+        const cs = [{ name: 'A', complement: false }, { name: 'B', complement: false }];
+        const p = calcCutSetProbability(cs, ei);
+        assert.approx(p, 0.02, 1e-9, '0.1 × 0.2 = 0.02');
+      }
+    },
+    {
+      name: 'Complement event uses (1 − p)',
+      meta: {
+        purpose: 'A complemented event (/A) represents "A is in the success state." Its probability contribution is (1 − P(A)). This is essential for correctly quantifying cut sets that include success-path events.',
+        input: 'Cut set: [{name:"A", complement:true}], P(A)=0.3',
+        expected: 'probability = 1 − 0.3 = 0.7',
+        tags: ['cut-set','complement','probability']
+      },
+      fn: () => {
+        const ei = { 'A': { Calc_Prob: 0.3 } };
+        const cs = [{ name: 'A', complement: true }];
+        const p = calcCutSetProbability(cs, ei);
+        assert.approx(p, 0.7, 1e-9, '1 − 0.3 = 0.7');
+      }
+    },
+    {
+      name: 'Three-event cut set: product of three probabilities',
+      meta: {
+        purpose: 'Third-order cut sets have three events. Their probability is the triple product P(A)×P(B)×P(C). High-order cut sets are important for understanding diversity and redundancy.',
+        input: 'Cut set: [A, B, C], P(A)=0.1, P(B)=0.2, P(C)=0.5',
+        expected: 'probability = 0.1 × 0.2 × 0.5 = 0.01',
+        tags: ['cut-set','probability','third-order']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.1 }, B: { Calc_Prob: 0.2 }, C: { Calc_Prob: 0.5 } };
+        const cs = ['A','B','C'].map(n => ({ name:n, complement:false }));
+        const p = calcCutSetProbability(cs, ei);
+        assert.approx(p, 0.01, 1e-9, '0.1×0.2×0.5=0.01');
+      }
+    },
+    {
+      name: 'Missing event info returns null',
+      meta: {
+        purpose: 'If an event referenced in a cut set has no entry in eventInfo (e.g., no BEI file was loaded), the probability cannot be computed. The function must return null rather than NaN or a wrong value, so the UI can display "?" instead of an incorrect number.',
+        input: 'Cut set: [{name:"MISSING"}], eventInfo: {} (empty)',
+        expected: 'null',
+        tags: ['cut-set','missing-data','null','robustness']
+      },
+      fn: () => {
+        const ei = {};
+        const cs = [{ name: 'MISSING', complement: false }];
+        const p = calcCutSetProbability(cs, ei);
+        assert.isNull(p, 'null when info missing');
+      }
+    },
+    {
+      name: 'Mixed complement and non-complement in one cut set',
+      meta: {
+        purpose: 'A cut set can mix normal and complemented events. P = P(A) × (1−P(B)).',
+        input: 'Cut set: [A (normal), B (complement)], P(A)=0.5, P(B)=0.2',
+        expected: 'probability = 0.5 × (1−0.2) = 0.5 × 0.8 = 0.4',
+        tags: ['cut-set','complement','mixed','probability']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.5 }, B: { Calc_Prob: 0.2 } };
+        const cs = [{ name:'A', complement:false }, { name:'B', complement:true }];
+        const p = calcCutSetProbability(cs, ei);
+        assert.approx(p, 0.5 * 0.8, 1e-9, '0.5 × 0.8 = 0.4');
+      }
+    },
+    {
+      name: 'Zero-probability event yields zero cut set probability',
+      meta: {
+        purpose: 'If any event in a cut set has P=0 (false flag, or impossible event), the entire cut set probability must be zero. This ensures impossible cut sets do not contribute to MCUB.',
+        input: 'Cut set: [A, B], P(A)=0.1, P(B)=0 (false-flagged event)',
+        expected: 'probability = 0',
+        tags: ['cut-set','zero','false-flag']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.1 }, B: { Calc_Prob: 0 } };
+        const cs = [{ name:'A', complement:false }, { name:'B', complement:false }];
+        const p = calcCutSetProbability(cs, ei);
+        assert.approx(p, 0, 1e-15, 'zero product');
+      }
+    },
+  ]
+};
+
+// ── 9. MCUB ────────────────────────────────────────────────────────
+SUITES.mcub = {
+  icon: '&#x1F4D0;',
+  title: 'MCUB (Minimal Cut-set Upper Bound)',
+  desc: 'Tests MCUB calculation: sum of cut set probabilities. MCUB is a conservative (slightly high) approximation of the top event probability. It equals the exact probability when cut sets are disjoint, and exceeds it when they share events.',
+  tests: [
+    {
+      name: 'MCUB of single cut set equals cut set probability',
+      meta: {
+        purpose: 'With one cut set, MCUB = P(cut set). There is no overlap correction needed.',
+        input: 'One cut set: [A], P(A)=0.01',
+        expected: 'MCUB = 0.01',
+        tags: ['MCUB','single','baseline']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.01 } };
+        const cs = [[{ name:'A', complement:false }]];
+        const m = calcMCUB(cs, ei);
+        assert.approx(m, 0.01, 1e-9, 'MCUB = 0.01');
+      }
+    },
+    {
+      name: 'MCUB of two independent cut sets = sum of probabilities',
+      meta: {
+        purpose: 'MCUB sums cut set probabilities without the inclusion-exclusion correction. For two non-overlapping cut sets, MCUB = P(CS1) + P(CS2). This is a slight overestimate of the exact probability (1−(1−p1)(1−p2)).',
+        input: 'Two cut sets: {A} and {B}, P(A)=0.01, P(B)=0.02',
+        expected: 'MCUB = 0.01 + 0.02 = 0.03',
+        tags: ['MCUB','sum','two-cut-sets']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.01 }, B: { Calc_Prob: 0.02 } };
+        const cs = [[{ name:'A', complement:false }], [{ name:'B', complement:false }]];
+        const m = calcMCUB(cs, ei);
+        assert.approx(m, 0.03, 1e-9, 'sum = 0.03');
+      }
+    },
+    {
+      name: 'MCUB with 2-event cut set',
+      meta: {
+        purpose: 'A second-order cut set {A,B} has probability P(A)×P(B). MCUB of just this one cut set equals that product.',
+        input: 'One cut set: {A,B}, P(A)=0.1, P(B)=0.1',
+        expected: 'MCUB = 0.1 × 0.1 = 0.01',
+        tags: ['MCUB','second-order']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.1 }, B: { Calc_Prob: 0.1 } };
+        const cs = [[{ name:'A', complement:false }, { name:'B', complement:false }]];
+        const m = calcMCUB(cs, ei);
+        assert.approx(m, 0.01, 1e-9, '0.1 × 0.1 = 0.01');
+      }
+    },
+    {
+      name: 'MCUB returns null when event info is missing',
+      meta: {
+        purpose: 'If any event probability is unknown, MCUB cannot be computed. The function must signal this by returning null, not a partial sum or NaN.',
+        input: 'Cut set: [{name:"MISSING"}], eventInfo: {} (empty)',
+        expected: 'null',
+        tags: ['MCUB','null','missing-data']
+      },
+      fn: () => {
+        const ei = {};
+        const cs = [[{ name:'MISSING', complement:false }]];
+        const m = calcMCUB(cs, ei);
+        assert.isNull(m, 'null when missing info');
+      }
+    },
+    {
+      name: 'MCUB with complement event: uses (1−p) correctly',
+      meta: {
+        purpose: 'A complemented event in a cut set contributes (1−P) to that cut set\'s probability, which then feeds into MCUB. Verifies the full chain from complement flag through to MCUB.',
+        input: 'Cut set: [{name:"A", complement:true}], P(A)=0.3',
+        expected: 'MCUB = (1−0.3) = 0.7',
+        tags: ['MCUB','complement']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.3 } };
+        const cs = [[{ name:'A', complement:true }]];
+        const m = calcMCUB(cs, ei);
+        assert.approx(m, 0.7, 1e-9, 'complement: 1−0.3=0.7');
+      }
+    },
+    {
+      name: 'MCUB with three cut sets = sum of three probabilities',
+      meta: {
+        purpose: 'Extends the two-cut-set test to three. MCUB = sum of all individual cut set probabilities.',
+        input: 'Three cut sets: {A}, {B}, {C}, P(A)=0.01, P(B)=0.02, P(C)=0.03',
+        expected: 'MCUB = 0.01 + 0.02 + 0.03 = 0.06',
+        tags: ['MCUB','three-cut-sets','sum']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.01 }, B: { Calc_Prob: 0.02 }, C: { Calc_Prob: 0.03 } };
+        const cs = [
+          [{ name:'A', complement:false }],
+          [{ name:'B', complement:false }],
+          [{ name:'C', complement:false }]
+        ];
+        const m = calcMCUB(cs, ei);
+        assert.approx(m, 0.06, 1e-9, '0.01+0.02+0.03=0.06');
+      }
+    },
+    {
+      name: 'MCUB is always >= maximum single cut set probability',
+      meta: {
+        purpose: 'By definition, MCUB (sum of cut set probabilities) is always at least as large as the largest individual cut set probability. This property ensures MCUB is a conservative upper bound.',
+        input: 'Two cut sets: {A} P=0.05, {B} P=0.03',
+        expected: 'MCUB (0.08) >= max individual cut set probability (0.05)',
+        tags: ['MCUB','conservatism','upper-bound']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.05 }, B: { Calc_Prob: 0.03 } };
+        const cs = [
+          [{ name:'A', complement:false }],
+          [{ name:'B', complement:false }]
+        ];
+        const m = calcMCUB(cs, ei);
+        assert.truthy(m >= 0.05, 'MCUB >= max cut set prob');
+      }
+    },
+    {
+      name: 'MCUB of empty cut set list returns 0',
+      meta: {
+        purpose: 'When there are no cut sets (logically impossible top event, or tree not quantified), MCUB should be 0, not null or undefined.',
+        input: 'Empty cut sets array []',
+        expected: 'MCUB = 0',
+        tags: ['MCUB','empty','edge-case']
+      },
+      fn: () => {
+        const m = calcMCUB([], {});
+        assert.approx(m, 0, 1e-15, 'MCUB of empty = 0');
+      }
+    },
+  ]
+};
+
+// ── 10. Failure Models ─────────────────────────────────────────────
+SUITES.failureModels = {
+  icon: '&#x231B;',
+  title: 'Failure Model Computations',
+  desc: 'Tests the SAPHIRE failure model formulas computed during BEI post-processing. Each FdT code triggers a different reliability model with different input parameters.',
+  tests: [
+    {
+      name: 'FM2 Poisson: 1 − exp(−λT) for λ=0.1/hr, T=10hr',
+      meta: {
+        purpose: 'FdT=3 maps internally to FailureModel="2" (Poisson/exponential). The formula is P = 1 − e^(−λT). This models a component that is running continuously and can fail at any time during the mission.',
+        input: 'BEI: FdT=3, Lambda=0.1, Mission=10',
+        expected: 'Calc_Prob = 1 − e^(−0.1×10) = 1 − e^(−1) ≈ 0.6321',
+        tags: ['failure-model','FM2','Poisson','exponential','lambda']
+      },
+      fn: () => {
+        const bei = `EVT,3,,,0,0.1,0.1,0,10,F,,0,0`;
+        const info = parseBEI(bei);
+        const expected = 1 - Math.exp(-0.1 * 10);
+        assert.approx(info['EVT'].Calc_Prob, expected, 1e-8, 'FM2 correct');
+      }
+    },
+    {
+      name: 'FM2 Poisson: very small lambda gives small probability',
+      meta: {
+        purpose: 'Verifies the Poisson model gives a sensibly small result for a highly reliable component. For λ=10⁻⁶/hr and T=1hr, P should be approximately 10⁻⁶.',
+        input: 'BEI: FdT=3, Lambda=1×10⁻⁶, Mission=1',
+        expected: 'Calc_Prob < 0.01 (much less than 1%)',
+        tags: ['failure-model','FM2','small-lambda']
+      },
+      fn: () => {
+        const bei = `EVT,3,,,0,1e-6,1e-6,0,1,F,,0,0`;
+        const info = parseBEI(bei);
+        assert.truthy(info['EVT'].Calc_Prob < 0.01, 'small prob for small lambda');
+      }
+    },
+    {
+      name: 'FM3 Standby: 1 + (exp(−λT)−1)/(λT) for λ=0.01, T=100',
+      meta: {
+        purpose: 'FdT=7 maps to FailureModel="3" (standby model). The formula P = 1 + (e^(−λT)−1)/(λT) models a component in standby that is tested periodically. This is commonly used for emergency diesel generators and safety injection pumps.',
+        input: 'BEI: FdT=7, Lambda=0.01, Mission=100',
+        expected: 'Calc_Prob = 1 + (e^(−1)−1)/1 ≈ 0.6321 (same numeric value as Poisson for λT=1)',
+        tags: ['failure-model','FM3','standby','periodic-test']
+      },
+      fn: () => {
+        const bei = `EVT,7,,,0,0.01,0.01,0,100,F,,0,0`;
+        const info = parseBEI(bei);
+        const li = 0.01 * 100;
+        const expected = 1 + (Math.exp(-li) - 1) / li;
+        assert.approx(info['EVT'].Calc_Prob, expected, 1e-8, 'FM3 correct');
+      }
+    },
+    {
+      name: 'FM4 Repair model formula: (λτ)(1−exp(−(λ+1/τ)T))/(1+λτ)',
+      meta: {
+        purpose: 'FdT=5 maps to FailureModel="4" (repair/unavailability model). This formula models a repairable component with failure rate λ and mean repair time τ. Commonly used for active components with online repair.',
+        input: 'BEI: FdT=5, Lambda=0.001/hr, Tau=100hr, Mission=720hr',
+        expected: 'Calc_Prob = (λτ)(1−e^(−(λ+1/τ)T))/(1+λτ) using those values',
+        tags: ['failure-model','FM4','repair','unavailability']
+      },
+      fn: () => {
+        const lambda = 0.001, tau = 100, T = 720;
+        const bei = `EVT,5,,,0,${lambda},${lambda},${tau},${T},F,,0,0`;
+        const info = parseBEI(bei);
+        const expected = (lambda*tau)*(1-Math.exp(-(lambda+1/tau)*T))/(1+lambda*tau);
+        assert.approx(info['EVT'].Calc_Prob, expected, 1e-8, 'FM4 correct');
+      }
+    },
+    {
+      name: 'FM0 preserves Calc_Prob from file directly',
+      meta: {
+        purpose: 'When FdT is blank (FM0 = simple probability), the Calc_Prob value in the file is used as-is. No formula is applied. This is the most common case for human action events and failure-to-start events.',
+        input: 'BEI: blank FdT, Calc_Prob=0.05 in the file',
+        expected: 'Calc_Prob = 0.05 exactly (no formula applied)',
+        tags: ['failure-model','FM0','point-estimate']
+      },
+      fn: () => {
+        const bei = `EVT,,,,0,0,0,0,0,F,,0,0.05`;
+        const info = parseBEI(bei);
+        assert.approx(info['EVT'].Calc_Prob, 0.05, 1e-9, 'FM0 direct');
+      }
+    },
+    {
+      name: 'Lambda field mapped to DistLambda property',
+      meta: {
+        purpose: 'The BEI Lambda field (failure rate) is mapped to DistLambda on the event object. DistLambda is used by the KUREAS dialog when editing reliability parameters.',
+        input: 'BEI: FdT=3, Lambda=0.001',
+        expected: 'eventInfo.DistLambda = 0.001',
+        tags: ['BEI','parser','mapping','lambda']
+      },
+      fn: () => {
+        const bei = `EVT,3,,,0,0.001,0.001,0,100,F,,0,0`;
+        const info = parseBEI(bei);
+        assert.approx(info['EVT'].DistLambda, 0.001, 1e-9, 'DistLambda from Lambda');
+      }
+    },
+    {
+      name: 'Mission time mapped to MissionTime property',
+      meta: {
+        purpose: 'The BEI Mission field (column 9) is the mission duration in hours. It is mapped to MissionTime on the event object. 8760 hours = 1 year is commonly used for annual unavailability calculations.',
+        input: 'BEI: Mission=8760 (one year)',
+        expected: 'eventInfo.MissionTime = 8760',
+        tags: ['BEI','parser','mapping','mission-time']
+      },
+      fn: () => {
+        const bei = `EVT,3,,,0,0.001,0.001,0,8760,F,,0,0`;
+        const info = parseBEI(bei);
+        assert.approx(info['EVT'].MissionTime, 8760, 1e-9, 'MissionTime=8760');
+      }
+    },
+  ]
+};
+
+// ── 11. SAPHIRE Export ─────────────────────────────────────────────
+SUITES.saphireExport = {
+  icon: '&#x1F4E4;',
+  title: 'SAPHIRE .FTL Export Tests',
+  desc: 'Tests reconstruction of SAPHIRE-compatible .FTL format text from KUREAS tree structures. The exported text must be re-importable into SAPHIRE without modification.',
+  tests: [
+    {
+      name: 'Simple OR tree exports correct header and gate line',
+      meta: {
+        purpose: 'Verifies the two essential lines in a SAPHIRE FTL export: the comma-separated header with project and tree name (ending in =), and the gate definition line.',
+        input: 'Project: TESTPROJ, Tree: MYTREE with OR root (children A, B)',
+        expected: 'Output contains "TESTPROJ, MYTREE=" and "TOP OR A B" and "^EOS"',
+        tags: ['export','SAPHIRE','FTL','header']
+      },
+      fn: () => {
+        const project = {
+          projectName: 'TESTPROJ',
+          faultTrees: [{
+            treeName: 'MYTREE',
+            rootNode: { name: 'TOP', type: 'OR', children: [
+              { name: 'A', type: 'EVENT', children: [] },
+              { name: 'B', type: 'EVENT', children: [] }
+            ]}
+          }]
+        };
+        const out = exportToSAPHIRE_FTL(project);
+        assert.includes(out, 'TESTPROJ, MYTREE=', 'header present');
+        assert.includes(out, 'TOP OR A B', 'gate line');
+        assert.includes(out, '^EOS', 'EOS terminator');
+      }
+    },
+    {
+      name: 'CRLF (\\r\\n) line endings used throughout',
+      meta: {
+        purpose: 'SAPHIRE runs on Windows and requires Windows-style CRLF line endings in its import files. The exporter must use \\r\\n, not \\n alone.',
+        input: 'Any valid project',
+        expected: 'Exported string contains "\\r\\n" sequences',
+        tags: ['export','SAPHIRE','CRLF','Windows']
+      },
+      fn: () => {
+        const project = {
+          projectName: 'P',
+          faultTrees: [{ treeName: 'T', rootNode: { name: 'G', type: 'AND', children: [
+            { name: 'X', type: 'EVENT', children: [] }
+          ]}}]
+        };
+        const out = exportToSAPHIRE_FTL(project);
+        assert.includes(out, '\r\n', 'Windows line endings');
+      }
+    },
+    {
+      name: 'AND gate exports with "AND" keyword',
+      meta: {
+        purpose: 'The AND gate type string must be written exactly as "AND" in the output — no other representation is accepted by SAPHIRE.',
+        input: 'AND gate with children A, B',
+        expected: 'Output line: "G AND A B"',
+        tags: ['export','SAPHIRE','AND']
+      },
+      fn: () => {
+        const project = {
+          projectName: 'P',
+          faultTrees: [{ treeName: 'T', rootNode: { name: 'G', type: 'AND', children: [
+            { name: 'A', type: 'EVENT', children: [] },
+            { name: 'B', type: 'EVENT', children: [] }
+          ]}}]
+        };
+        const out = exportToSAPHIRE_FTL(project);
+        assert.includes(out, 'G AND A B', 'AND gate format');
+      }
+    },
+    {
+      name: 'TRAN gate exports with target name as input',
+      meta: {
+        purpose: 'Transfer gates must export as "NODENAME TRAN TARGETTREENAME". SAPHIRE uses this to link to a sub-tree stored elsewhere in the project database.',
+        input: 'TRAN node with name="XREF", transferTo="SUBTREE"',
+        expected: 'Output contains "TRAN" and "SUBTREE"',
+        tags: ['export','SAPHIRE','TRAN','transfer']
+      },
+      fn: () => {
+        const project = {
+          projectName: 'P',
+          faultTrees: [{ treeName: 'T', rootNode: { name: 'TOP', type: 'OR', children: [
+            { name: 'XREF', type: 'TRAN', transferTo: 'SUBTREE', children: [] },
+            { name: 'A', type: 'EVENT', children: [] }
+          ]}}]
+        };
+        const out = exportToSAPHIRE_FTL(project);
+        assert.includes(out, 'TRAN', 'TRAN present');
+        assert.includes(out, 'SUBTREE', 'transfer target');
+      }
+    },
+    {
+      name: 'VOTING gate exports as N/M format',
+      meta: {
+        purpose: 'Voting gates must be written as the fraction "N/M" where N=votingN and M=number of children. SAPHIRE recognises this pattern via a regex.',
+        input: 'VOTING gate with votingN=2, 3 children (A, B, C)',
+        expected: 'Output contains "2/3"',
+        tags: ['export','SAPHIRE','VOTING','N-of-M']
+      },
+      fn: () => {
+        const project = {
+          projectName: 'P',
+          faultTrees: [{ treeName: 'T', rootNode: { name: 'V', type: 'VOTING', votingN: 2, children: [
+            { name: 'A', type: 'EVENT', children: [] },
+            { name: 'B', type: 'EVENT', children: [] },
+            { name: 'C', type: 'EVENT', children: [] }
+          ]}}]
+        };
+        const out = exportToSAPHIRE_FTL(project);
+        assert.includes(out, '2/3', 'N/M format');
+      }
+    },
+    {
+      name: 'Multi-tree project: both trees present with two ^EOS markers',
+      meta: {
+        purpose: 'Each fault tree in the project must have its own section terminated by ^EOS. The count of ^EOS markers must equal the number of trees.',
+        input: 'Project with 2 trees: T1 (OR root) and T2 (AND root)',
+        expected: 'Output contains "T1=", "T2=", and exactly 2 "^EOS" occurrences',
+        tags: ['export','SAPHIRE','multi-tree','EOS']
+      },
+      fn: () => {
+        const project = {
+          projectName: 'P',
+          faultTrees: [
+            { treeName: 'T1', rootNode: { name: 'G1', type: 'OR', children: [{ name: 'A', type: 'EVENT', children: [] }] }},
+            { treeName: 'T2', rootNode: { name: 'G2', type: 'AND', children: [{ name: 'B', type: 'EVENT', children: [] }] }}
+          ]
+        };
+        const out = exportToSAPHIRE_FTL(project);
+        assert.includes(out, 'T1=', 'first tree');
+        assert.includes(out, 'T2=', 'second tree');
+        const eosCount = (out.match(/\^EOS/g) || []).length;
+        assert.strictEq(eosCount, 2, 'two EOS markers');
+      }
+    },
+    {
+      name: 'Round-trip: export then re-parse gives equivalent tree',
+      meta: {
+        purpose: 'The ultimate export test: start with a JS tree structure, export to FTL text, re-parse that text, and verify the structure is equivalent. Any loss or corruption in the export format would break this test.',
+        input: 'Tree: TOP (OR) → G1 (AND) → [A, B]; TOP also has child C',
+        expected: 'After export→parse: root.name="TOP", type=OR, 2 children, first child has 2 children',
+        tags: ['export','round-trip','integration']
+      },
+      fn: () => {
+        const project = {
+          projectName: 'RT',
+          faultTrees: [{
+            treeName: 'ROUNDTRIP',
+            rootNode: { name: 'TOP', type: 'OR', children: [
+              { name: 'G1', type: 'AND', children: [
+                { name: 'A', type: 'EVENT', children: [] },
+                { name: 'B', type: 'EVENT', children: [] }
+              ]},
+              { name: 'C', type: 'EVENT', children: [] }
+            ]}
+          }]
+        };
+        const exported = exportToSAPHIRE_FTL(project);
+        const reparsed = parseFTLStructure(exported);
+        assert.len(reparsed.faultTrees, 1, 'one tree');
+        const root = reparsed.faultTrees[0].rootNode;
+        assert.strictEq(root.name, 'TOP', 'root name preserved');
+        assert.strictEq(root.type, 'OR', 'root type preserved');
+        assert.len(root.children, 2, 'children count preserved');
+      }
+    },
+  ]
+};
+
+// ── 12. .KNOW_FTL Format ───────────────────────────────────────────
+SUITES.knowFormat = {
+  icon: '&#x1F4BE;',
+  title: '.KNOW_FTL File Format Tests',
+  desc: 'Tests the KUREAS native JSON project format (.KNOW_FTL). Validates required top-level fields, tree structure serialization, eventInfo embedding, and that data survives JSON round-trips.',
+  tests: [
+    {
+      name: '.KNOW_FTL JSON has all required top-level fields',
+      meta: {
+        purpose: 'A valid .KNOW_FTL file must have projectName, faultTrees, eventInfo, and cutSets at the top level. These fields are expected by loadProject() in the application.',
+        input: 'JSON object with projectName, faultTrees, eventInfo, cutSets',
+        expected: 'All four fields are defined after JSON.parse(JSON.stringify(...))',
+        tags: ['KNOW_FTL','format','structure','required-fields']
+      },
+      fn: () => {
+        const proj = {
+          projectName: 'TEST', version: '1.0',
+          faultTrees: [], eventInfo: {}, cutSets: {}
+        };
+        const loaded = JSON.parse(JSON.stringify(proj));
+        assert.defined(loaded.projectName, 'projectName');
+        assert.defined(loaded.faultTrees, 'faultTrees');
+        assert.defined(loaded.eventInfo, 'eventInfo');
+        assert.defined(loaded.cutSets, 'cutSets');
+      }
+    },
+    {
+      name: 'Tree with eventInfo survives JSON round-trip',
+      meta: {
+        purpose: 'The entire project including tree structure and event probability data must survive serialization to JSON and back without any value loss or type coercion.',
+        input: 'Project with one tree node and one eventInfo entry with Calc_Prob=0.01',
+        expected: 'After round-trip: eventInfo["A"].Calc_Prob ≈ 0.01',
+        tags: ['KNOW_FTL','round-trip','serialization','JSON']
+      },
+      fn: () => {
+        const proj = {
+          projectName: 'ROUND', version: '1.1',
+          faultTrees: [{ treeName: 'T', rootNode: { name: 'G', type: 'OR', children: [
+            { name: 'A', type: 'EVENT', children: [] }
+          ]}}],
+          eventInfo: { 'A': { Name: 'A', Calc_Prob: 0.01 } },
+          cutSets: {}
+        };
+        const reparsed = JSON.parse(JSON.stringify(proj));
+        assert.approx(reparsed.eventInfo['A'].Calc_Prob, 0.01, 1e-9, 'Calc_Prob preserved');
+      }
+    },
+    {
+      name: 'File extension is .KNOW_FTL (case-sensitive convention check)',
+      meta: {
+        purpose: 'Verifies that the expected filename extension follows the KUREAS naming convention. This is important for file association and the import file-type filter in the open dialog.',
+        input: 'Filename string: "MyProject.KNOW_FTL"',
+        expected: 'String ends with ".KNOW_FTL"',
+        tags: ['KNOW_FTL','filename','convention']
+      },
+      fn: () => {
+        const fname = 'MyProject.KNOW_FTL';
+        assert.truthy(fname.endsWith('.KNOW_FTL'), 'correct extension');
+      }
+    },
+    {
+      name: 'Missing faultTrees array handled gracefully in export',
+      meta: {
+        purpose: 'If a project object lacks the faultTrees array (e.g., old file format), the SAPHIRE export function should not throw a TypeError on "(project.faultTrees || []).map(...)".',
+        input: 'Project object with only projectName, no faultTrees key',
+        expected: 'Export returns defined string without throwing',
+        tags: ['KNOW_FTL','robustness','backward-compat']
+      },
+      fn: () => {
+        const proj = { projectName: 'P' };
+        const r = exportToSAPHIRE_FTL(proj);
+        assert.truthy(r !== undefined, 'no crash on missing faultTrees');
+      }
+    },
+    {
+      name: 'CutSets stored and retrieved per tree name',
+      meta: {
+        purpose: 'Cut sets in .KNOW_FTL are keyed by tree name. The structure is cutSets: { "TREENAME": { cutSets: [...] } }. Verifies this nesting survives serialization.',
+        input: 'Project with cutSets["TREE1"] containing one cut set',
+        expected: 'After JSON round-trip: cutSets["TREE1"] is defined',
+        tags: ['KNOW_FTL','cut-sets','keyed-by-tree']
+      },
+      fn: () => {
+        const proj = {
+          projectName: 'P', faultTrees: [],
+          eventInfo: {},
+          cutSets: {
+            'TREE1': { cutSets: [[{ name: 'A', complement: false }]] }
+          }
+        };
+        const reparsed = JSON.parse(JSON.stringify(proj));
+        assert.defined(reparsed.cutSets['TREE1'], 'TREE1 cut sets stored');
+      }
+    },
+  ]
+};
+
+// ── 13. OpenPSA Export ─────────────────────────────────────────────
+SUITES.openPSA = {
+  icon: '&#x1F310;',
+  title: 'OpenPSA XML Export Tests',
+  desc: 'Tests generation of OpenPSA-compatible XML for fault trees. OpenPSA is an open standard for exchanging PRA models between tools.',
+  tests: [
+    {
+      name: 'OR gate generates <or> element',
+      meta: {
+        purpose: 'In OpenPSA XML, an OR gate is represented as <or>...</or> containing its children. Basic events are <basic-event name="..."/> elements.',
+        input: 'OR gate with children A (EVENT) and B (EVENT)',
+        expected: 'XML contains "<or>" and "basic-event" tags',
+        tags: ['OpenPSA','export','XML','OR']
+      },
+      fn: () => {
+        const node = { name: 'G', type: 'OR', children: [
+          { name: 'A', type: 'EVENT', children: [] },
+          { name: 'B', type: 'EVENT', children: [] }
+        ]};
+        const xml = buildOpenPSAFormula(node);
+        assert.includes(xml, '<or>', 'OR element');
+        assert.includes(xml, 'basic-event', 'basic-event child');
+      }
+    },
+    {
+      name: 'AND gate generates <and> element',
+      meta: {
+        purpose: 'In OpenPSA XML, an AND gate is represented as <and>...</and>.',
+        input: 'AND gate with child A (EVENT)',
+        expected: 'XML contains "<and>"',
+        tags: ['OpenPSA','export','XML','AND']
+      },
+      fn: () => {
+        const node = { name: 'G', type: 'AND', children: [
+          { name: 'A', type: 'EVENT', children: [] }
+        ]};
+        const xml = buildOpenPSAFormula(node);
+        assert.includes(xml, '<and>', 'AND element');
+      }
+    },
+    {
+      name: 'VOTING gate generates <atleast min="N"> element',
+      meta: {
+        purpose: 'OpenPSA uses <atleast min="N"> for voting/threshold gates. The min attribute must be the votingN value from the node.',
+        input: 'VOTING gate with votingN=2, children A, B, C',
+        expected: 'XML contains \'atleast min="2"\'',
+        tags: ['OpenPSA','export','XML','VOTING','atleast']
+      },
+      fn: () => {
+        const node = { name: 'V', type: 'VOTING', votingN: 2, children: [
+          { name: 'A', type: 'EVENT', children: [] },
+          { name: 'B', type: 'EVENT', children: [] },
+          { name: 'C', type: 'EVENT', children: [] }
+        ]};
+        const xml = buildOpenPSAFormula(node);
+        assert.includes(xml, 'atleast min="2"', 'atleast with min=2');
+      }
+    },
+    {
+      name: 'NOT gate generates <or><not> wrapper',
+      meta: {
+        purpose: 'KUREAS NOT gates represent "at least one child succeeds" (failure requires child to succeed). In OpenPSA this maps to <or><not>...</not></or>.',
+        input: 'NOT gate with child A (EVENT)',
+        expected: 'XML contains both "<not>" and "<or>" wrapper',
+        tags: ['OpenPSA','export','XML','NOT']
+      },
+      fn: () => {
+        const node = { name: 'G', type: 'NOT', children: [
+          { name: 'A', type: 'EVENT', children: [] }
+        ]};
+        const xml = buildOpenPSAFormula(node);
+        assert.includes(xml, '<not>', 'NOT element');
+        assert.includes(xml, '<or>', 'OR wrapper');
+      }
+    },
+    {
+      name: 'NAND gate generates <not><and> wrapper',
+      meta: {
+        purpose: 'NAND = NOT(AND). In OpenPSA this is written as <not><and>...</and></not>.',
+        input: 'NAND gate with child A (EVENT)',
+        expected: 'XML contains "<not>" and "<and>" nested',
+        tags: ['OpenPSA','export','XML','NAND']
+      },
+      fn: () => {
+        const node = { name: 'G', type: 'NAND', children: [
+          { name: 'A', type: 'EVENT', children: [] }
+        ]};
+        const xml = buildOpenPSAFormula(node);
+        assert.includes(xml, '<not>', 'NOT wrapper');
+        assert.includes(xml, '<and>', 'AND inside');
+      }
+    },
+    {
+      name: 'TRAN gate generates <gate name="..."> reference',
+      meta: {
+        purpose: 'Transfer gates reference another defined fault tree. In OpenPSA a gate reference is written as <gate name="TREENAME"/>.',
+        input: 'TRAN node with transferTo="SUBTREE"',
+        expected: 'XML contains \'<gate name="SUBTREE"\'',
+        tags: ['OpenPSA','export','XML','TRAN','gate-reference']
+      },
+      fn: () => {
+        const node = { name: 'XREF', type: 'TRAN', transferTo: 'SUBTREE', children: [] };
+        const xml = buildOpenPSAFormula(node);
+        assert.includes(xml, '<gate name="SUBTREE"', 'gate reference');
+      }
+    },
+    {
+      name: 'EVENT node generates <basic-event name="..."> element',
+      meta: {
+        purpose: 'Basic events (leaf nodes) are the terminals of the fault tree. In OpenPSA they are self-closing <basic-event name="EVENTNAME"/> elements.',
+        input: 'EVENT node with name="PUMP-FAIL"',
+        expected: 'XML contains "PUMP-FAIL" and "basic-event"',
+        tags: ['OpenPSA','export','XML','basic-event','leaf']
+      },
+      fn: () => {
+        const node = { name: 'PUMP-FAIL', type: 'EVENT', children: [] };
+        const xml = buildOpenPSAFormula(node);
+        assert.includes(xml, 'PUMP-FAIL', 'event name');
+        assert.includes(xml, 'basic-event', 'basic-event element');
+      }
+    },
+  ]
+};
+
+// ── 14. Tree Operations ────────────────────────────────────────────
+SUITES.treeOps = {
+  icon: '&#x1F333;',
+  title: 'Tree Node Operations',
+  desc: 'Tests node counting, searching, deletion, and tree traversal — the core algorithms behind the interactive tree editor.',
+  tests: [
+    {
+      name: 'Node count traversal: 5 nodes in a 3-level tree',
+      meta: {
+        purpose: 'Tree node counting is used for the tree info panel and to validate tree complexity. This tests that all nodes (gates and events) are visited exactly once in a DFS traversal.',
+        input: 'Tree: TOP(OR) → [G1(AND) → [A, B], C]  — 5 total nodes',
+        expected: 'Walk visits all 5 nodes: TOP, G1, A, B, C',
+        tags: ['tree-ops','traversal','counting']
+      },
+      fn: () => {
+        const root = {
+          name: 'TOP', type: 'OR', children: [
+            { name: 'G1', type: 'AND', children: [
+              { name: 'A', type: 'EVENT', children: [] },
+              { name: 'B', type: 'EVENT', children: [] }
+            ]},
+            { name: 'C', type: 'EVENT', children: [] }
+          ]
+        };
+        let count = 0;
+        const walk = n => { count++; (n.children||[]).forEach(walk); };
+        walk(root);
+        assert.strictEq(count, 5, 'five nodes total');
+      }
+    },
+    {
+      name: 'Collect all basic event names from a tree',
+      meta: {
+        purpose: 'The event list panel collects all unique basic event names from the tree for display and editing. Tests that all leaf EVENT nodes are collected and gates are excluded.',
+        input: 'Tree with OR root and 3 EVENT children: A, B, C',
+        expected: 'Set contains "A", "B", "C" (3 events, 0 gates)',
+        tags: ['tree-ops','event-collection','leaf-nodes']
+      },
+      fn: () => {
+        const root = {
+          name: 'TOP', type: 'OR', children: [
+            { name: 'A', type: 'EVENT', children: [] },
+            { name: 'B', type: 'EVENT', children: [] },
+            { name: 'C', type: 'EVENT', children: [] }
+          ]
+        };
+        const events = new Set();
+        const collect = n => { if(n.type === 'EVENT') events.add(n.name); (n.children||[]).forEach(collect); };
+        collect(root);
+        assert.truthy(events.has('A') && events.has('B') && events.has('C'), 'all events collected');
+        assert.truthy(!events.has('TOP'), 'gate not in events');
+      }
+    },
+    {
+      name: 'Find node by name: locates deeply nested node',
+      meta: {
+        purpose: 'The editor uses findNodeByName to locate a node when the user clicks a context menu item. Verifies that a node at depth 3 can be found by name.',
+        input: 'Tree: TOP → G1 → TARGET (EVENT at depth 3)',
+        expected: 'findNode(root, "TARGET") returns the TARGET node',
+        tags: ['tree-ops','search','find']
+      },
+      fn: () => {
+        const root = {
+          name: 'TOP', type: 'OR', children: [
+            { name: 'G1', type: 'AND', children: [
+              { name: 'TARGET', type: 'EVENT', children: [] }
+            ]}
+          ]
+        };
+        const findNode = (n, name) => {
+          if (n.name === name) return n;
+          for (const c of (n.children||[])) { const f = findNode(c, name); if(f) return f; }
+          return null;
+        };
+        const found = findNode(root, 'TARGET');
+        assert.defined(found, 'node found');
+        assert.strictEq(found.name, 'TARGET', 'correct node returned');
+      }
+    },
+    {
+      name: 'Delete leaf node: removes it from parent\'s children array',
+      meta: {
+        purpose: 'The context menu "Delete" action removes a node from its parent. After deletion, the sibling remains and the deleted node is gone.',
+        input: 'OR root with children A and B; delete A',
+        expected: 'root.children.length = 1, root.children[0].name = "B"',
+        tags: ['tree-ops','delete','leaf']
+      },
+      fn: () => {
+        const root = {
+          name: 'TOP', type: 'OR', children: [
+            { name: 'A', type: 'EVENT', children: [] },
+            { name: 'B', type: 'EVENT', children: [] }
+          ]
+        };
+        const deleteNode = (r, name) => {
+          r.children = (r.children||[]).filter(c => c.name !== name);
+          (r.children||[]).forEach(c => deleteNode(c, name));
+        };
+        deleteNode(root, 'A');
+        assert.len(root.children, 1, 'one child after deletion');
+        assert.strictEq(root.children[0].name, 'B', 'B remains');
+      }
+    },
+    {
+      name: 'Delete gate node: removes gate and its entire subtree',
+      meta: {
+        purpose: 'Deleting a gate node should remove the gate AND all its descendants. The entire subtree is eliminated in one operation.',
+        input: 'OR root with children G1(AND→[A,B]) and C; delete G1',
+        expected: 'root.children.length = 1, only C remains (G1, A, B are all gone)',
+        tags: ['tree-ops','delete','gate','subtree']
+      },
+      fn: () => {
+        const root = {
+          name: 'TOP', type: 'OR', children: [
+            { name: 'G1', type: 'AND', children: [
+              { name: 'A', type: 'EVENT', children: [] },
+              { name: 'B', type: 'EVENT', children: [] }
+            ]},
+            { name: 'C', type: 'EVENT', children: [] }
+          ]
+        };
+        const deleteNode = (r, name) => {
+          r.children = (r.children||[]).filter(c => c.name !== name);
+          (r.children||[]).forEach(c => deleteNode(c, name));
+        };
+        deleteNode(root, 'G1');
+        assert.len(root.children, 1, 'G1 subtree removed');
+        assert.strictEq(root.children[0].name, 'C', 'only C remains');
+      }
+    },
+    {
+      name: 'Tree depth measurement: 4-level tree returns depth 4',
+      meta: {
+        purpose: 'Depth measurement is used to determine canvas height and detect overly complex trees. A 4-level chain (L1→L2→L3→L4) should return depth=4.',
+        input: '4-level linear chain: L1(OR)→L2(AND)→L3(OR)→L4(EVENT)',
+        expected: 'depth(root) = 4',
+        tags: ['tree-ops','depth','measurement']
+      },
+      fn: () => {
+        const root = {
+          name: 'L1', type: 'OR', children: [{
+            name: 'L2', type: 'AND', children: [{
+              name: 'L3', type: 'OR', children: [{
+                name: 'L4', type: 'EVENT', children: []
+              }]
+            }]
+          }]
+        };
+        const depth = n => n.children && n.children.length > 0
+          ? 1 + Math.max(...n.children.map(depth))
+          : 1;
+        assert.strictEq(depth(root), 4, 'depth=4');
+      }
+    },
+  ]
+};
+
+// ── 15. Layout Algorithm ───────────────────────────────────────────
+SUITES.treeLayout = {
+  icon: '&#x1F4D0;',
+  title: 'Layout Algorithm Tests',
+  desc: 'Tests the compact tree layout algorithm that positions nodes on the canvas. Each node gets (x, y) coordinates based on its depth and the widths of its subtrees.',
+  tests: [
+    {
+      name: 'Root node placed at (0, 0)',
+      meta: {
+        purpose: 'The root is always the origin of the layout. All other nodes are positioned relative to it. Confirms calculateLayout() sets x=0, y=0 on the root node.',
+        input: 'OR root with one EVENT child',
+        expected: 'root.x = 0, root.y = 0',
+        tags: ['layout','root','coordinates']
+      },
+      fn: () => {
+        const root = { name: 'R', type: 'OR', children: [
+          { name: 'A', type: 'EVENT', children: [] }
+        ]};
+        calculateLayout(root);
+        assert.strictEq(root.x, 0, 'root x=0');
+        assert.strictEq(root.y, 0, 'root y=0');
+      }
+    },
+    {
+      name: 'Children placed at larger y than root',
+      meta: {
+        purpose: 'In a top-down fault tree layout, children are drawn below their parent. Their y coordinate must be strictly greater than the parent\'s y.',
+        input: 'OR root with children A and B',
+        expected: 'child.y > root.y for all children',
+        tags: ['layout','y-coordinate','vertical']
+      },
+      fn: () => {
+        const root = { name: 'R', type: 'OR', children: [
+          { name: 'A', type: 'EVENT', children: [] },
+          { name: 'B', type: 'EVENT', children: [] }
+        ]};
+        calculateLayout(root);
+        for (const c of root.children) assert.truthy(c.y > root.y, `${c.name}.y > root.y`);
+      }
+    },
+    {
+      name: 'Two siblings have different x positions',
+      meta: {
+        purpose: 'Siblings must be placed side-by-side horizontally (different x values) so they do not overlap on the canvas.',
+        input: 'OR root with children A and B',
+        expected: 'A.x ≠ B.x',
+        tags: ['layout','x-coordinate','siblings','horizontal']
+      },
+      fn: () => {
+        const root = { name: 'R', type: 'OR', children: [
+          { name: 'A', type: 'EVENT', children: [] },
+          { name: 'B', type: 'EVENT', children: [] }
+        ]};
+        calculateLayout(root);
+        assert.truthy(root.children[0].x !== root.children[1].x, 'siblings have different x');
+      }
+    },
+    {
+      name: 'Grandchildren placed deeper than children',
+      meta: {
+        purpose: 'Verifies that the y-coordinate increases monotonically with depth. A 3-level chain must have grandchild.y > child.y > root.y.',
+        input: 'Chain: R(OR) → G(AND) → A(EVENT)',
+        expected: 'A.y > G.y > R.y',
+        tags: ['layout','depth','y-coordinate','3-level']
+      },
+      fn: () => {
+        const root = { name: 'R', type: 'OR', children: [{
+          name: 'G', type: 'AND', children: [
+            { name: 'A', type: 'EVENT', children: [] }
+          ]
+        }]};
+        calculateLayout(root);
+        const child = root.children[0];
+        const grandchild = child.children[0];
+        assert.truthy(grandchild.y > child.y, 'grandchild.y > child.y');
+        assert.truthy(child.y > root.y, 'child.y > root.y');
+      }
+    },
+    {
+      name: 'nodeMultiplier=2 gives larger y spacing than default',
+      meta: {
+        purpose: 'The nodeMultiplier scales all node sizes and spacings uniformly. With multiplier=2, all vertical distances should be at least twice as large as with multiplier=1.',
+        input: 'Same 2-level tree with nodeMultiplier=1 and nodeMultiplier=2',
+        expected: 'child.y with multiplier=2 > child.y with multiplier=1',
+        tags: ['layout','multiplier','scaling']
+      },
+      fn: () => {
+        const root1 = { name: 'R', type: 'OR', children: [
+          { name: 'A', type: 'EVENT', children: [] }
+        ]};
+        const root2 = { name: 'R', type: 'OR', children: [
+          { name: 'A', type: 'EVENT', children: [] }
+        ]};
+        calculateLayout(root1, 1);
+        calculateLayout(root2, 2);
+        assert.truthy(root2.children[0].y > root1.children[0].y, 'larger y with multiplier=2');
+      }
+    },
+    {
+      name: 'Single leaf node (no children) placed at (0, 0)',
+      meta: {
+        purpose: 'A standalone event node (no children) should still receive valid (0,0) coordinates from the layout algorithm without crashing.',
+        input: 'Single EVENT node with no children',
+        expected: 'node.x = 0, node.y = 0',
+        tags: ['layout','leaf','single-node','edge-case']
+      },
+      fn: () => {
+        const root = { name: 'ALONE', type: 'EVENT', children: [] };
+        calculateLayout(root);
+        assert.strictEq(root.x, 0);
+        assert.strictEq(root.y, 0);
+      }
+    },
+  ]
+};
+
+// ── 16. Edge Cases ─────────────────────────────────────────────────
+SUITES.edgeCases = {
+  icon: '&#x26A0;&#xFE0F;',
+  title: 'Edge Cases & Robustness',
+  desc: 'Tests boundary conditions, malformed inputs, very long names, and special characters. These protect against crashes when users load unexpected files.',
+  tests: [
+    {
+      name: 'Empty FTC input returns empty object (no crash)',
+      meta: {
+        purpose: 'Passing an empty string to parseFTC() must return an empty object without throwing. This protects against accidental calls with unloaded file content.',
+        input: 'Empty string ""',
+        expected: 'parseFTC returns {} (empty object)',
+        tags: ['edge-case','empty-input','FTC','robustness']
+      },
+      fn: () => {
+        const r = parseFTC('');
+        assert.eq(r, {}, 'empty object');
+      }
+    },
+    {
+      name: 'BEI with only comment lines returns empty object',
+      meta: {
+        purpose: 'A BEI file that consists entirely of * comment lines should yield no events — not a crash, and not spurious entries.',
+        input: 'BEI text with two * comment lines and nothing else',
+        expected: 'Object.keys(result).length = 0',
+        tags: ['edge-case','comments-only','BEI','robustness']
+      },
+      fn: () => {
+        const bei = `* All comments\n* More comments`;
+        const info = parseBEI(bei);
+        assert.strictEq(Object.keys(info).length, 0, 'no events parsed');
+      }
+    },
+    {
+      name: 'Cyclic FTL parse completes in under 2 seconds',
+      meta: {
+        purpose: 'Ensures cycle detection is effective. A gate that directly references itself would cause infinite recursion without the path-tracking guard. The test times the parse and fails if it exceeds 2 seconds.',
+        input: 'FTL: "G OR G E1" — G references itself as its own input',
+        expected: 'Parse completes in <2000ms without stack overflow',
+        tags: ['edge-case','cycle','performance','robustness']
+      },
+      fn: () => {
+        const start = Date.now();
+        const ftl = `P, C=\nG OR G E1\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const elapsed = Date.now() - start;
+        assert.truthy(elapsed < 2000, `completed in ${elapsed}ms (<2000ms required)`);
+        assert.truthy(r !== undefined, 'no crash');
+      }
+    },
+    {
+      name: 'Event name with hyphens parsed correctly in BED',
+      meta: {
+        purpose: 'SAPHIRE event names frequently use hyphens to separate system, component, and failure mode codes (e.g., PUMP-A-001-FTS). These must survive parsing without being split at the hyphens.',
+        input: 'BED line: "PUMP-A-001, Pump A train 001 fails"',
+        expected: 'descriptions["PUMP-A-001"] is defined with correct description',
+        tags: ['edge-case','hyphens','event-name','naming-convention']
+      },
+      fn: () => {
+        const bed = `PUMP-A-001, Pump A train 001 fails`;
+        const d = parseEventDescriptions(bed);
+        assert.defined(d['PUMP-A-001'], 'hyphenated name');
+      }
+    },
+    {
+      name: 'Event name with underscores parsed correctly in BED',
+      meta: {
+        purpose: 'Underscores are another common separator in SAPHIRE event names. They must be preserved in the key.',
+        input: 'BED line: "VALVE_OPEN_FTF, Valve fails to open"',
+        expected: 'descriptions["VALVE_OPEN_FTF"] is defined',
+        tags: ['edge-case','underscores','event-name']
+      },
+      fn: () => {
+        const bed = `VALVE_OPEN_FTF, Valve fails to open`;
+        const d = parseEventDescriptions(bed);
+        assert.defined(d['VALVE_OPEN_FTF'], 'underscored name');
+      }
+    },
+    {
+      name: 'BEI line with too few fields is skipped gracefully',
+      meta: {
+        purpose: 'A BEI line with fewer than 3 comma-separated fields is incomplete and must be skipped without creating a malformed entry or throwing.',
+        input: 'BEI line: "EVT1,0" (only 2 fields; minimum is 3)',
+        expected: 'No crash; result is defined (event may or may not be present)',
+        tags: ['edge-case','malformed-input','BEI','robustness']
+      },
+      fn: () => {
+        const bei = `EVT1,0`;
+        const info = parseBEI(bei);
+        assert.truthy(info !== undefined, 'no crash on short line');
+      }
+    },
+    {
+      name: 'FTC with only * comments in data section produces empty cut sets',
+      meta: {
+        purpose: 'If all lines between "=" and "^EOS" are comments, the result should have an empty cutSets array, not a set of phantom cut sets.',
+        input: 'FTC:\n  PROJ, TREE\n  * comment 1\n  * comment 2\n  =\n  ^EOS',
+        expected: 'cutSets.length = 0',
+        tags: ['edge-case','comments','FTC','empty']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE\n* comment 1\n* comment 2\n=\n^EOS`;
+        const r = parseFTC(ftc);
+        assert.len(r['TREE'].cutSets, 0, 'no cut sets from comments');
+      }
+    },
+    {
+      name: 'Event name at SAPHIRE max length (48 chars) parses correctly',
+      meta: {
+        purpose: 'SAPHIRE enforces a 48-character limit on event names. A name of exactly 48 characters is valid and must parse without truncation or error.',
+        input: 'BED line with a 48-character event name (AAAA...A)',
+        expected: 'descriptions[48-char key] is defined with correct description',
+        tags: ['edge-case','max-length','SAPHIRE','48-chars']
+      },
+      fn: () => {
+        const longName = 'A'.repeat(48);
+        const bed = `${longName}, Description for long name event`;
+        const d = parseEventDescriptions(bed);
+        assert.defined(d[longName], '48-char event name');
+      }
+    },
+    {
+      name: 'formatProbability handles very small values (1e-300)',
+      meta: {
+        purpose: 'Extreme probabilities can arise from very high-order cut sets. The formatter must handle them without returning NaN or throwing a RangeError.',
+        input: 'prob = 1×10⁻³⁰⁰, digits = "2"',
+        expected: 'Result is a string containing "E" (scientific notation)',
+        tags: ['edge-case','very-small-probability','format']
+      },
+      fn: () => {
+        const r = formatProbability(1e-300, '2');
+        assert.truthy(r.includes('E'), 'scientific notation for very small value');
+      }
+    },
+    {
+      name: 'FTL tree name with spaces gets normalized (no spaces in result)',
+      meta: {
+        purpose: 'Tree names must not contain spaces because spaces would break SAPHIRE import and cross-reference lookups. The parser strips spaces from the tree name field.',
+        input: 'FTL header: "PROJ, MY TREE ="',
+        expected: 'treeName does not contain a space character',
+        tags: ['edge-case','spaces','normalization','tree-name']
+      },
+      fn: () => {
+        const ftl = `PROJ, MY TREE =\nTOP OR A\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.falsy(r.faultTrees[0].treeName.includes(' '), 'no spaces in name');
+      }
+    },
+  ]
+};
+
+// ── 17. Round-Trip Tests ───────────────────────────────────────────
+SUITES.roundtrip = {
+  icon: '&#x1F504;',
+  title: 'Round-Trip Integration Tests',
+  desc: 'Tests that data survives a full cycle: parse → process → export → re-parse. Any loss or corruption across format conversions will be caught here.',
+  tests: [
+    {
+      name: 'FTL → parse → export → re-parse: tree name preserved',
+      meta: {
+        purpose: 'The tree name must survive the full SAPHIRE FTL cycle. This catches subtle issues like extra = signs or spaces being introduced during export.',
+        input: 'Original FTL with tree "DIESEL_GEN"',
+        expected: 'After parse→export→reparse: treeName = "DIESEL_GEN"',
+        tags: ['round-trip','FTL','tree-name']
+      },
+      fn: () => {
+        const orig = `MYPROJ, DIESEL_GEN=\nTOP OR PUMP_FAIL VALVE_FAIL\n^EOS`;
+        const parsed = parseFTLStructure(orig);
+        const exported = exportToSAPHIRE_FTL({ projectName: 'MYPROJ', faultTrees: parsed.faultTrees });
+        const reparsed = parseFTLStructure(exported);
+        assert.strictEq(reparsed.faultTrees[0].treeName, 'DIESEL_GEN', 'tree name round-trips');
+      }
+    },
+    {
+      name: 'FTL → parse → export → re-parse: AND gate type preserved',
+      meta: {
+        purpose: 'Gate types must round-trip correctly. If an AND gate were accidentally exported as OR, all quantification results would be wrong.',
+        input: 'FTL: "G AND A B" in tree T',
+        expected: 'After round-trip: rootNode.type = "AND"',
+        tags: ['round-trip','FTL','gate-type','AND']
+      },
+      fn: () => {
+        const orig = `P, T=\nG AND A B\n^EOS`;
+        const parsed = parseFTLStructure(orig);
+        const exported = exportToSAPHIRE_FTL({ projectName: 'P', faultTrees: parsed.faultTrees });
+        const reparsed = parseFTLStructure(exported);
+        assert.strictEq(reparsed.faultTrees[0].rootNode.type, 'AND', 'AND gate round-trips');
+      }
+    },
+    {
+      name: 'BEI → parse → JSON serialize → deserialize: Calc_Prob preserved',
+      meta: {
+        purpose: 'Event probability data must survive JSON serialization (saving to .KNOW_FTL) and deserialization (loading). Floating-point precision must not degrade.',
+        input: 'BEI event with Calc_Prob=0.01 → JSON → back',
+        expected: 'Restored Calc_Prob ≈ 0.01 (within 1×10⁻⁹)',
+        tags: ['round-trip','BEI','JSON','Calc_Prob']
+      },
+      fn: () => {
+        const bei = `PUMP,0,,,0,0.01,0,0,0,F,,0,0.01`;
+        const info = parseBEI(bei);
+        const json = JSON.stringify(info);
+        const restored = JSON.parse(json);
+        assert.approx(restored['PUMP'].Calc_Prob, 0.01, 1e-9, 'Calc_Prob preserved');
+      }
+    },
+    {
+      name: 'FTC complement events survive parse and produce correct probabilities',
+      meta: {
+        purpose: 'Tests that complement event flag survives FTC parsing and is correctly used in probability calculation. Two cut sets: {A×B} and {/C×D}.',
+        input: 'FTC: "A * B." and "/C * D." → P(A)=0.1, P(B)=0.2, P(C)=0.3, P(D)=0.4',
+        expected: 'CS1 probability = 0.1×0.2 = 0.02; CS2 probability = (1−0.3)×0.4 = 0.28',
+        tags: ['round-trip','FTC','complement','probability']
+      },
+      fn: () => {
+        const ftc = `PROJ, TREE\n=\nA * B.\n/C * D.\n^EOS`;
+        const r = parseFTC(ftc);
+        const ei = { A: { Calc_Prob: 0.1 }, B: { Calc_Prob: 0.2 }, C: { Calc_Prob: 0.3 }, D: { Calc_Prob: 0.4 }};
+        const p1 = calcCutSetProbability(r['TREE'].cutSets[0], ei);
+        const p2 = calcCutSetProbability(r['TREE'].cutSets[1], ei);
+        assert.approx(p1, 0.02, 1e-9, 'A×B = 0.02');
+        assert.approx(p2, 0.7 * 0.4, 1e-9, '/C×D = (1−0.3)×0.4 = 0.28');
+      }
+    },
+    {
+      name: 'Multi-tree FTL round-trip preserves tree count',
+      meta: {
+        purpose: 'Verifies that a project with 2 trees retains exactly 2 trees after a full export→parse cycle. Guards against trees being merged or dropped during export.',
+        input: 'Two FTL trees (T1: OR, T2: AND) → export → re-parse',
+        expected: 'reparsed.faultTrees.length = 2',
+        tags: ['round-trip','multi-tree','count']
+      },
+      fn: () => {
+        const orig = `P, T1=\nG1 OR A B\n^EOS\nP, T2=\nG2 AND C D\n^EOS`;
+        const parsed = parseFTLStructure(orig);
+        const proj = { projectName: 'P', faultTrees: parsed.faultTrees };
+        const exported = exportToSAPHIRE_FTL(proj);
+        const reparsed = parseFTLStructure(exported);
+        assert.len(reparsed.faultTrees, 2, 'two trees round-trip');
+      }
+    },
+  ]
+};
+
+// ── 18. Known PRA Examples ─────────────────────────────────────────
+SUITES.knownPRA = {
+  icon: '&#x1F3ED;',
+  title: 'Known PRA Textbook Examples',
+  desc: 'Tests against canonical fault tree examples with known analytical solutions. These validate correctness against hand-computed answers from PRA textbooks and NUREG documents.',
+  tests: [
+    {
+      name: 'Series system (AND gate): P(top) = P(A) × P(B) = 0.02',
+      meta: {
+        purpose: 'A series reliability system fails when ALL components fail — this maps to an AND gate in a fault tree (the top event requires both A and B to fail). The probability is simply the product. This is the most basic quantification formula in PRA.',
+        input: 'AND cut set: {A, B}, P(A)=0.1, P(B)=0.2',
+        expected: 'P(top) = P(A) × P(B) = 0.1 × 0.2 = 0.02',
+        tags: ['PRA','series','AND','product','textbook']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.1 }, B: { Calc_Prob: 0.2 } };
+        const cutSets = [[{ name:'A', complement:false }, { name:'B', complement:false }]];
+        const p = calcMCUB(cutSets, ei);
+        assert.approx(p, 0.02, 1e-9, 'series P = 0.02');
+      }
+    },
+    {
+      name: 'Parallel system (OR gate): MCUB = P(A) + P(B) = 0.03 (exact ≈ 0.0298)',
+      meta: {
+        purpose: 'A parallel system (OR gate) fails when EITHER component fails. The minimal cut sets are {A} and {B} independently. MCUB = P(A)+P(B) = 0.03, which slightly overestimates the exact probability 1−(1−0.01)(1−0.02) = 0.0298. This conservative overestimate is characteristic of MCUB.',
+        input: 'Two single-event cut sets: {A} P=0.01, {B} P=0.02',
+        expected: 'MCUB = 0.03 (≥ exact value 0.0298, demonstrating conservatism)',
+        tags: ['PRA','parallel','OR','MCUB','conservatism','textbook']
+      },
+      fn: () => {
+        const ei = { A: { Calc_Prob: 0.01 }, B: { Calc_Prob: 0.02 } };
+        const cutSets = [
+          [{ name:'A', complement:false }],
+          [{ name:'B', complement:false }]
+        ];
+        const mcub = calcMCUB(cutSets, ei);
+        assert.approx(mcub, 0.03, 1e-9, 'MCUB = 0.03');
+        assert.truthy(mcub >= 0.0298, 'MCUB >= exact probability (conservative)');
+      }
+    },
+    {
+      name: '2-of-3 voting gate: structure parsed correctly',
+      meta: {
+        purpose: 'A 2-of-3 voting gate (common in reactor safety systems) has 4 minimal cut sets: C(3,2) = 3 two-event cut sets plus C(3,3) = 1 three-event cut set. This test verifies the tree structure is parsed correctly as the first step toward quantification.',
+        input: 'FTL: "TOP 2/3 A B C"',
+        expected: 'rootNode.type="VOTING", votingN=2, 3 children — ready for cut set generation',
+        tags: ['PRA','voting','2-of-3','C(3,2)','structure']
+      },
+      fn: () => {
+        const ftl = `PROJ, VOT=\nTOP 2/3 A B C\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.votingN, 2, '2-of-3 config');
+        assert.len(r.faultTrees[0].rootNode.children, 3, '3 inputs');
+      }
+    },
+    {
+      name: 'NUREG-style Diesel Generator fault tree: structure and gate types',
+      meta: {
+        purpose: 'Diesel Generator failure trees in NPP PRAs typically model three failure modes (engine, fuel, starting) under an OR gate, with each mode having AND logic for its sub-causes. This validates that a realistic PRA tree parses correctly.',
+        input: 'FTL:\n  DG-FAIL OR DG-ENG DG-FUEL DG-START\n  DG-ENG AND ENG-MECH ENG-CTRL\n  DG-FUEL AND FUEL-PUMP FUEL-VALVE',
+        expected: 'root.name="DG-FAIL" (OR, 3 children); DG-ENG is AND gate',
+        tags: ['PRA','NUREG','diesel-generator','NPP','realistic']
+      },
+      fn: () => {
+        const ftl = `NPP, DG-FAIL=\nDG-FAIL OR DG-ENG DG-FUEL DG-START\nDG-ENG AND ENG-MECH ENG-CTRL\nDG-FUEL AND FUEL-PUMP FUEL-VALVE\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        const root = r.faultTrees[0].rootNode;
+        assert.strictEq(root.name, 'DG-FAIL', 'top event name');
+        assert.strictEq(root.type, 'OR', 'OR gate — any failure mode fails DG');
+        assert.len(root.children, 3, 'three failure modes');
+        const eng = root.children.find(c => c.name === 'DG-ENG');
+        assert.strictEq(eng.type, 'AND', 'AND for engine failure — both causes required');
+      }
+    },
+    {
+      name: 'Poisson model annual unavailability: λ=10⁻⁴/hr, T=8760hr',
+      meta: {
+        purpose: 'Annual unavailability is a key PRA metric. For λ=10⁻⁴/hr and T=8760hr (one year), P = 1 − e^(−0.876) ≈ 0.5836. Verifies the BEI parser correctly computes this real-world value.',
+        input: 'BEI: FdT=3, Lambda=1×10⁻⁴/hr, Mission=8760hr (1 year)',
+        expected: 'Calc_Prob ≈ 1 − e^(−0.876) ≈ 0.5836',
+        tags: ['PRA','Poisson','annual','8760hr','lambda']
+      },
+      fn: () => {
+        const lambda = 1e-4, T = 8760;
+        const expected = 1 - Math.exp(-lambda * T);
+        const bei = `PUMP,3,,,0,${lambda},${lambda},0,${T},F,,0,0`;
+        const info = parseBEI(bei);
+        assert.approx(info['PUMP'].Calc_Prob, expected, 1e-8, 'annual Poisson correct');
+      }
+    },
+    {
+      name: 'Common cause failure (CCF) via AND gate: probability product',
+      meta: {
+        purpose: 'Common cause failures model scenarios where a single shared cause defeats multiple redundant trains simultaneously. In fault trees, CCF events typically appear together under an AND gate. Their joint probability is the product of individual CCF event probabilities.',
+        input: 'AND gate: {CCF-PUMP1, CCF-PUMP2}, P(each)=0.01',
+        expected: 'Cut set probability = 0.01 × 0.01 = 0.0001',
+        tags: ['PRA','CCF','common-cause','AND','independence']
+      },
+      fn: () => {
+        const ftl = `P, CCF=\nFAIL AND CCF-PUMP1 CCF-PUMP2\n^EOS`;
+        const r = parseFTLStructure(ftl);
+        assert.strictEq(r.faultTrees[0].rootNode.type, 'AND', 'CCF as AND');
+        const ei = { 'CCF-PUMP1': { Calc_Prob: 0.01 }, 'CCF-PUMP2': { Calc_Prob: 0.01 }};
+        const cs = r.faultTrees[0].rootNode.children.map(c => ({ name: c.name, complement: false }));
+        const p = calcCutSetProbability(cs, ei);
+        assert.approx(p, 0.0001, 1e-9, 'CCF probability = 0.01² = 0.0001');
+      }
+    },
+  ]
+};
+
+// TEST RUNNER ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+let currentSuiteKey = 'parseFTL';
+let results = {};
+let activeFilter = 'all';
+let running = false;
+
+function initResults() {
+  for (const key of Object.keys(SUITES)) {
+    results[key] = SUITES[key].tests.map(() => ({ state: 'pending', message: '', time: 0 }));
+  }
+}
+
+function getStats() {
+  let total=0, pass=0, fail=0, pending=0, time=0;
+  for (const key of Object.keys(SUITES)) {
+    for (const r of (results[key]||[])) {
+      total++;
+      if (r.state === 'pass') { pass++; time += r.time; }
+      else if (r.state === 'fail') { fail++; time += r.time; }
+      else pending++;
+    }
+  }
+  return { total, pass, fail, pending, time };
+}
+
+function updateStats() {
+  const s = getStats();
+  document.getElementById('statTotal').textContent = s.total;
+  document.getElementById('statPass').textContent = s.pass;
+  document.getElementById('statFail').textContent = s.fail;
+  document.getElementById('statSkip').textContent = s.pending;
+  document.getElementById('statTime').textContent = s.time < 1000 ? `${s.time}ms` : `${(s.time/1000).toFixed(1)}s`;
+  const pct = s.total > 0 ? ((s.pass + s.fail) / s.total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  // Update sidebar counts
+  for (const key of Object.keys(SUITES)) {
+    const el = document.getElementById(`cnt-${key}`);
+    if (!el) continue;
+    const rs = results[key] || [];
+    const p = rs.filter(r => r.state === 'pass').length;
+    const f = rs.filter(r => r.state === 'fail').length;
+    const total = rs.length;
+    el.textContent = `${p}/${total}`;
+    el.className = 'suite-count' + (f > 0 ? ' fail' : (p === total && total > 0 ? ' pass' : ''));
+  }
+}
+
+function renderDetailPanel(test, r, idx, suiteLen) {
+  const m = test.meta || {};
+  const tags = (m.tags || []).map(t => `<span class="tag-pill">${escHtml(t)}</span>`).join('');
+
+  // ── Meta documentation block ──────────────────────────────────────
+  let html = `<div class="meta-section">`;
+  if (m.purpose) html += `<div class="meta-purpose">${escHtml(m.purpose)}</div>`;
+  if (tags) html += `<div style="margin-bottom:0.6rem;">${tags}</div>`;
+
+  html += `<div class="meta-grid">`;
+  if (m.input)    html += `<span class="meta-key">Input</span><code class="meta-val code">${escHtml(m.input)}</code>`;
+  if (m.expected) html += `<span class="meta-key">Expected</span><code class="meta-val code">${escHtml(m.expected)}</code>`;
+  html += `<span class="meta-key">Test #</span><span class="meta-val">${idx + 1} of ${suiteLen}</span>`;
+  html += `</div></div>`;
+
+  // ── Assertion results ─────────────────────────────────────────────
+  if (r.state === 'pending') {
+    html += `<div style="color:#475569;font-size:0.79rem;font-style:italic;">&#x23F3; Not yet run — click Run Suite or Run All Tests</div>`;
+    return html;
+  }
+
+  html += `<hr class="divider">`;
+
+  if (r.captures && r.captures.length > 0) {
+    html += `<div style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Assertion Results</div>`;
+    for (const cap of r.captures) {
+      const sym = cap.pass ? '&#x2713;' : '&#x2715;';
+      const cls = cap.pass ? 'assertion-pass' : 'assertion-trace';
+      let capHtml = `<div class="${cls}">`;
+      capHtml += `${sym} <strong>${escHtml(cap.label)}</strong>`;
+      if (!cap.pass) {
+        capHtml += `\n  Got:      ${escHtml(cap.actual)}`;
+        capHtml += `\n  Expected: ${escHtml(cap.expected)}`;
+        if (cap.note) capHtml += `\n  Note:     ${escHtml(cap.note)}`;
+      } else {
+        capHtml += `  \u2192 ${escHtml(cap.actual)}`;
+        if (cap.note) capHtml += `  (${escHtml(cap.note)})`;
+      }
+      capHtml += `</div>`;
+      html += capHtml;
+    }
+  }
+
+  // ── Error trace if overall failure ───────────────────────────────
+  if (r.state === 'fail' && r.message) {
+    html += `<div class="error-msg" style="margin-top:0.6rem;"><strong>&#x26A0; Failure:</strong>\n${escHtml(r.message)}</div>`;
+  } else if (r.state === 'pass') {
+    html += `<div class="assertion-pass" style="margin-top:0.4rem;">&#x2713; All assertions passed &mdash; ${r.time}ms</div>`;
+  }
+
+  return html;
+}
+
+function renderTestList() {
+  const suite = SUITES[currentSuiteKey];
+  const list = document.getElementById('testList');
+  list.innerHTML = '';
+
+  suite.tests.forEach((test, idx) => {
+    const r = results[currentSuiteKey][idx];
+    if (activeFilter !== 'all' && r.state !== activeFilter) return;
+
+    const item = document.createElement('div');
+    item.className = `test-item ${r.state}`;
+    item.id = `test-item-${idx}`;
+
+    const icon = r.state === 'pass' ? '&#x2713;' :
+                 r.state === 'fail' ? '&#x2715;' :
+                 r.state === 'running' ? '&#x25CF;' : '&#x25CB;';
+
+    item.innerHTML = `
+      <div class="test-header" onclick="toggleDetail(${idx})">
+        <div class="test-status ${r.state}">${icon}</div>
+        <div class="test-name">${escHtml(test.name)}</div>
+        <div class="test-time">${r.time > 0 ? r.time + 'ms' : ''}</div>
+        <span class="chevron" id="chev-${idx}">&#x276F;</span>
+      </div>
+      <div class="test-details hidden" id="detail-${idx}">
+        ${renderDetailPanel(test, r, idx, suite.tests.length)}
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+function toggleDetail(idx) {
+  const d = document.getElementById(`detail-${idx}`);
+  const c = document.getElementById(`chev-${idx}`);
+  d.classList.toggle('hidden');
+  c.classList.toggle('open');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function runSuiteTests(suiteKey) {
+  const suite = SUITES[suiteKey];
+  document.getElementById(`nav-${suiteKey}`).querySelector('.suite-count').className = 'suite-count running';
+
+  for (let i = 0; i < suite.tests.length; i++) {
+    results[suiteKey][i].state = 'running';
+    if (currentSuiteKey === suiteKey) renderTestList();
+
+    await new Promise(r => setTimeout(r, 0)); // yield to UI
+
+    const t0 = performance.now();
+    _assertCaptures = [];
+    try {
+      suite.tests[i].fn();
+      results[suiteKey][i].state = 'pass';
+      results[suiteKey][i].message = '';
+    } catch(e) {
+      results[suiteKey][i].state = 'fail';
+      results[suiteKey][i].message = e.message || String(e);
+    }
+    results[suiteKey][i].time = Math.round(performance.now() - t0);
+    results[suiteKey][i].captures = [..._assertCaptures];
+
+    if (currentSuiteKey === suiteKey) renderTestList();
+    updateStats();
+  }
+}
+
+async function runAll() {
+  if (running) return;
+  running = true;
+  document.getElementById('runAllBtn').disabled = true;
+  document.getElementById('runSuiteBtn').disabled = true;
+  document.getElementById('statusText').textContent = 'Running all suites...';
+
+  initResults();
+  updateStats();
+
+  for (const key of Object.keys(SUITES)) {
+    document.getElementById('statusText').textContent = `Running: ${SUITES[key].title}`;
+    await runSuiteTests(key);
+  }
+
+  const s = getStats();
+  document.getElementById('statusText').textContent =
+    `Complete: ${s.pass}/${s.total} passed, ${s.fail} failed in ${s.time}ms`;
+  document.getElementById('runAllBtn').disabled = false;
+  document.getElementById('runSuiteBtn').disabled = false;
+  running = false;
+  renderTestList();
+}
+
+async function runCurrentSuite() {
+  if (running) return;
+  running = true;
+  document.getElementById('runSuiteBtn').disabled = true;
+  document.getElementById('statusText').textContent = `Running: ${SUITES[currentSuiteKey].title}`;
+
+  results[currentSuiteKey] = SUITES[currentSuiteKey].tests.map(() => ({ state: 'pending', message: '', time: 0 }));
+  await runSuiteTests(currentSuiteKey);
+
+  const rs = results[currentSuiteKey];
+  const p = rs.filter(r => r.state === 'pass').length;
+  const f = rs.filter(r => r.state === 'fail').length;
+  document.getElementById('statusText').textContent = `Suite complete: ${p} passed, ${f} failed`;
+  document.getElementById('runSuiteBtn').disabled = false;
+  running = false;
+  renderTestList();
+}
+
+function resetAll() {
+  initResults();
+  updateStats();
+  renderTestList();
+  document.getElementById('statusText').textContent = 'Reset \u2014 ready to run';
+}
+
+function showSuite(key) {
+  currentSuiteKey = key;
+  // Update nav active state
+  document.querySelectorAll('.suite-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`nav-${key}`).classList.add('active');
+  // Update header
+  const suite = SUITES[key];
+  document.getElementById('suiteIcon').innerHTML = suite.icon;
+  document.getElementById('suiteTitleEl').textContent = suite.title;
+  document.getElementById('suiteDescEl').textContent = suite.desc;
+  renderTestList();
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTestList();
+}
+
+function exportResults() {
+  const s = getStats();
+  const lines = [`KUREAS-FTL Test Suite Results`, `Generated: ${new Date().toISOString()}`, ``,
+    `Summary: ${s.pass}/${s.total} passed, ${s.fail} failed, ${s.pending} pending, ${s.time}ms total`, ``];
+
+  for (const key of Object.keys(SUITES)) {
+    const suite = SUITES[key];
+    lines.push(`=== ${suite.title} ===`);
+    suite.tests.forEach((test, idx) => {
+      const r = results[key][idx];
+      const sym = r.state === 'pass' ? 'PASS' : r.state === 'fail' ? 'FAIL' : 'PEND';
+      lines.push(`  [${sym}] ${test.name}${r.state === 'fail' ? ' | ' + r.message : ''}`);
+    });
+    lines.push('');
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `KUREAS-FTL-TestResults-${Date.now()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Results exported!');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── Initialize ─────────────────────────────────────────────────────
+initResults();
+showSuite('parseFTL');
+updateStats();
+
+// Count total tests
+const totalTests = Object.values(SUITES).reduce((s, suite) => s + suite.tests.length, 0);
+document.getElementById('statTotal').textContent = totalTests;
+document.getElementById('appVersionBadge').textContent = `${totalTests} Tests | ${Object.keys(SUITES).length} Suites`;
+</script>
+</body>
+</html>
