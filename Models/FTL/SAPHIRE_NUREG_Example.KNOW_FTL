@@ -1,0 +1,680 @@
+{
+  "format": "KUREAS-FTL",
+  "version": "1.0",
+  "savedAt": "2026-03-05T04:09:23.673Z",
+  "projectName": "SAPHIRE_NUREG_Example",
+  "projectDescription": "This is the simple example found in the SAPHIRE report NUREG/CR-7039 Volume 7: Data Loading.",
+  "faultTrees": [
+    {
+      "projectName": "TIMELINESS",
+      "treeName": "ALARM",
+      "rootNode": {
+        "name": "ALARM",
+        "type": "OR",
+        "children": [
+          {
+            "name": "ALARM01",
+            "type": "OR",
+            "children": [
+              {
+                "name": "ALM-FTS",
+                "type": "EVENT",
+                "description": "",
+                "children": []
+              },
+              {
+                "name": "ALM-SWT",
+                "type": "EVENT",
+                "description": "",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "ALARM02",
+            "type": "AND",
+            "children": [
+              {
+                "name": "ALM-BPF",
+                "type": "EVENT",
+                "description": "",
+                "children": []
+              },
+              {
+                "name": "ALM-CPF",
+                "type": "EVENT",
+                "description": "",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "ALM-MECH",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "projectName": "TIMELINESS",
+      "treeName": "PERSONAL",
+      "rootNode": {
+        "name": "PERSONAL",
+        "type": "OR",
+        "children": [
+          {
+            "name": "OTHER",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          },
+          {
+            "name": "SICK",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          },
+          {
+            "name": "SICK-FAM",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "projectName": "TIMELINESS",
+      "treeName": "TRNS-2",
+      "rootNode": {
+        "name": "TRNS-2",
+        "type": "AND",
+        "children": [
+          {
+            "name": "PER-TRNS",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          },
+          {
+            "name": "PUB-TRNS-LATE",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "projectName": "TIMELINESS",
+      "treeName": "TRNSPRT",
+      "rootNode": {
+        "name": "TRNSPRT",
+        "type": "AND",
+        "children": [
+          {
+            "name": "PER-TRNS",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          },
+          {
+            "name": "PUB-TRANS",
+            "type": "EVENT",
+            "description": "",
+            "children": []
+          }
+        ]
+      }
+    }
+  ],
+  "eventDescriptions": {
+    "<FALSE>": "System Generated Success Event",
+    "<INIT>": "System Generated Initiating Event",
+    "<PASS>": "System Generated Ignore Event",
+    "<TRUE>": "System Generated Failure Event",
+    "ALARM": "Alarm Failure",
+    "ALM-BPF": "ALARM FAILS DUE to BATTERY FAILURE",
+    "ALM-CPF": "ALARM CLOCK FAILS DUE to COMMERCIAL POWER FAILURE",
+    "ALM-FTS": "FAILURE to SET ALARM CLOCK",
+    "ALM-MECH": "ALARM FAILS DUE to MECHANICAL FAILURE",
+    "ALM-SWT": "FAILURE to SET THE CORRECT TIME ON ALARM CLOCK",
+    "IE-WORK": "Initiating Event",
+    "MEDICINE": "RECOVERY FOR SICKNESS PREVENTING ATTENDING WORK",
+    "OTHER": "OTHER PERSONAL REASONS THAT CAUSE A FAILURE to GET to WORK",
+    "PER-TRNS": "PERSONAL TRANSPORTATION FAILS",
+    "PERSONAL": "Personal Failure",
+    "PUB-TRANS": "PUBLIC TRANSPORTATION FAILS",
+    "PUB-TRNS-LATE": "PUBLIC TRANSPORTATION FAILS (LATE TIME FRAME)",
+    "SICK": "FAILED to MAKE IT to WORK DUE to ILLNESS",
+    "SICK-FAM": "FAILURE to MAKE IT to WORK DUE to AN ILLNESS IN THE FAMILY",
+    "TRNS-2": "Commercial Transportation Fails at a Later Time",
+    "TRNSPRT": "Transportation Failure"
+  },
+  "gateDescriptions": {
+    "ALARM": "Alarm Failure",
+    "ALARM01": "Alarm clock setting failure",
+    "ALARM02": "Alarm clock power failure",
+    "PERSONAL": "Personal Failure",
+    "TRNS-2": "Commercial Transportation Fails at a Later Time",
+    "TRNSPRT": "Transportation Failure"
+  },
+  "eventInfo": {
+    "Prob": {
+      "Name": "Prob",
+      "FdT": "Freq",
+      "UdC": "Analysis Type",
+      "UdT": "Phase Type",
+      "UdValue": 0,
+      "Prob": 0,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": " ",
+      "UdValue2": 0,
+      "Calc_Prob": 0,
+      "Freq": " ",
+      "Model_Type": "",
+      "Phase_Type": "",
+      "Project": ""
+    },
+    "<FALSE>": {
+      "Name": "<FALSE>",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 0,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0,
+      "Freq": "",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "<INIT>": {
+      "Name": "<INIT>",
+      "FdT": "N",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 1,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 1,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "<PASS>": {
+      "Name": "<PASS>",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 1,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 1,
+      "Freq": "",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "<TRUE>": {
+      "Name": "<TRUE>",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 1,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 1,
+      "Freq": "",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "ALARM": {
+      "Name": "ALARM",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 1,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 1,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "ALM-BPF": {
+      "Name": "ALM-BPF",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 3,
+      "Prob": 0.0009,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.0009,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "ALM-CPF": {
+      "Name": "ALM-CPF",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 3,
+      "Prob": 0.015,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.015,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "ALM-FTS": {
+      "Name": "ALM-FTS",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 10,
+      "Prob": 0.0055,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.0055,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "ALM-MECH": {
+      "Name": "ALM-MECH",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 3,
+      "Prob": 0.00027,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.00027,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "ALM-SWT": {
+      "Name": "ALM-SWT",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 10,
+      "Prob": 0.0027,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.0027,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "IE-WORK": {
+      "Name": "IE-WORK",
+      "FdT": "N",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 10,
+      "Prob": 248,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 248,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "MEDICINE": {
+      "Name": "MEDICINE",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 5,
+      "Prob": 0.5,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.5,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "OTHER": {
+      "Name": "OTHER",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 10,
+      "Prob": 0.0081,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.0081,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "PER-TRNS": {
+      "Name": "PER-TRNS",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 3,
+      "Prob": 0.0055,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.0055,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "PERSONAL": {
+      "Name": "PERSONAL",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 1,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 1,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "PUB-TRANS": {
+      "Name": "PUB-TRANS",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 3,
+      "Prob": 0.0027,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.0027,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "PUB-TRNS-LATE": {
+      "Name": "PUB-TRNS-LATE",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 3,
+      "Prob": 0.002,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.002,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "SICK": {
+      "Name": "SICK",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 10,
+      "Prob": 0.0081,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.0081,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "SICK-FAM": {
+      "Name": "SICK-FAM",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "L",
+      "UdValue": 10,
+      "Prob": 0.004,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 0.004,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "TRNS-2": {
+      "Name": "TRNS-2",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 1,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 1,
+      "Freq": "",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    },
+    "TRNSPRT": {
+      "Name": "TRNSPRT",
+      "FdT": "1",
+      "UdC": "",
+      "UdT": "",
+      "UdValue": 0,
+      "Prob": 1,
+      "Lambda": 0,
+      "Tau": 0,
+      "Mission": 0,
+      "Init": false,
+      "PF": "",
+      "UdValue2": 0,
+      "Calc_Prob": 1,
+      "Freq": "Y",
+      "Model_Type": "RANDOM",
+      "Phase_Type": "PHASE_1",
+      "Project": "TIMELINESS"
+    }
+  },
+  "cutSets": {
+    "ALARM": {
+      "project": "TIMELINESS",
+      "faultTree": "ALARM",
+      "modelPhase": "RANDOM/PHASE_1",
+      "cutSets": [
+        [
+          {
+            "name": "ALM-FTS",
+            "complement": false
+          }
+        ],
+        [
+          {
+            "name": "ALM-SWT",
+            "complement": false
+          }
+        ],
+        [
+          {
+            "name": "ALM-MECH",
+            "complement": false
+          }
+        ],
+        [
+          {
+            "name": "ALM-BPF",
+            "complement": false
+          },
+          {
+            "name": "ALM-CPF",
+            "complement": false
+          }
+        ]
+      ]
+    },
+    "PERSONAL": {
+      "project": "TIMELINESS",
+      "faultTree": "PERSONAL",
+      "modelPhase": "RANDOM/PHASE_1",
+      "cutSets": [
+        [
+          {
+            "name": "OTHER",
+            "complement": false
+          }
+        ],
+        [
+          {
+            "name": "SICK",
+            "complement": false
+          }
+        ],
+        [
+          {
+            "name": "SICK-FAM",
+            "complement": false
+          }
+        ]
+      ]
+    },
+    "TRNS-2": {
+      "project": "TIMELINESS",
+      "faultTree": "TRNS-2",
+      "modelPhase": "RANDOM/PHASE_1",
+      "cutSets": [
+        [
+          {
+            "name": "PER-TRNS",
+            "complement": false
+          },
+          {
+            "name": "PUB-TRNS-LATE",
+            "complement": false
+          }
+        ]
+      ]
+    },
+    "TRNSPRT": {
+      "project": "TIMELINESS",
+      "faultTree": "TRNSPRT",
+      "modelPhase": "RANDOM/PHASE_1",
+      "cutSets": [
+        [
+          {
+            "name": "PER-TRNS",
+            "complement": false
+          },
+          {
+            "name": "PUB-TRANS",
+            "complement": false
+          }
+        ]
+      ]
+    }
+  }
+}
