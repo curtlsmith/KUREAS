@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!--
+    KUREAS-SYS Module Walkthrough Guide
+    Developed by Curtis Lee Smith and Claude.ai
+    MIT License - Copyright (c) 2024-2026 Curtis Lee Smith
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KUREAS-SYS Walkthrough Guide</title>
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEzUlEQVR4AcRXSUxUWRQ9r4oZmZpBpGkGATdudKUrh5hoXLgEosbExKEdAJV2ionzEDXRxKgxNmgjLETAGIdoTEx04caliImhAYONAgKFNHSoiaq+99f313/1XxVVHZP+4f733rn3vnv+rffvv9jwP18agcrKSv+PliraUyXmOPzsGgGetLW1gaW1uRl/HDmCxj170FhXBx6bz59HW2urpmebiEJ2zRcuoKGmBg27d+P3Xbs04XXTmTPGHhyTxSDAC/j9cH/+jD+3bkXnsmXoXL4c71auxJdr1+BzuTSTiLeZGTieP8c73bdzxQrNv2vVKvQSIe/4uMVdJsBqIgGfD5IwxrpI4vXC8ewZerdtg2tgIGhpsyF18WJUUGbTliwJ4vrMSkBXxDTowXu2b4eLMmj4UvD0pUux4M4dzFm0yIDNEysBIcz6wDxSBjj406fg4O7BwYA93yl4Jv0UC5qakLJwISNKsRJQmqlBPwUfe/IE3XRm3ENDQSMKnrV6Ncpv30ZSRUUQV8wkAn4yEELOgD/M0/s8How9fKg9uXdkhDz1Pwr+07p1KG9oQFJpqQ6GHyQC4c1kjRb8wQP07tgBT0jw3MpKlN+4gcTCQtkpzEoiIIQAZ8Fsy/kwZ4HT7rh/H930fntGRw1TQU+et2kT5l+9ioR58wx8tolEYDZjP6V9lApWz86d8I6NBc0peD69fvMvXUJ8bm4Qj2JmISCEnAV+ei0LHPzePe3Jvd++GVsLux0FtbUopuoXl51t4NFOLARUjn63G19bWtBDafdOTARNiGze5s0oPnUKcRkZQTyGmZUAbSoEP7O+C70Fw1RI+vbuxczkpA7qA+n+fv0azo8fdSD2wUpAsYdvehp8+BQqOLu78enkSfltUBmGwaIiEMZXg/mMOB4/xtDNm+CfSgNjuMVEwJaUhNLLl1HR2Ah7aqoRhrPzhfBx+hLyF9VQRDGJmgAHL6G+oIC+8TlVVZi7ZYu0vYc+tf1Hj2L6wwcJn21hJWA+gLq3FvzcOeRT5RMJCbCnpaGADmXo5/Wft2/x6fRpeB0ORHtZCSg88zZuxFz64NgSEw1tUkkJiujwxefkGBhPRjs6MNzUFPV5UBMIyYJITgao4HAAQ8gmgzqegn37IOLiDJir5cDFi5h49Qp+bmwMjXqiJqC2taCckXzKTNbatZLOMzyM/mPH4Orrk3DVwqYCLRgVHGEBA0B8Xh6K6PAll5UFAP0++eYN/qJMzJgrp64zD9ERMHso5tzz/Xz4MOwpKZJ2pKUFX+/ehY9KuaQwLX4IAT4DufRq5qxfD9DZgH75nE4MnD2LKcoGKIs6LA1qArSJEHLSueJJniELe3o6Cg8exBzqgM0kuEPuP34czv5+qPZQE8B/u5LLy/ELnYe4zExpg4mXLzF45Qp8U1MSzgslASHUPQE7RBRqTLLWrAkULHo1uUsCYSxDt25hjNo4SoO0hYWAPTNT26D4xAkUsVCxyaYmkyug5BlmYaOaUVhfj7Lr17U+gYsVS+GhQ2AioW4GgSo6RCwbqLWqpf9w9nd14cD79zhA46/UXldTNWR9NLKBGpe6Fy9QT6V5f2cnWH6jec2jR6iqrgbv8Z2IRqC9vV1I0tEh2gj7LpKO8FjWkWyZxL8AAAD//4MEZNkAAAAGSURBVAMAE0k4X2fO1c4AAAAASUVORK5CYII=" type="image/png">
+    <style>
+        .flex{display:flex}.fixed{position:fixed}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:.5rem}.gap-4{gap:1rem}.h-full{height:100%}.top-0{top:0}.left-0{left:0}.right-0{right:0}.z-50{z-index:50}.p-3{padding:.75rem}.px-3{padding-left:.75rem;padding-right:.75rem}.py-1{padding-top:.25rem;padding-bottom:.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.font-bold{font-weight:700}.text-white{color:#fff}.bg-blue-600{background-color:#2563eb}.bg-blue-900{background-color:#1e3a8a}.opacity-90{opacity:.9}.rounded{border-radius:.25rem}.shadow-lg{box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1)}.hover\:bg-blue-800:hover{background-color:#1e40af}
+        *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto','Oxygen','Ubuntu','Cantarell','Fira Sans','Droid Sans','Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;background:#f8fafc;color:#1e293b}
+        @media print{.no-print{display:none!important}.page-break{page-break-before:always}body{background:#fff}.main-content{max-width:100%;padding:0 20px}}
+        html{scroll-behavior:smooth}
+        .main-content{max-width:820px;margin:0 auto;padding:32px 48px 80px 48px}
+        .guide-section{margin-bottom:48px}
+        .guide-section h2{font-size:24px;font-weight:700;color:#1e40af;border-bottom:2px solid #dbeafe;padding-bottom:8px;margin-bottom:20px}
+        .guide-section h3{font-size:18px;font-weight:600;color:#1e293b;margin:24px 0 12px 0}
+        .guide-section h4{font-size:15px;font-weight:600;color:#334155;margin:16px 0 8px 0}
+        .guide-section p{line-height:1.7;margin-bottom:12px;color:#334155}
+        .callout{border-radius:8px;padding:16px 20px;margin:16px 0;font-size:14px;line-height:1.6}
+        .callout-info{background:#eff6ff;border-left:4px solid #3b82f6;color:#1e40af}
+        .callout-tip{background:#f0fdf4;border-left:4px solid #22c55e;color:#166534}
+        .callout-warn{background:#fefce8;border-left:4px solid #eab308;color:#854d0e}
+        .callout strong{display:block;margin-bottom:4px}
+        .step-box{display:flex;gap:16px;margin:16px 0;padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:8px}
+        .step-number{flex-shrink:0;width:36px;height:36px;background:#2563eb;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+        .step-content{flex:1}.step-content p{margin:0}.step-content strong{color:#1e293b}
+        .guide-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+        .guide-table th{background:#1e40af;color:#fff;text-align:left;padding:10px 14px;font-weight:600;font-size:13px}
+        .guide-table th:first-child{border-radius:6px 0 0 0}.guide-table th:last-child{border-radius:0 6px 0 0}
+        .guide-table td{padding:10px 14px;border-bottom:1px solid #e2e8f0}
+        .guide-table tr:nth-child(even) td{background:#f8fafc}
+        .guide-table code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px;color:#be185d}
+        kbd{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;padding:2px 6px;font-family:inherit;font-size:12px;box-shadow:0 1px 0 #94a3b8}
+        @media(max-width:700px){.main-content{padding:20px 24px 60px 24px}}
+    </style>
+</head>
+<body>
+
+<header class="bg-blue-600 text-white p-3 shadow-lg fixed top-0 left-0 right-0 z-50 no-print" style="height:56px;">
+    <div class="flex items-center justify-between h-full">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg font-bold">KUREAS-SYS</h1>
+            <span class="text-sm opacity-90">Module Walkthrough Guide &mdash; v1.0</span>
+        </div>
+        <button onclick="window.print()" class="px-3 py-1 bg-blue-900 text-white text-sm rounded hover:bg-blue-800">Print</button>
+    </div>
+</header>
+<div style="height:56px"></div>
+
+<div class="main-content">
+
+    <div style="margin-bottom:48px;padding:40px 0 32px 0;border-bottom:3px solid #1e40af;">
+        <h1 style="font-size:32px;font-weight:800;color:#1e40af;margin:0 0 8px 0;">KUREAS-SYS Module Walkthrough</h1>
+        <p style="font-size:16px;color:#64748b;margin:0 0 12px 0;">System Evaluation Module &mdash; Step-by-step practical exercises</p>
+        <p style="font-size:13px;color:#94a3b8;margin:0;">v1.0 &bull; Curtis Lee Smith and Claude.ai &bull; MIT License</p>
+    </div>
+
+    <!-- EXERCISE 1 -->
+    <div class="guide-section" id="ex1">
+        <h2>Exercise 1: Creating a System and Adding Components</h2>
+        <p>In this exercise you will create a new system model, define its components (SSCs), and assign failure modes with reliability data.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Open KUREAS-SYS.html</strong> in your browser. You will see a 6-pane layout: Pane A (Component List) on the far left, Pane B (System Info bar) across the top, Pane C (SSCs in System) and Pane D (Supercomponents) on the mid-left, Pane E (&ldquo;How the System Works&rdquo; logic editor) in the center, and Pane F (Edit SSC) on the right.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Name your system.</strong> In Pane B (the blue bar), enter System Name = <code>Emergency Cooling System</code>, Acronym = <code>ECS</code>. Click the Description field and enter a brief description of the system&rsquo;s function.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Add your first SSC.</strong> In Pane C, click the <strong>+SSC</strong> button. In the dialog, enter: Name = <code>PUMP-A</code>, Description = <code>Train A emergency cooling pump</code>, SSC Type = <code>Active</code>, Component Type = <code>Motor-Driven Pump</code>. For the failure mode, enter: Failure Mode = <code>Fails to Start</code>, then set Failure Model = <strong>FM0: Direct Probability</strong>, Distribution = <strong>Lognormal</strong>, Mean = <code>3E-3</code>, Error Factor = <code>5</code>. Click <strong>Save</strong>.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Add a second failure mode.</strong> Select <code>PUMP-A</code> in Pane C, then click <strong>+FM</strong>. Enter: Failure Mode = <code>Fails to Run</code>, Failure Model = <strong>FM2: Fails While Operating</strong>, enter Lambda (failure rate) = <code>1E-5</code> per hour and Mission Time = <code>24</code> hours. The probability is computed automatically. Click <strong>Save</strong>.</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Add remaining components.</strong> Repeat to add <code>PUMP-B</code> (same failure modes), <code>VALVE-1</code> (Fails to Open, FM0, Mean = 1E-3, EF = 3), and <code>VALVE-2</code> (same). You now have a 4-component system with multiple failure modes each.</p></div></div>
+
+        <div class="step-box"><div class="step-number">6</div><div class="step-content"><p><strong>Review in Pane F.</strong> Click any SSC in Pane C to see its details in the Edit SSC pane (Pane F) on the right. You can edit the name, description, and each failure mode&rsquo;s parameters directly in this pane. Each failure mode shows its computed probability and distribution parameters.</p></div></div>
+
+        <div class="callout callout-tip"><strong>Loading from a database</strong> Instead of adding SSCs manually, you can click <strong>Load Database</strong> in Pane A to load a <code>.relDB</code> or <code>.fmeaDB</code> file. This populates the Component List tree on the left, from which you can drag components directly into Pane C.</div>
+    </div>
+
+    <!-- EXERCISE 2 -->
+    <div class="guide-section" id="ex2">
+        <h2>Exercise 2: Writing System Logic</h2>
+        <p>This exercise teaches you to use the &ldquo;How the System Works&rdquo; scripting language to define system success criteria and generate fault tree logic.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Navigate to Pane E.</strong> The &ldquo;How the System Works&rdquo; pane shows a text editor with the initial expression <code>SYSTEM WORKS =</code>. Above it, you will see clickable keyword buttons and SSC names that insert tokens at the cursor position.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Define a simple redundant system.</strong> Type or click to build the expression: <code>SYSTEM WORKS = PUMP-A OR PUMP-B ;</code>. This means the system works if either pump is working (an OR relationship). Press Enter to start a new line, then add: <code>SYSTEM WORKS = VALVE-1 AND VALVE-2 ;</code>. This means both valves must work.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Use variables for grouping.</strong> Replace the above with a more structured approach. Type: <code>PUMPS= PUMP-A PUMP-B ;</code> (this defines a variable). Then on the next line: <code>SYSTEM WORKS = PUMPS= OR ;</code>. Then: <code>SYSTEM WORKS = VALVE-1 AND VALVE-2 ;</code>. The variable approach makes complex logic easier to read and maintain.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Click &ldquo;Check Script&rdquo;.</strong> The orange Check Script button validates your logic for syntax errors, unmatched parentheses, and unknown identifiers. If it finds SSC names in the logic that don&rsquo;t exist in your SSC list, it will offer to create them automatically.</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Try advanced keywords.</strong> Experiment with adding dependency logic: <code>PUMPS= RELIES ON POWER ;</code> means the pumps group depends on POWER &mdash; if POWER fails, the pumps also fail regardless of their own reliability. Try conditional logic: <code>IF POWER FAILS THEN PUMP-A FAILS ;</code>.</p></div></div>
+
+        <div class="callout callout-info"><strong>Keyword reference</strong> Hover over any keyword button above the editor to see a tooltip with a detailed explanation and usage example. The keywords include SYSTEM WORKS, AND, OR, NOT, RELIES ON, WORKS, FAILS, UNLESS, WHEN, IF/THEN, IS TRUE/FALSE, ARE IN, ARE NOT IN, and comparison operators (=, &lt;, &gt;, &lt;=, &gt;=).</div>
+    </div>
+
+    <!-- EXERCISE 3 -->
+    <div class="guide-section" id="ex3">
+        <h2>Exercise 3: Analyzing &ldquo;How the System Fails&rdquo;</h2>
+        <p>This exercise uses the failure analysis modal to view the derived fault tree, cut sets, and importance measures.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Click &ldquo;How the System Fails&rdquo;</strong> in the toolbar (the dark red button). A full-screen modal opens showing two side-by-side panels. The left panel shows the fault tree derived from your system logic; the right panel shows analysis results.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Explore the fault tree.</strong> The left panel has two tabs: <strong>Text</strong> (an indented text representation) and <strong>Graphic</strong> (a canvas rendering of the tree with AND/OR gates). Toggle between them. The graphic view supports zoom and pan.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Review cut sets.</strong> In the right panel, click the <strong>Cut Sets</strong> tab. The minimal cut sets are listed with their probability contributions. Each cut set represents a minimal combination of component failures that causes system failure. The MCUB (Minimal Cut Upper Bound) probability is shown at the top.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>View importance measures.</strong> Click the <strong>Importance</strong> tab. A sortable table shows each basic event with four importance measures: Risk Increase Ratio (RIR), Risk Reduction Ratio (RRR), Probability of Contribution (PC), and System-Wide Importance Measure (SWIM). Click column headers to sort.</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Visualize importance.</strong> Click the <strong>Plot</strong> tab. A scatter plot shows two importance measures plotted against each other. Use the axis dropdown menus to change which measures are plotted (e.g., SWIM vs. RIR). Data points are labeled with basic event names. Axis selections are saved for next time.</p></div></div>
+
+        <div class="callout callout-warn"><strong>Linked systems</strong> If any SSC uses a &ldquo;Linked System&rdquo; probability type (referencing another <code>.KNOW_SYS</code> file), the failure analysis will resolve those linked probabilities automatically. Events with unresolved links show &ldquo;LINKED&rdquo; instead of a probability.</div>
+    </div>
+
+    <!-- EXERCISE 4 -->
+    <div class="guide-section" id="ex4">
+        <h2>Exercise 4: FMEA Editor and Mermaid Diagrams</h2>
+        <p>This exercise demonstrates the Failure Modes and Effects Analysis editor with auto-generated diagrams.</p>
+
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Click &ldquo;FMEA&rdquo;</strong> in the toolbar. The full-screen FMEA modal opens with a two-pane layout: the SSC list on the left and the Mermaid FMEA diagram on the right.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Select an SSC.</strong> Click <code>PUMP-A</code> in the left pane. The right pane updates to show the FMEA block diagram for this component, rendered using Mermaid.js. Each failure mode is shown as a connected block with its description and probability.</p></div></div>
+
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Add FMEA details.</strong> Click a failure mode in the left pane to expand its editor. Add an <strong>Effect</strong> (what happens when this failure mode occurs), then fill in <strong>Severity</strong>, <strong>Detection</strong>, and <strong>Mitigation</strong> fields. These fields appear in the FMEA section of reports and in <code>.fmeaDB</code> exports.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Add a new failure mode from FMEA.</strong> You can add new failure modes directly in the FMEA editor. Click <strong>Add Failure Mode</strong> for the selected SSC, fill in the failure mode details, and the diagram updates automatically.</p></div></div>
+
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Review the diagram.</strong> The Mermaid diagram is interactive &mdash; zoom and pan to explore complex systems. The diagram shows the SSC at the center with failure modes branching out, and effects branching from each failure mode.</p></div></div>
+    </div>
+
+    <!-- EXERCISE 5 -->
+    <div class="guide-section" id="ex5">
+        <h2>Exercise 5: Importing, Exporting, and Reporting</h2>
+        <p>This exercise covers data interchange with other KUREAS modules and report generation.</p>
+
+        <h3>5A: Importing Data</h3>
+        <div class="step-box"><div class="step-number">1</div><div class="step-content"><p><strong>Import boundary conditions from SEQ.</strong> Click <strong>Import</strong> in the toolbar. Select <strong>Boundary Conditions from SEQ file</strong>. Choose a <code>.KNOW</code> file saved by KUREAS-SEQ. Review the available boundary conditions, check the ones to import, and click <strong>Import</strong>. Imported boundary conditions appear as tokens in the system logic editor.</p></div></div>
+
+        <div class="step-box"><div class="step-number">2</div><div class="step-content"><p><strong>Import basic events from FTL.</strong> Click <strong>Import</strong> again and select <strong>Basic events from FTL file</strong>. Choose a <code>.KNOW_FTL</code> file saved by KUREAS-FTL. Review the basic events, select which to import, and confirm. Each imported event becomes an SSC in your system with its probability data preserved.</p></div></div>
+
+        <h3>5B: Exporting Data</h3>
+        <div class="step-box"><div class="step-number">3</div><div class="step-content"><p><strong>Export to Reliability Database.</strong> Click <strong>Export</strong>. Select <strong>Reliability Database (.relDB)</strong>. Check the components to include. The exported CSV file contains system name, SSC type, component type, failure mode, description, units, distribution type, and parameters. This file can be loaded back into any KUREAS-SYS project.</p></div></div>
+
+        <div class="step-box"><div class="step-number">4</div><div class="step-content"><p><strong>Export fault tree to KUREAS-FTL.</strong> In the Export dialog, select <strong>KUREAS-FTL Fault Tree (.KNOW_FTL)</strong>. This exports the system fault tree (derived from your &ldquo;How the System Works&rdquo; logic) as a complete KUREAS-FTL project with basic event probabilities, descriptions, and pre-computed cut sets. Load it directly in KUREAS-FTL for further editing.</p></div></div>
+
+        <h3>5C: Generating Reports</h3>
+        <div class="step-box"><div class="step-number">5</div><div class="step-content"><p><strong>Configure the report.</strong> Click <strong>Report</strong>. The report dialog lets you select which sections to include (11 available sections), choose Word (.doc) or Markdown (.md) format, and set a filename. Reorder sections by dragging. Section preferences are saved across sessions.</p></div></div>
+
+        <div class="step-box"><div class="step-number">6</div><div class="step-content"><p><strong>Generate and review.</strong> Click <strong>Generate</strong>. For Word format, a preview opens in the browser where you can review, print, or download. Reports include embedded fault tree graphics, FMEA diagrams, importance measure scatter plots, and all SSC data tables.</p></div></div>
+
+        <div class="step-box"><div class="step-number">7</div><div class="step-content"><p><strong>Save the project.</strong> Click <strong>Save SYS</strong> to save your complete project as a <code>.KNOW_SYS</code> file. This file preserves all system data, SSCs, failure modes, logic, supercomponents, and boundary conditions for future editing or use in KUREAS-REPORT.</p></div></div>
+
+        <div class="callout callout-tip"><strong>Cross-module integration</strong> The <code>.KNOW_SYS</code> file can be loaded into KUREAS-REPORT for integrated safety report assembly. The <code>.KNOW_FTL</code> export creates a direct bridge to KUREAS-FTL for detailed fault tree analysis. The <code>.relDB</code> export creates a reusable reliability database for future projects.</div>
+    </div>
+
+    <div style="border-top:2px solid #e2e8f0;padding-top:24px;margin-top:48px;color:#94a3b8;font-size:13px;">
+        <p>KUREAS-SYS Walkthrough Guide v1.0 &bull; &copy; 2024&ndash;2026 Curtis Lee Smith &bull; MIT License &bull; Developed by Curtis Lee Smith and Claude.ai</p>
+    </div>
+</div>
+</body>
+</html>
