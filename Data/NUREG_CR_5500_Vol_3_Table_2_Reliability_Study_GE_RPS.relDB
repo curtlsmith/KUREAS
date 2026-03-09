@@ -1,0 +1,15 @@
+﻿source name: NUREG-CR-5500 Vol 3 GE RPS
+source description: Reliability Study: General Electric Reactor Protection System, 1984-1995, Table 2, NUREG/CR-5500 Vol.3, February 1999, URL https://nrcoe.inl.gov/publicdocs/SystemStudies/nureg-cr-5500-vol-3.pdf
+*System                        ,                    SSC Type,  Component Type              ,Failure Mode           ,Description                                                                         ,Units (per demand or per hour),Distribution Type,Mean,Distribution Shape Parameter (α),Distribution Scale Parameter (β)
+Reactor Protection System (RPS),Control Unit (CTRL),Hydraulic (HYD),Fails to Operate (FTOP),Reactor Protection System (RPS) Hydraulic (HYD) Fails to Operate (FTOP),d,Lognormal,2.20E-05,2.20E-05,4.47
+Reactor Protection System (RPS),Valve (VALVE),Air-Operated Valve (AOV),Fails to Operate (FTOP),Reactor Protection System (RPS) Air-Operated Valve (AOV) Fails to Operate (FTOP),d,Lognormal,2.90E-06,2.90E-06,3.23
+Reactor Protection System (RPS),Switch (SWC),Bistable (BIS),Fails to Operate (FTOP),Reactor Protection System (RPS) Bistable Switch (BIS) Fails to Operate (FTOP),d,Lognormal,2.90E-04,2.90E-04,6.23
+Reactor Protection System (RPS),Process Logic Controller (PLC),Level PLC (LEVL),Fails to Operate (FTOP),Reactor Protection System (RPS) Level PLC (LEVL) Fails to Operate (FTOP),d,Lognormal,7.70E-04,7.70E-04,10.99
+Reactor Protection System (RPS),Process Logic Controller (PLC),Pressure PLC (PRES),Fails to Operate (FTOP),Reactor Protection System (RPS) Pressure PLC (PRES) Fails to Operate (FTOP),d,Lognormal,5.70E-05,5.70E-05,5.52
+Reactor Protection System (RPS),Switch (SWC),Manual Switch (MAN),Fails to Open or Close (FTOC),Reactor Protection System (RPS) Manual Switch (MAN) Fails to Open or Close (FTOC),d,Lognormal,1.30E-05,1.30E-05,5.68
+Reactor Protection System (RPS),Electrical (ELECT),DC System (DC),Fails to Operate (FTOP),Reactor Protection System (RPS) DC System (DC) Fails to Operate (FTOP),d,Lognormal,6.00E-05,6.00E-05,10.00
+Reactor Protection System (RPS),Rod Assembly (RA),Control Rod Drive (CRD),Fails to Insert (FTI),Reactor Protection System (RPS) Control Rod Drive (CRD) Fails to Insert (FTI),d,Lognormal,5.00E-05,5.00E-05,5.90
+Reactor Protection System (RPS),Switch (SWC),Level (LEVEL),Fails to Operate (FTOP),Reactor Protection System (RPS) Level Switch (LEVEL) Fails to Operate (FTOP),d,Lognormal,6.10E-04,6.10E-04,5.92
+Reactor Protection System (RPS),Scram Discharge Volume (SDV),Assembly (ASMBLY),Fails to Operate (FTOP),Reactor Protection System (RPS) Discharge Assembly Volume (ASMBLY) Fails to Operate (FTOP),d,Lognormal,6.70E-04,6.70E-04,3.26
+Reactor Protection System (RPS),Valve (VALVE),Solenoid-Operated Valve (SOV),Fails to Operate (FTOP),Reactor Protection System (RPS) Solenoid-Operated Valve (SOV) Fails to Operate (FTOP),d,Lognormal,7.00E-04,7.00E-04,10.41
+Reactor Protection System (RPS),Switch (SWC),Relay Switch (RLY),Fails to Operate (FTOP),Reactor Protection System (RPS) Relay Switch (RLY) Fails to Operate (FTOP),d,Lognormal,1.90E-05,1.90E-05,6.14

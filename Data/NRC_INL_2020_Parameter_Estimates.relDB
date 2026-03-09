@@ -1,0 +1,309 @@
+﻿source name: NRC-INL 2020 Parameter Estimation
+source description: Industry Average Parameter Estimates, 2020 Update, URL https://nrcoe.inl.gov/avgperf/
+*System,SSC Type,Component Type,Failure Mode,Description,Units (per demand or per hour),Distribution Type,Mean,Distribution Shape Parameter (α),Distribution Scale Parameter (β)
+,Valve (VALVE),Air-Operated Valve (AOV),Fails to Open (FTO), Air-Operated Valve (AOV) Fails to Open (FTO),d,Beta,3.0E-04,50.50,1.66E+05
+,Valve (VALVE),Air-Operated Valve (AOV),Fails to Close (FTC), Air-Operated Valve (AOV) Fails to Close (FTC),d,Beta,1.9E-04,0.64,3.38E+03
+,Valve (VALVE),Air-Operated Valve (AOV),Fails to Open or Close (FTOC), Air-Operated Valve (AOV) Fails to Open or Close (FTOC),d,Beta,5.6E-04,0.83,1.49E+03
+,Valve (VALVE),Air-Operated Valve (AOV),Failure to Control (FTCRL), Air-Operated Valve (AOV) Failure to Control (FTCRL),h,Gamma,1.8E-07,1.26,7.17E+06
+,Valve (VALVE),Air-Operated Valve (AOV),Spurious Operation (SPUR), Air-Operated Valve (AOV) Spurious Operation (SPUR),h,Gamma,5.8E-08,0.86,1.47E+07
+,Valve (VALVE),Air-Operated Valve (AOV),Internal Leakage (INLEAK), Air-Operated Valve (AOV) Internal Leakage (INLEAK),h,Gamma,3.2E-08,35.50,1.11E+09
+,Valve (VALVE),Air-Operated Valve (AOV),Internal Rupture (INRUPT), Air-Operated Valve (AOV) Internal Rupture (INRUPT),h,Gamma,6.4E-10,0.30,4.69E+08
+,Valve (VALVE),Air-Operated Valve (AOV),External Leakage (EXLEAK), Air-Operated Valve (AOV) External Leakage (EXLEAK),h,Gamma,3.4E-08,0.58,1.68E+07
+,Valve (VALVE),Air-Operated Valve (AOV),External Rupture (EXRUPT), Air-Operated Valve (AOV) External Rupture (EXRUPT),h,Gamma,2.4E-09,0.30,1.25E+08
+Instrument Air (INSAIR),Valve (VALVE),Air-Operated Valve (AOV),Spurious Operation (SPUR),Instrument Air (INSAIR) Air-Operated Valve (AOV) Spurious Operation (SPUR),h,Gamma,8.0E-08,0.50,6.22E+06
+,Valve (VALVE),Motor-Operated Valve (MOV),Fails to Open (FTO), Motor-Operated Valve (MOV) Fails to Open (FTO),d,Beta,3.4E-04,2.48,7.22E+03
+,Valve (VALVE),Motor-Operated Valve (MOV),Fails to Close (FTC), Motor-Operated Valve (MOV) Fails to Close (FTC),d,Beta,2.3E-04,0.97,4.26E+03
+,Valve (VALVE),Motor-Operated Valve (MOV),Fails to Open or Close (FTOC), Motor-Operated Valve (MOV) Fails to Open or Close (FTOC),d,Beta,6.4E-04,2.43,3.80E+03
+,Valve (VALVE),Motor-Operated Feed Control Valve (FCV),Failure to Control (FTCRL), Motor-Operated Feed Control Valve (FCV) Failure to Control (FTCRL),h,Gamma,3.5E-08,0.80,2.30E+07
+,Valve (VALVE),Motor-Operated Valve (MOV),Spurious Operation (SPUR), Motor-Operated Valve (MOV) Spurious Operation (SPUR),h,Gamma,2.5E-08,41.50,1.63E+09
+,Valve (VALVE),Motor-Operated Valve (MOV),Internal Leakage (INLEAK), Motor-Operated Valve (MOV) Internal Leakage (INLEAK),h,Gamma,3.6E-08,0.45,1.25E+07
+,Valve (VALVE),Motor-Operated Valve (MOV),Internal Rupture (INRUPT), Motor-Operated Valve (MOV) Internal Rupture (INRUPT),h,Gamma,7.2E-10,0.30,4.16E+08
+,Valve (VALVE),Motor-Operated Valve (MOV),External Leakage (EXLEAK), Motor-Operated Valve (MOV) External Leakage (EXLEAK),h,Gamma,1.9E-08,0.46,2.46E+07
+,Valve (VALVE),Motor-Operated Valve (MOV),External Rupture (EXRUPT), Motor-Operated Valve (MOV) External Rupture (EXRUPT),h,Gamma,1.3E-09,0.30,2.28E+08
+Component Cooling Water (CCW),Valve (VALVE),Motor-Operated Valve (MOV),Spurious Operation (SPUR),Component Cooling Water (CCW) Motor-Operated Valve (MOV) Spurious Operation (SPUR),h,Gamma,2.5E-08,4.50,1.84E+08
+Component Cooling Water (CCW),Valve (VALVE),Air-Operated Valve (AOV),Spurious Operation (SPUR),Component Cooling Water (CCW) Air-Operated Valve (AOV) Spurious Operation (SPUR),h,Gamma,7.3E-08,10.50,1.45E+08
+Component Cooling Water (CCW),Valve (VALVE),Butterfly Valve (BFV),Spurious Operation (SPUR),Component Cooling Water (CCW) Butterfly Valve (BFV) Spurious Operation (SPUR),h,Gamma,2.9E-08,2.50,8.66E+07
+,Valve (VALVE),Butterfly Valve (BFV),Fails to Open (FTO), Butterfly Valve (BFV) Fails to Open (FTO),d,Beta,2.7E-04,24.50,8.94E+04
+,Valve (VALVE),Butterfly Valve (BFV),Fails to Close (FTC), Butterfly Valve (BFV) Fails to Close (FTC),d,Beta,2.9E-04,1.27,4.39E+03
+,Valve (VALVE),Butterfly Valve (BFV),Fails to Open or Close (FTOC), Butterfly Valve (BFV) Fails to Open or Close (FTOC),d,Beta,7.7E-04,0.60,7.83E+02
+Standby Service Water (SWS),Valve (VALVE),Motor-Operated Valve (MOV),Spurious Operation (SPUR),Standby Service Water (SWS) Motor-Operated Valve (MOV) Spurious Operation (SPUR),h,Gamma,7.7E-09,0.50,6.47E+07
+,Valve (VALVE),Hydraulic-Operated Valve (HOV),Fails to Open (FTO), Hydraulic-Operated Valve (HOV) Fails to Open (FTO),d,Beta,1.2E-03,0.44,3.53E+02
+,Valve (VALVE),Hydraulic-Operated Valve (HOV),Failure to Control (FTCRL), Hydraulic-Operated Valve (HOV) Failure to Control (FTCRL),h,Gamma,2.8E-07,21.50,7.62E+07
+,Valve (VALVE),Hydraulic-Operated Valve (HOV),Spurious Operation (SPUR), Hydraulic-Operated Valve (HOV) Spurious Operation (SPUR),h,Gamma,1.2E-07,0.53,4.28E+06
+,Valve (VALVE),Hydraulic-Operated Valve (HOV),Internal Leakage (INLEAK), Hydraulic-Operated Valve (HOV) Internal Leakage (INLEAK),h,Gamma,3.3E-08,2.50,7.62E+07
+,Valve (VALVE),Hydraulic-Operated Valve (HOV),Internal Rupture (INRUPT), Hydraulic-Operated Valve (HOV) Internal Rupture (INRUPT),h,Gamma,6.6E-10,0.30,4.57E+08
+,Valve (VALVE),Hydraulic-Operated Valve (HOV),External Leakage (EXLEAK), Hydraulic-Operated Valve (HOV) External Leakage (EXLEAK),h,Gamma,9.7E-08,0.45,4.65E+06
+,Valve (VALVE),Hydraulic-Operated Valve (HOV),External Rupture (EXRUPT), Hydraulic-Operated Valve (HOV) External Rupture (EXRUPT),h,Gamma,6.8E-09,0.30,4.44E+07
+,Valve (VALVE),Solenoid-Operated Valve (SOV),Fails to Open (FTO), Solenoid-Operated Valve (SOV) Fails to Open (FTO),d,Beta,4.8E-04,13.50,2.79E+04
+,Valve (VALVE),Solenoid-Operated Valve (SOV),Failure to Control (FTCRL), Solenoid-Operated Valve (SOV) Failure to Control (FTCRL),h,Gamma,1.5E-07,0.61,4.01E+06
+,Valve (VALVE),Solenoid-Operated Valve (SOV),Spurious Operation (SPUR), Solenoid-Operated Valve (SOV) Spurious Operation (SPUR),h,Gamma,8.2E-08,9.50,1.16E+08
+,Valve (VALVE),Solenoid-Operated Valve (SOV),Internal Leakage (INLEAK), Solenoid-Operated Valve (SOV) Internal Leakage (INLEAK),h,Gamma,7.3E-08,8.50,1.16E+08
+,Valve (VALVE),Solenoid-Operated Valve (SOV),Internal Rupture (INRUPT), Solenoid-Operated Valve (SOV) Internal Rupture (INRUPT),h,Gamma,1.5E-09,0.30,2.04E+08
+,Valve (VALVE),Solenoid-Operated Valve (SOV),External Leakage (EXLEAK), Solenoid-Operated Valve (SOV) External Leakage (EXLEAK),h,Gamma,2.2E-08,2.50,1.16E+08
+,Valve (VALVE),Solenoid-Operated Valve (SOV),External Rupture (EXRUPT), Solenoid-Operated Valve (SOV) External Rupture (EXRUPT),h,Gamma,1.5E-09,0.30,1.98E+08
+,Valve (VALVE),Explosive-Operated Valve (EOV),Fails to Open (FTO), Explosive-Operated Valve (EOV) Fails to Open (FTO),d,Beta,4.6E-03,1.01,2.17E+02
+,Valve (VALVE),Vacuum Breaker Valve (VBV),Fails to Open (FTO), Vacuum Breaker Valve (VBV) Fails to Open (FTO),d,Beta,6.5E-05,1.50,2.32E+04
+,Valve (VALVE),Vacuum Breaker Valve (VBV),Fails to Close (FTC), Vacuum Breaker Valve (VBV) Fails to Close (FTC),d,Beta,6.5E-05,1.50,2.32E+04
+,Valve (VALVE),Vacuum Breaker Valve (VBV),Fails to Open or Close (FTOC), Vacuum Breaker Valve (VBV) Fails to Open or Close (FTOC),d,Beta,1.1E-04,2.50,2.32E+04
+,Valve (VALVE),Vacuum Breaker Valve (VBV),Spurious Operation (SPUR), Vacuum Breaker Valve (VBV) Spurious Operation (SPUR),h,Gamma,1.1E-08,0.50,4.37E+07
+,Valve (VALVE),Vacuum Breaker Valve (VBV),Internal Leakage (INLEAK), Vacuum Breaker Valve (VBV) Internal Leakage (INLEAK),h,Gamma,5.7E-08,2.50,4.37E+07
+,Valve (VALVE),Vacuum Breaker Valve (VBV),Internal Rupture (INRUPT), Vacuum Breaker Valve (VBV) Internal Rupture (INRUPT),h,Gamma,1.1E-09,0.30,2.62E+08
+,Valve (VALVE),Turbine Bypass Valve (TBV),Fails to Open (FTO), Turbine Bypass Valve (TBV) Fails to Open (FTO),d,Beta,6.3E-04,1.50,2.37E+03
+,Valve (VALVE),Turbine Bypass Valve (TBV),Fails to Close (FTC), Turbine Bypass Valve (TBV) Fails to Close (FTC),d,Beta,2.1E-04,0.50,2.37E+03
+,Valve (VALVE),Turbine Bypass Valve (TBV),Fails to Open or Close (FTOC), Turbine Bypass Valve (TBV) Fails to Open or Close (FTOC),d,Beta,6.3E-04,1.50,2.37E+03
+,Valve (VALVE),Turbine Bypass Valve (TBV),Failure to Control (FTCRL), Turbine Bypass Valve (TBV) Failure to Control (FTCRL),h,Gamma,3.6E-07,0.49,1.38E+06
+,Valve (VALVE),Main Steam Isolation Valve (MSV),Fails to Open or Close (FTOC), Main Steam Isolation Valve (MSV) Fails to Open or Close (FTOC),d,Beta,7.6E-04,24.50,3.22E+04
+,Valve (VALVE),Main Steam Isolation Valve (MSV),Spurious Operation (SPUR), Main Steam Isolation Valve (MSV) Spurious Operation (SPUR),h,Gamma,2.3E-07,0.50,2.14E+06
+,Valve (VALVE),Main Steam Isolation Valve (MSV),Internal Leakage (INLEAK), Main Steam Isolation Valve (MSV) Internal Leakage (INLEAK),h,Gamma,3.6E-07,23.50,6.58E+07
+,Valve (VALVE),Main Steam Isolation Valve (MSV),Internal Rupture (INRUPT), Main Steam Isolation Valve (MSV) Internal Rupture (INRUPT),h,Gamma,7.1E-09,0.30,4.20E+07
+,Valve (VALVE),Main Steam Isolation Valve (MSV),External Leakage (EXLEAK), Main Steam Isolation Valve (MSV) External Leakage (EXLEAK),h,Gamma,2.3E-08,1.50,6.58E+07
+,Valve (VALVE),Main Steam Isolation Valve (MSV),External Rupture (EXRUPT), Main Steam Isolation Valve (MSV) External Rupture (EXRUPT),h,Gamma,1.6E-09,0.30,1.88E+08
+,Valve (VALVE),Check Valve (CKV),Fails to Open (FTO), Check Valve (CKV) Fails to Open (FTO),d,Beta,1.1E-05,0.50,4.48E+04
+,Valve (VALVE),Check Valve (CKV),Fails to Close (FTC), Check Valve (CKV) Fails to Close (FTC),d,Beta,1.2E-04,5.50,4.48E+04
+,Valve (VALVE),Check Valve (CKV),Spurious Operation (SPUR), Check Valve (CKV) Spurious Operation (SPUR),h,Gamma,6.2E-10,0.50,8.07E+08
+,Valve (VALVE),Check Valve (CKV),Internal Leakage (INLEAK), Check Valve (CKV) Internal Leakage (INLEAK),h,Gamma,7.3E-08,58.50,8.07E+08
+,Valve (VALVE),Check Valve (CKV),Internal Rupture (INRUPT), Check Valve (CKV) Internal Rupture (INRUPT),h,Gamma,1.5E-09,0.30,2.07E+08
+,Valve (VALVE),Check Valve (CKV),External Leakage (EXLEAK), Check Valve (CKV) External Leakage (EXLEAK),h,Gamma,4.3E-09,3.50,8.07E+08
+,Valve (VALVE),Check Valve (CKV),External Rupture (EXRUPT), Check Valve (CKV) External Rupture (EXRUPT),h,Gamma,3.0E-10,0.30,9.87E+08
+,Valve (VALVE),Manual Valve (XVM),Fails to Open (FTO), Manual Valve (XVM) Fails to Open (FTO),d,Beta,5.2E-04,1.50,2.87E+03
+,Valve (VALVE),Manual Valve (XVM),Spurious Operation (SPUR), Manual Valve (XVM) Spurious Operation (SPUR),h,Gamma,1.9E-08,2.50,1.33E+08
+,Valve (VALVE),Manual Valve (XVM),Internal Leakage (INLEAK), Manual Valve (XVM) Internal Leakage (INLEAK),h,Gamma,2.6E-08,3.50,1.33E+08
+,Valve (VALVE),Manual Valve (XVM),Internal Rupture (INRUPT), Manual Valve (XVM) Internal Rupture (INRUPT),h,Gamma,5.3E-10,0.30,5.68E+08
+,Valve (VALVE),Manual Valve (XVM),External Leakage (EXLEAK), Manual Valve (XVM) External Leakage (EXLEAK),h,Gamma,8.7E-08,11.50,1.33E+08
+,Valve (VALVE),Manual Valve (XVM),External Rupture (EXRUPT), Manual Valve (XVM) External Rupture (EXRUPT),h,Gamma,6.1E-09,0.30,4.94E+07
+Standby Service Water (SWS),Valve (VALVE),Manual Valve (XVM),Spurious Operation (SPUR),Standby Service Water (SWS) Manual Valve (XVM) Spurious Operation (SPUR),h,Gamma,2.8E-08,0.50,1.81E+07
+,Valve (VALVE),Flow Control Valve (FCV),Fails to Open or Close (FTOC), Flow Control Valve (FCV) Fails to Open or Close (FTOC),d,Beta,4.4E-05,0.50,1.13E+04
+,Valve (VALVE),Flow Control Valve (FCV),Failure to Control (FTCRL), Flow Control Valve (FCV) Failure to Control (FTCRL),h,Gamma,1.2E-07,8.50,7.36E+07
+,Valve (VALVE),Flow Control Valve (FCV),Spurious Operation (SPUR), Flow Control Valve (FCV) Spurious Operation (SPUR),h,Gamma,3.4E-08,2.50,7.36E+07
+,Valve (VALVE),Flow Control Valve (FCV),Fails to Operate (FTOP), Flow Control Valve (FCV) Fails to Operate (FTOP),h,Gamma,1.9E-06,0.67,3.54E+05
+,Valve (VALVE),Safety Relief Valve (SRV),Fails to Open (FTO), Safety Relief Valve (SRV) Fails to Open (FTO),d,Beta,2.1E-03,7.50,3.54E+03
+BWR Automatic Depressurization System (ADS),Valve (VALVE),Safety Relief Valve (SRV),Fails to Close (FTC),BWR Automatic Depressurization System (ADS) Safety Relief Valve (SRV) Fails to Close (FTC),d,Beta,1.4E-04,0.50,3.55E+03
+BWR Primary System (PRIM),Valve (VALVE),Safety Relief Valve (SRV),Failure to Control (FTCRL),BWR Primary System (PRIM) Safety Relief Valve (SRV) Failure to Control (FTCRL),h,Gamma,8.2E-09,0.50,6.10E+07
+,Valve (VALVE),Safety Relief Valve (SRV),Spurious Operation (SPUR), Safety Relief Valve (SRV) Spurious Operation (SPUR),h,Gamma,7.4E-08,4.50,6.10E+07
+BWR Primary System (PRIM),Valve (VALVE),Safety Relief Valve (SRV),Internal Leakage (INLEAK),BWR Primary System (PRIM) Safety Relief Valve (SRV) Internal Leakage (INLEAK),h,Gamma,3.9E-07,23.50,6.10E+07
+BWR Primary System (PRIM),Valve (VALVE),Safety Relief Valve (SRV),Internal Rupture (INRUPT),BWR Primary System (PRIM) Safety Relief Valve (SRV) Internal Rupture (INRUPT),h,Gamma,7.7E-09,0.30,3.90E+07
+BWR Primary System (PRIM),Valve (VALVE),Safety Relief Valve (SRV),External Leakage (EXLEAK),BWR Primary System (PRIM) Safety Relief Valve (SRV) External Leakage (EXLEAK),h,Gamma,8.2E-09,0.50,6.10E+07
+BWR Primary System (PRIM),Valve (VALVE),Safety Relief Valve (SRV),External Rupture (EXRUPT),BWR Primary System (PRIM) Safety Relief Valve (SRV) External Rupture (EXRUPT),h,Gamma,5.7E-10,0.30,5.23E+08
+Pressurizer,Valve (VALVE),Safety Valve (SVV),Spurious Operation (SPUR),Pressurizer Safety Valve (SVV) Spurious Operation (SPUR),h,Gamma,8.7E-09,1.50,1.72E+08
+Pressurizer,Valve (VALVE),Safety Valve (SVV),Internal Leakage (INLEAK),Pressurizer Safety Valve (SVV) Internal Leakage (INLEAK),h,Gamma,3.2E-08,5.50,1.72E+08
+Pressurizer,Valve (VALVE),Safety Valve (SVV),Internal Rupture (INRUPT),Pressurizer Safety Valve (SVV) Internal Rupture (INRUPT),h,Gamma,6.4E-10,0.30,4.69E+08
+Pressurizer,Valve (VALVE),Safety Valve (SVV),External Leakage (EXLEAK),Pressurizer Safety Valve (SVV) External Leakage (EXLEAK),h,Gamma,8.7E-09,1.50,1.72E+08
+Pressurizer,Valve (VALVE),Safety Valve (SVV),External Rupture (EXRUPT),Pressurizer Safety Valve (SVV) External Rupture (EXRUPT),h,Gamma,6.1E-10,0.30,4.90E+08
+PWR Main Steam System  (PWRSTEAM),Valve (VALVE),Safety Valve (SVV),Fails to Open (FTO),PWR Main Steam System  (PWRSTEAM) Safety Valve (SVV) Fails to Open (FTO),d,Beta,6.7E-04,0.50,7.44E+02
+PWR Main Steam System  (PWRSTEAM),Valve (VALVE),Safety Valve (SVV),Fails to Close (FTC),PWR Main Steam System  (PWRSTEAM) Safety Valve (SVV) Fails to Close (FTC),d,Beta,6.0E-03,4.50,7.42E+02
+PWR Main Steam System  (PWRSTEAM),Valve (VALVE),Safety Valve (SVV),Spurious Operation (SPUR),PWR Main Steam System  (PWRSTEAM) Safety Valve (SVV) Spurious Operation (SPUR),h,Gamma,3.6E-09,0.50,1.40E+08
+PWR Reactor Coolant System (PWRRCS),Valve (VALVE),Safety Valve (SVV),Fails to Open (FTO),PWR Reactor Coolant System (PWRRCS) Safety Valve (SVV) Fails to Open (FTO),d,Beta,6.6E-04,0.50,7.52E+02
+PWR Reactor Coolant System (PWRRCS),Valve (VALVE),Safety Valve (SVV),Fails to Close (FTC),PWR Reactor Coolant System (PWRRCS) Safety Valve (SVV) Fails to Close (FTC),d,Beta,4.1E-02,2.49,5.77E+01
+PWR Reactor Coolant System (PWRRCS),Valve (VALVE),Safety Valve (SVV),Spurious Operation (SPUR),PWR Reactor Coolant System (PWRRCS) Safety Valve (SVV) Spurious Operation (SPUR),h,Gamma,6.3E-08,1.50,2.39E+07
+PWR Reactor Coolant System (PWRRCS),Valve (VALVE),Power-Operated Relief Valve (PORV),Fails to Open (FTO),PWR Reactor Coolant System (PWRRCS) Power-Operated Relief Valve (PORV) Fails to Open (FTO),d,Beta,1.2E-02,4.50,3.74E+02
+PWR Reactor Coolant System (PWRRCS),Valve (VALVE),Power-Operated Relief Valve (PORV),Fails to Close (FTC),PWR Reactor Coolant System (PWRRCS) Power-Operated Relief Valve (PORV) Fails to Close (FTC),d,Beta,4.0E-03,0.49,1.24E+02
+PWR Main Steam System  (PWRSTEAM),Valve (VALVE),Power-Operated Relief Valve (PORV),Fails to Open (FTO),PWR Main Steam System  (PWRSTEAM) Power-Operated Relief Valve (PORV) Fails to Open (FTO),d,Beta,1.6E-02,25.50,1.56E+03
+PWR Main Steam System  (PWRSTEAM),Valve (VALVE),Power-Operated Relief Valve (PORV),Fails to Close (FTC),PWR Main Steam System  (PWRSTEAM) Power-Operated Relief Valve (PORV) Fails to Close (FTC),d,Beta,4.4E-03,1.05,2.41E+02
+PWR Main Steam System  (PWRSTEAM),Valve (VALVE),Power-Operated Relief Valve (PORV),Failure to Control (FTCRL),PWR Main Steam System  (PWRSTEAM) Power-Operated Relief Valve (PORV) Failure to Control (FTCRL),d,Beta,2.7E-02,7.50,2.72E+02
+,Valve (VALVE),Power-Operated Relief Valve (PORV),Spurious Operation (SPUR), Power-Operated Relief Valve (PORV) Spurious Operation (SPUR),h,Gamma,2.4E-07,13.50,5.72E+07
+,Valve (VALVE),Power-Operated Relief Valve (PORV),Internal Leakage (INLEAK), Power-Operated Relief Valve (PORV) Internal Leakage (INLEAK),h,Gamma,6.1E-08,3.50,5.72E+07
+,Valve (VALVE),Power-Operated Relief Valve (PORV),Internal Rupture (INRUPT), Power-Operated Relief Valve (PORV) Internal Rupture (INRUPT),h,Gamma,1.2E-09,0.30,2.45E+08
+,Valve (VALVE),Power-Operated Relief Valve (PORV),External Leakage (EXLEAK), Power-Operated Relief Valve (PORV) External Leakage (EXLEAK),h,Gamma,8.7E-09,0.50,5.72E+07
+,Valve (VALVE),Power-Operated Relief Valve (PORV),External Rupture (EXRUPT), Power-Operated Relief Valve (PORV) External Rupture (EXRUPT),h,Gamma,6.1E-10,0.30,4.90E+08
+PWR Reactor Coolant System (PWRRCS),Valve (VALVE),Power-Operated Relief Valve (PORV),Open During LOOP (ODLOOP),PWR Reactor Coolant System (PWRRCS) Power-Operated Relief Valve (PORV) Open During LOOP (ODLOOP),d,Point Estimate,9.2E-02,--,--
+PWR Reactor Coolant System (PWRRCS),Valve (VALVE),Power-Operated Relief Valve (PORV),Open During TRANS (ODTRANS),PWR Reactor Coolant System (PWRRCS) Power-Operated Relief Valve (PORV) Open During TRANS (ODTRANS),d,Point Estimate,2.3E-02,--,--
+,Valve (VALVE),Low-Capacity Relief Valve (RVL),Fails to Open (FTO), Low-Capacity Relief Valve (RVL) Fails to Open (FTO),d,Beta,7.6E-03,0.50,6.54E+01
+,Valve (VALVE),Low-Capacity Relief Valve (RVL),Fails to Close (FTC), Low-Capacity Relief Valve (RVL) Fails to Close (FTC),d,Beta,7.6E-03,0.50,6.54E+01
+,Valve (VALVE),Low-Capacity Relief Valve (RVL),Spurious Operation (SPUR), Low-Capacity Relief Valve (RVL) Spurious Operation (SPUR),h,Gamma,5.5E-08,0.50,9.17E+06
+,Valve (VALVE),Low-Capacity Relief Valve (RVL),Internal Leakage (INLEAK), Low-Capacity Relief Valve (RVL) Internal Leakage (INLEAK),h,Gamma,3.8E-07,3.50,9.17E+06
+,Valve (VALVE),Low-Capacity Relief Valve (RVL),Internal Rupture (INRUPT), Low-Capacity Relief Valve (RVL) Internal Rupture (INRUPT),h,Gamma,7.6E-09,0.30,3.93E+07
+,Valve (VALVE),Low-Capacity Relief Valve (RVL),External Leakage (EXLEAK), Low-Capacity Relief Valve (RVL) External Leakage (EXLEAK),h,Gamma,3.8E-07,3.50,9.17E+06
+,Valve (VALVE),Low-Capacity Relief Valve (RVL),External Rupture (EXRUPT), Low-Capacity Relief Valve (RVL) External Rupture (EXRUPT),h,Gamma,2.7E-08,0.30,1.12E+07
+,Pump (PUMP),Motor-Driven Pump (MDP),Fails to Start while in Standby (FTS), Motor-Driven Pump (MDP) Fails to Start while in Standby (FTS),d,Beta,5.9E-04,2.07,3.52E+03
+,Pump (PUMP),Motor-Driven Pump (MDP),Fails to Run in First Hour (FTRFH), Motor-Driven Pump (MDP) Fails to Run in First Hour (FTRFH),h,Gamma,9.1E-05,0.58,6.34E+03
+,Pump (PUMP),Motor-Driven Pump (MDP),Fails to Run after First Hour (FTR), Motor-Driven Pump (MDP) Fails to Run after First Hour (FTR),h,Gamma,8.1E-06,0.51,6.29E+04
+,Pump (PUMP),Motor-Driven Pump (MDP),External Leakage (EXLEAK), Motor-Driven Pump (MDP) External Leakage (EXLEAK),h,Gamma,2.0E-07,0.68,3.45E+06
+,Pump (PUMP),Motor-Driven Pump (MDP),External Rupture (EXRUPT), Motor-Driven Pump (MDP) External Rupture (EXRUPT),h,Gamma,1.4E-08,0.30,2.16E+07
+,Pump (PUMP),Motor-Driven Pump (MDP),Fails to Restart (FTRESTART), Motor-Driven Pump (MDP) Fails to Restart (FTRESTART),d,Beta,7.9E-04,1.08,1.37E+03
+,Pump (PUMP),Motor-Driven Pump (MDP),Fails to Continue Runing (FTCR), Motor-Driven Pump (MDP) Fails to Continue Runing (FTCR),h,Gamma,2.3E-06,1.97,8.72E+05
+Component Cooling Water (CCW),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Start while in Standby (FTS),Component Cooling Water (CCW) Motor-Driven Pump (MDP) Fails to Start while in Standby (FTS),d,Beta,4.6E-04,0.80,1.74E+03
+Component Cooling Water (CCW),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Run (FTR),Component Cooling Water (CCW) Motor-Driven Pump (MDP) Fails to Run (FTR),h,Gamma,1.8E-06,1.85,1.04E+06
+Service Water (SWS),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Start while in Standby (FTS),Service Water (SWS) Motor-Driven Pump (MDP) Fails to Start while in Standby (FTS),d,Beta,7.4E-04,0.85,1.14E+03
+Service Water (SWS),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Run (FTR),Service Water (SWS) Motor-Driven Pump (MDP) Fails to Run (FTR),h,Gamma,4.2E-06,1.17,2.79E+05
+Circulating Water (CWS),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Run (FTR),Circulating Water (CWS) Motor-Driven Pump (MDP) Fails to Run (FTR),h,Gamma,4.9E-06,4.57,9.41E+05
+,Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Start while in Standby (FTS), Turbine-Driven Pump (TDP) Fails to Start while in Standby (FTS),d,Beta,5.3E-03,1.26,2.35E+02
+,Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Run in First Hour (FTRFH), Turbine-Driven Pump (TDP) Fails to Run in First Hour (FTRFH),h,Gamma,2.6E-03,0.44,1.73E+02
+,Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Run after First Hour (FTR), Turbine-Driven Pump (TDP) Fails to Run after First Hour (FTR),h,Gamma,6.4E-03,0.44,6.95E+01
+,Pump (PUMP),Turbine-Driven Pump (TDP),External Leakage (EXLEAK), Turbine-Driven Pump (TDP) External Leakage (EXLEAK),h,Gamma,4.1E-07,2.02,4.90E+06
+,Pump (PUMP),Turbine-Driven Pump (TDP),External Rupture (EXRUPT), Turbine-Driven Pump (TDP) External Rupture (EXRUPT),h,Gamma,2.9E-08,0.30,1.04E+07
+Auxiliary Feedwater (AFW),Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Start while in Standby (FTS),Auxiliary Feedwater (AFW) Turbine-Driven Pump (TDP) Fails to Start while in Standby (FTS),d,Beta,3.8E-03,0.83,2.18E+02
+Auxiliary Feedwater (AFW),Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Run in First Hour (FTRFH),Auxiliary Feedwater (AFW) Turbine-Driven Pump (TDP) Fails to Run in First Hour (FTRFH),h,Gamma,1.7E-03,18.50,1.07E+04
+Auxiliary Feedwater (AFW),Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Run after First Hour (FTR),Auxiliary Feedwater (AFW) Turbine-Driven Pump (TDP) Fails to Run after First Hour (FTR),h,Gamma,2.6E-03,8.50,3.30E+03
+High Pressure Coolant Injection (HPI) or Reactor Core Isolation Cooling,Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Restart (FTRESTART),High Pressure Coolant Injection (HPI) or Reactor Core Isolation Cooling Turbine-Driven Pump (TDP) Fails to Restart (FTRESTART),d,Beta,6.7E-03,1.29,1.92E+02
+High Pressure Coolant Injection (HPI),Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Run in First Hour (FTRFH),High Pressure Coolant Injection (HPI) Turbine-Driven Pump (TDP) Fails to Run in First Hour (FTRFH),h,Gamma,3.4E-03,2.22,6.64E+02
+High Pressure Coolant Injection (HPI) or Reactor Core Isolation Cooling,Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Run after First Hour (FTR),High Pressure Coolant Injection (HPI) or Reactor Core Isolation Cooling Turbine-Driven Pump (TDP) Fails to Run after First Hour (FTR),h,Gamma,8.2E-03,9.50,1.16E+03
+Main Feedwater (MFW),Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Restart (FTRESTART),Main Feedwater (MFW) Turbine-Driven Pump (TDP) Fails to Restart (FTRESTART),d,Beta,4.6E-03,0.63,1.37E+02
+Main Feedwater (MFW),Pump (PUMP),Turbine-Driven Pump (TDP),Fails to Continue Runing (FTCR),Main Feedwater (MFW) Turbine-Driven Pump (TDP) Fails to Continue Runing (FTCR),h,Gamma,8.5E-06,0.82,9.76E+04
+,Pump (PUMP),Engine-Driven Pump (EDP),Fails to Start while in Standby (FTS), Engine-Driven Pump (EDP) Fails to Start while in Standby (FTS),d,Beta,7.6E-04,13.50,1.78E+04
+,Pump (PUMP),Engine-Driven Pump (EDP),Fails to Run in First Hour (FTRFH), Engine-Driven Pump (EDP) Fails to Run in First Hour (FTRFH),h,Gamma,6.6E-04,6.50,9.89E+03
+,Pump (PUMP),Engine-Driven Pump (EDP),Fails to Run after First Hour (FTR), Engine-Driven Pump (EDP) Fails to Run after First Hour (FTR),h,Gamma,3.3E-03,15.50,4.75E+03
+,Pump (PUMP),Engine-Driven Pump (EDP),External Leakage (EXLEAK), Engine-Driven Pump (EDP) External Leakage (EXLEAK),h,Gamma,8.5E-07,6.50,7.69E+06
+,Pump (PUMP),Engine-Driven Pump (EDP),External Rupture (EXRUPT), Engine-Driven Pump (EDP) External Rupture (EXRUPT),h,Gamma,5.9E-08,0.30,5.07E+06
+Auxiliary Feedwater (AFW),Pump (PUMP),Engine-Driven Pump (EDP),Fails to Start while in Standby (FTS),Auxiliary Feedwater (AFW) Engine-Driven Pump (EDP) Fails to Start while in Standby (FTS),d,Beta,1.3E-03,1.50,1.16E+03
+Auxiliary Feedwater (AFW),Pump (PUMP),Engine-Driven Pump (EDP),Fails to Run in First Hour (FTRFH),Auxiliary Feedwater (AFW) Engine-Driven Pump (EDP) Fails to Run in First Hour (FTRFH),h,Gamma,3.3E-03,2.50,7.59E+02
+Auxiliary Feedwater (AFW),Pump (PUMP),Engine-Driven Pump (EDP),Fails to Run after First Hour (FTR),Auxiliary Feedwater (AFW) Engine-Driven Pump (EDP) Fails to Run after First Hour (FTR),h,Gamma,1.1E-02,2.50,2.34E+02
+,Pump (PUMP),Positive Displacement Pump (PDP),Fails to Restart (FTRESTART), Positive Displacement Pump (PDP) Fails to Restart (FTRESTART),d,Beta,2.5E-03,0.83,3.33E+02
+,Pump (PUMP),Positive Displacement Pump (PDP),Fails to Continue Runing (FTCR), Positive Displacement Pump (PDP) Fails to Continue Runing (FTCR),h,Gamma,1.9E-05,1.33,6.98E+04
+,Pump (PUMP),Positive Displacement Pump (PDP),Fails to Start while in Standby (FTS), Positive Displacement Pump (PDP) Fails to Start while in Standby (FTS),d,Beta,1.2E-03,10.50,9.05E+03
+,Pump (PUMP),Positive Displacement Pump (PDP),Fails to Run in First Hour (FTRFH), Positive Displacement Pump (PDP) Fails to Run in First Hour (FTRFH),h,Gamma,3.7E-04,1.50,4.05E+03
+,Pump (PUMP),Positive Displacement Pump (PDP),Fails to Run after First Hour (FTR), Positive Displacement Pump (PDP) Fails to Run after First Hour (FTR),h,Gamma,3.3E-04,0.50,1.50E+03
+,Pump (PUMP),Positive Displacement Pump (PDP),External Leakage (EXLEAK), Positive Displacement Pump (PDP) External Leakage (EXLEAK),h,Gamma,7.3E-07,15.50,2.12E+07
+,Pump (PUMP),Positive Displacement Pump (PDP),External Rupture (EXRUPT), Positive Displacement Pump (PDP) External Rupture (EXRUPT),h,Gamma,5.1E-08,0.30,5.86E+06
+,Pump (PUMP),Pump Volute (PMP),Fails to Continue Runing (FTCR), Pump Volute (PMP) Fails to Continue Runing (FTCR),h,Gamma,1.2E-04,16.50,1.33E+05
+,Electrical (ELECT),Emergency Diesel Generator (EDG),Fails to Start while in Standby (FTS), Emergency Diesel Generator (EDG) Fails to Start while in Standby (FTS),d,Beta,2.2E-03,23.80,1.07E+04
+,Electrical (ELECT),Emergency Diesel Generator (EDG),Fails to Run in First Hour (FTRFH), Emergency Diesel Generator (EDG) Fails to Run in First Hour (FTRFH),h,Gamma,3.3E-03,3.61,1.09E+03
+,Electrical (ELECT),Emergency Diesel Generator (EDG),Fails to Run after First Hour (FTR), Emergency Diesel Generator (EDG) Fails to Run after First Hour (FTR),h,Gamma,1.2E-03,3.83,3.25E+03
+,Electrical (ELECT),Hydro Turbine Generator (HTG),Fails to Start while in Standby (FTS), Hydro Turbine Generator (HTG) Fails to Start while in Standby (FTS),d,Beta,1.0E-03,6.50,6.36E+03
+,Electrical (ELECT),Hydro Turbine Generator (HTG),Fails to Run in First Hour (FTRFH), Hydro Turbine Generator (HTG) Fails to Run in First Hour (FTRFH),h,Gamma,5.5E-04,2.50,4.58E+03
+,Electrical (ELECT),Hydro Turbine Generator (HTG),Fails to Run after First Hour (FTR), Hydro Turbine Generator (HTG) Fails to Run after First Hour (FTR),h,Gamma,1.1E-04,1.50,1.39E+04
+,Electrical (ELECT),Combustion Turbine Generator (CTG),Fails to Start while in Standby (FTS), Combustion Turbine Generator (CTG) Fails to Start while in Standby (FTS),d,Beta,7.0E-02,1.20,1.59E+01
+,Electrical (ELECT),Combustion Turbine Generator (CTG),Fails to Run in First Hour (FTRFH), Combustion Turbine Generator (CTG) Fails to Run in First Hour (FTRFH),h,Gamma,6.9E-03,2.50,3.60E+02
+,Electrical (ELECT),Combustion Turbine Generator (CTG),Fails to Run after First Hour (FTR), Combustion Turbine Generator (CTG) Fails to Run after First Hour (FTR),h,Gamma,4.7E-03,4.50,9.59E+02
+High Pressure Core Spray (HCS),Electrical (ELECT),Generator (GEN),Fails to Start while in Standby (FTS),High Pressure Core Spray (HCS) Generator (GEN) Fails to Start while in Standby (FTS),d,Beta,2.1E-03,4.50,2.11E+03
+High Pressure Core Spray (HCS),Electrical (ELECT),Generator (GEN),Fails to Run (FTR),High Pressure Core Spray (HCS) Generator (GEN) Fails to Run (FTR),h,Gamma,8.3E-04,3.50,4.20E+03
+,Electrical (ELECT),Station Blackout Generator (SBO),Fails to Start while in Standby (FTS), Station Blackout Generator (SBO) Fails to Start while in Standby (FTS),d,Beta,2.9E-02,0.98,3.22E+01
+,Electrical (ELECT),Station Blackout Generator (SBO),Fails to Run (FTR), Station Blackout Generator (SBO) Fails to Run (FTR),h,Gamma,1.1E-03,2.50,2.20E+03
+,Electrical (ELECT),Battery Charger (BCH),Fails to Operate (FTOP), Battery Charger (BCH) Fails to Operate (FTOP),h,Gamma,1.8E-06,1.08,6.12E+05
+,Electrical (ELECT),Battery (BAT),Fails to Operate (FTOP), Battery (BAT) Fails to Operate (FTOP),h,Gamma,4.1E-07,0.63,1.57E+06
+,Electrical (ELECT),Automatic Bus Transfer Switch (ABT),Fails to Transfer (FTTRANS), Automatic Bus Transfer Switch (ABT) Fails to Transfer (FTTRANS),d,Beta,1.3E-03,4.50,3.37E+03
+,Electrical (ELECT),Automatic Bus Transfer Switch (ABT),Spurious Operation (SPUR), Automatic Bus Transfer Switch (ABT) Spurious Operation (SPUR),h,Gamma,1.3E-07,0.50,4.01E+06
+,Electrical (ELECT),Circuit Breaker (CBK),Fails to Open or Close (FTOC), Circuit Breaker (CBK) Fails to Open or Close (FTOC),d,Beta,1.6E-03,0.79,4.99E+02
+,Electrical (ELECT),Circuit Breaker (CBK),Spurious Operation (SPUR), Circuit Breaker (CBK) Spurious Operation (SPUR),h,Gamma,1.7E-07,0.47,2.68E+06
+,Electrical (ELECT),High Voltage (13.8/16 kV) Circuit Breaker (CBK),Fails to Open or Close (FTOC), High Voltage (13.8/16 kV) Circuit Breaker (CBK) Fails to Open or Close (FTOC),d,Beta,1.9E-03,17.50,9.18E+03
+,Electrical (ELECT),High Voltage (13.8/16 kV) Circuit Breaker (CBK),Spurious Operation (SPUR), High Voltage (13.8/16 kV) Circuit Breaker (CBK) Spurious Operation (SPUR),h,Gamma,3.9E-07,14.50,3.76E+07
+,Electrical (ELECT),Medium Voltage (4.2/6.9kV) Circuit Breaker (CBK),Fails to Open or Close (FTOC), Medium Voltage (4.2/6.9kV) Circuit Breaker (CBK) Fails to Open or Close (FTOC),d,Beta,2.6E-03,0.47,1.76E+02
+,Electrical (ELECT),Medium Voltage (4.2/6.9kV) Circuit Breaker (CBK),Spurious Operation (SPUR), Medium Voltage (4.2/6.9kV) Circuit Breaker (CBK) Spurious Operation (SPUR),h,Gamma,1.0E-07,15.50,1.49E+08
+,Electrical (ELECT),Low Voltage (480V) Circuit Breaker (CBK),Fails to Open or Close (FTOC), Low Voltage (480V) Circuit Breaker (CBK) Fails to Open or Close (FTOC),d,Beta,8.6E-04,0.50,5.79E+02
+,Electrical (ELECT),Low Voltage (480V) Circuit Breaker (CBK),Spurious Operation (SPUR), Low Voltage (480V) Circuit Breaker (CBK) Spurious Operation (SPUR),h,Gamma,8.9E-08,27.50,3.11E+08
+,Electrical (ELECT),DC Circuit Breaker (CBK),Fails to Open or Close (FTOC), DC Circuit Breaker (CBK) Fails to Open or Close (FTOC),d,Beta,3.1E-04,5.50,1.76E+04
+,Electrical (ELECT),DC Circuit Breaker (CBK),Spurious Operation (SPUR), DC Circuit Breaker (CBK) Spurious Operation (SPUR),h,Gamma,1.4E-08,0.50,3.49E+07
+,Electrical (ELECT),Inverter (INV),Fails to Operate (FTOP), Inverter (INV) Fails to Operate (FTOP),h,Gamma,3.5E-06,0.99,2.82E+05
+,Electrical (ELECT),AC Bus (BUS),Fails to Operate (FTOP), AC Bus (BUS) Fails to Operate (FTOP),h,Gamma,5.9E-07,0.99,1.68E+06
+,Electrical (ELECT),DC Bus (BUS),Fails to Operate (FTOP), DC Bus (BUS) Fails to Operate (FTOP),h,Gamma,7.1E-07,1.50,2.10E+06
+,Electrical (ELECT),Motor Control Center (MCC),Fails to Operate (FTOP), Motor Control Center (MCC) Fails to Operate (FTOP),h,Gamma,2.4E-07,1.02,4.19E+06
+,Electrical (ELECT),Transformer (TRANS),Fails to Operate (FTOP), Transformer (TRANS) Fails to Operate (FTOP),h,Gamma,1.9E-06,1.63,8.47E+05
+Diesel Generator (DG),Electrical (ELECT),Sequencer (SEQ),Fails to Operate (FTOP),Diesel Generator (DG) Sequencer (SEQ) Fails to Operate (FTOP),d,Beta,1.1E-04,6.50,6.14E+04
+,Electrical (ELECT),Fuse (FUSE),Spurious Operation (SPUR), Fuse (FUSE) Spurious Operation (SPUR),h,Gamma,8.9E-09,1.50,1.69E+08
+,Electrical (ELECT),Instrumentation and Control Circuit (I&C),Fails to Operate (FTOP), Instrumentation and Control Circuit (I&C) Fails to Operate (FTOP),d,Beta,1.7E-03,3.90,2.27E+03
+,Electrical (ELECT),Turbine Trip Instrumentation (TTI&C),Fails to Operate (FTOP), Turbine Trip Instrumentation (TTI&C) Fails to Operate (FTOP),d,Beta,1.7E-03,3.90,2.27E+03
+,Electrical (ELECT),Automatic Actuation Circuit (ACTI&C),Fails to Operate (FTOP), Automatic Actuation Circuit (ACTI&C) Fails to Operate (FTOP),d,Beta,1.7E-03,3.90,2.27E+03
+Dirty Water,Filtration (FILT),Filter (FLT),Plugging (PLUG),Dirty Water Filter (FLT) Plugging (PLUG),h,Gamma,8.2E-07,6.50,7.92E+06
+,Filtration (FILT),Filter (FLT),External Leakage (EXLEAK), Filter (FLT) External Leakage (EXLEAK),h,Gamma,5.3E-08,1.50,2.81E+07
+,Filtration (FILT),Filter (FLT) NUREG/CR-6928,External Leakage (EXLEAK), Filter (FLT) NUREG/CR-6928 External Leakage (EXLEAK),h,Gamma,3.7E-09,0.30,8.03E+07
+Clean Water,Filtration (FILT),Filter (FLT),Plugging (PLUG),Clean Water Filter (FLT) Plugging (PLUG),h,Gamma,1.8E-07,1.50,8.16E+06
+Clean Water,Filtration (FILT),Filter (FLT),Bypass (BYP),Clean Water Filter (FLT) Bypass (BYP),h,Gamma,6.1E-08,0.50,8.16E+06
+Intrument Air (IAS),Filtration (FILT),Filter (FLT),Plugging (PLUG),Intrument Air (IAS) Filter (FLT) Plugging (PLUG),h,Gamma,2.4E-06,0.50,2.10E+05
+,Filtration (FILT),Self-Cleaning Strainer (FLTSC),Plugging (PLUG), Self-Cleaning Strainer (FLTSC) Plugging (PLUG),h,Gamma,1.5E-06,32.50,2.16E+07
+,Filtration (FILT),Self-Cleaning Strainer (FLTSC),Bypass (BYP), Self-Cleaning Strainer (FLTSC) Bypass (BYP),h,Gamma,2.3E-08,0.50,2.16E+07
+,Filtration (FILT),Self-Cleaning Strainer (FLTSC),Fails to Operate (FTOP), Self-Cleaning Strainer (FLTSC) Fails to Operate (FTOP),h,Gamma,2.5E-06,53.50,2.16E+07
+,Filtration (FILT),Self-Cleaning Strainer (FLTSC),External Leakage (EXLEAK), Self-Cleaning Strainer (FLTSC) External Leakage (EXLEAK),h,Gamma,1.2E-07,2.50,2.16E+07
+,Filtration (FILT),Self-Cleaning Strainer (FLTSC) NUREG/CR-6928,External Rupture (EXRUPT), Self-Cleaning Strainer (FLTSC) NUREG/CR-6928 External Rupture (EXRUPT),h,Gamma,8.1E-09,0.30,3.69E+07
+Service Water (SWS),Filtration (FILT),Self-Cleaning Strainer (FLTSC),Plugging (PLUG),Service Water (SWS) Self-Cleaning Strainer (FLTSC) Plugging (PLUG),h,Gamma,1.5E-06,19.50,1.32E+07
+Service Water (SWS),Filtration (FILT),Self-Cleaning Strainer (FLTSC),Plugging while in Standby (PLUGS),Service Water (SWS) Self-Cleaning Strainer (FLTSC) Plugging while in Standby (PLUGS),h,Gamma,1.7E-06,13.50,7.80E+06
+Service Water (SWS),Filtration (FILT),Self-Cleaning Strainer (FLTSC),Plugging Environmental Conditions (PLUGE),Service Water (SWS) Self-Cleaning Strainer (FLTSC) Plugging Environmental Conditions (PLUGE),h,Gamma,1.9E-07,1.50,7.80E+06
+BWR Containment (BWRCONT),Filtration (FILT),Sump Strainer (SMP),Plugging (PLUG),BWR Containment (BWRCONT) Sump Strainer (SMP) Plugging (PLUG),h,Gamma,9.1E-08,0.50,5.52E+06
+PWR Contianment (PWRCONT),Filtration (FILT),Sump Strainer (SMP),Plugging (PLUG),PWR Contianment (PWRCONT) Sump Strainer (SMP) Plugging (PLUG),h,Gamma,4.3E-07,1.50,3.53E+06
+,Filtration (FILT),Traveling Screen Assembly (TSA),Plugging (PLUG), Traveling Screen Assembly (TSA) Plugging (PLUG),h,Gamma,1.5E-06,37.50,2.52E+07
+,Filtration (FILT),Traveling Screen Assembly (TSA),Bypass (BYP), Traveling Screen Assembly (TSA) Bypass (BYP),h,Gamma,9.9E-08,2.50,2.52E+07
+,Filtration (FILT),Traveling Screen Assembly (TSA),Fails to Operate (FTOP), Traveling Screen Assembly (TSA) Fails to Operate (FTOP),h,Gamma,2.1E-06,0.55,2.59E+05
+Service Water (SWS),Filtration (FILT),Traveling Screen Assembly (TSA),Plugging (PLUG),Service Water (SWS) Traveling Screen Assembly (TSA) Plugging (PLUG),h,Gamma,2.5E-07,0.50,1.97E+06
+,Filtration (FILT),Trash Rack (TRK),Plugging (PLUG), Trash Rack (TRK) Plugging (PLUG),h,Gamma,3.8E-07,0.50,1.31E+06
+Reactor Protection System (RPS),Switch (SWC),Bistable (BIS),Fails to Operate (FTOP),Reactor Protection System (RPS) Bistable (BIS) Fails to Operate (FTOP),d,Beta,5.4E-04,0.50,9.19E+02
+Reactor Protection System (RPS),Process Logic Controller (PLC),Flow PLC (FLOW),Fails to Operate (FTOP),Reactor Protection System (RPS) Flow PLC (FLOW) Fails to Operate (FTOP),d,Beta,6.3E-04,0.50,7.99E+02
+Reactor Protection System (RPS),Process Logic Controller (PLC),Level PLC (LEVEL),Fails to Operate (FTOP),Reactor Protection System (RPS) Level PLC (LEVEL) Fails to Operate (FTOP),d,Beta,6.3E-04,0.50,7.99E+02
+Reactor Protection System (RPS),Process Logic Controller (PLC),Pressure PLC (PRES),Fails to Operate (FTOP),Reactor Protection System (RPS) Pressure PLC (PRES) Fails to Operate (FTOP),d,Beta,1.6E-04,0.50,3.12E+03
+Reactor Protection System (RPS),Process Logic Controller (PLC),Temperature Delta PLC (TEMPD),Fails to Operate (FTOP),Reactor Protection System (RPS) Temperature Delta PLC (TEMPD) Fails to Operate (FTOP),d,Beta,5.1E-03,0.50,9.80E+01
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Flow Sensor (FLOW),Fails on Demand (FOD),Reactor Protection System (RPS) Flow Sensor (FLOW) Fails on Demand (FOD),d,Beta,8.2E-04,0.50,6.13E+02
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Flow Sensor (FLOW),Fails to Operate (FTOP),Reactor Protection System (RPS) Flow Sensor (FLOW) Fails to Operate (FTOP),h,Gamma,1.0E-07,0.50,4.92E+06
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Level Sensor (LEVEL),Fails on Demand (FOD),Reactor Protection System (RPS) Level Sensor (LEVEL) Fails on Demand (FOD),d,Beta,8.2E-04,0.50,6.13E+02
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Level Sensor (LEVEL),Fails to Operate (FTOP),Reactor Protection System (RPS) Level Sensor (LEVEL) Fails to Operate (FTOP),h,Gamma,1.0E-07,0.50,4.92E+06
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Pressure Sensor (PRES),Fails on Demand (FOD),Reactor Protection System (RPS) Pressure Sensor (PRES) Fails on Demand (FOD),d,Beta,1.2E-04,0.50,4.28E+03
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Pressure Sensor (PRES),Fails to Operate (FTOP),Reactor Protection System (RPS) Pressure Sensor (PRES) Fails to Operate (FTOP),h,Gamma,8.2E-07,0.50,6.08E+05
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Temperature Sensor (TEMP),Fails on Demand (FOD),Reactor Protection System (RPS) Temperature Sensor (TEMP) Fails on Demand (FOD),d,Beta,4.3E-04,0.50,1.16E+03
+Reactor Protection System (RPS),Sensor/Transmitter (SENS),Temperature Sensor (TEMP),Fails to Operate (FTOP),Reactor Protection System (RPS) Temperature Sensor (TEMP) Fails to Operate (FTOP),h,Gamma,8.4E-07,0.50,5.95E+05
+Reactor Protection System (RPS),Breaker (BKR),Mechanical Breaker (MECH),Fails to Open or Close (FTOC),Reactor Protection System (RPS) Mechanical Breaker (MECH) Fails to Open or Close (FTOC),d,Beta,1.5E-05,0.50,3.25E+04
+Reactor Protection System (RPS),Breaker (BKR),Reactor Trip Breaker (RTB),Fails to Operate (FTOP),Reactor Protection System (RPS) Reactor Trip Breaker (RTB) Fails to Operate (FTOP),d,Beta,3.3E-04,0.50,1.52E+03
+Reactor Protection System (RPS),Breaker (BKR),Reactor Trip Breaker (RTB),Fails to Operate (FTOP),Reactor Protection System (RPS) Reactor Trip Breaker (RTB) Fails to Operate (FTOP),d,Beta,4.1E-04,0.50,1.21E+03
+Reactor Protection System (RPS),Breaker (BKR),Reactor Trip Breaker (RTB),Fails to Open or Close (FTOC),Reactor Protection System (RPS) Reactor Trip Breaker (RTB) Fails to Open or Close (FTOC),d,Beta,1.6E-05,0.50,3.22E+04
+Reactor Protection System (RPS),Switch (SWC),Manual Switch (MAN),Fails to Open or Close (FTOC),Reactor Protection System (RPS) Manual Switch (MAN) Fails to Open or Close (FTOC),d,Beta,1.3E-04,0.50,3.96E+03
+Reactor Protection System (RPS),Switch (SWC),Relay Switch (RLY),Fails to Operate (FTOP),Reactor Protection System (RPS) Relay Switch (RLY) Fails to Operate (FTOP),d,Beta,2.5E-05,0.50,2.01E+04
+,Rod Assembly (RA),Control Rod Drive (CRD),Fails to Insert (FTI), Control Rod Drive (CRD) Fails to Insert (FTI),h,Gamma,1.7E-07,0.56,3.34E+06
+,Rod Assembly (RA),Control Rod Drive (CRD),Spurious Operation (SPUR), Control Rod Drive (CRD) Spurious Operation (SPUR),h,Gamma,1.6E-07,23.50,1.45E+08
+,Rod Assembly (RA),Control Rod (ROD),Fails to Insert (FTI), Control Rod (ROD) Fails to Insert (FTI),h,Gamma,9.5E-08,10.50,1.10E+08
+,Rod Assembly (RA),Control Rod (ROD),Spurious Operation (SPUR), Control Rod (ROD) Spurious Operation (SPUR),h,Gamma,1.0E-07,11.50,1.10E+08
+,Rod Assembly (RA),Hydraulic Control Unit (HCU),Fails to Insert (FTI), Hydraulic Control Unit (HCU) Fails to Insert (FTI),h,Beta,1.0E-07,0.35,3.42E+06
+,Rod Assembly (RA),Hydraulic Control Unit (HCU),Fails to Operate (FTOP), Hydraulic Control Unit (HCU) Fails to Operate (FTOP),h,Gamma,1.5E-08,19.50,1.35E+09
+,Rod Assembly (RA),Hydraulic Control Unit (HCU),Spurious Operation (SPUR), Hydraulic Control Unit (HCU) Spurious Operation (SPUR),h,Gamma,2.0E-08,4.30,2.16E+08
+,Heating and Ventilation (HVAC),Air Damper (DMP),Fails to Open or Close (FTOC), Air Damper (DMP) Fails to Open or Close (FTOC),d,Beta,7.6E-05,0.50,6.60E+03
+,Heating and Ventilation (HVAC),Air Damper (DMP),Spurious Operation (SPUR), Air Damper (DMP) Spurious Operation (SPUR),h,Gamma,1.6E-07,0.58,3.60E+06
+,Heating and Ventilation (HVAC),Air Damper (DMP),Internal Leakage (INLEAK), Air Damper (DMP) Internal Leakage (INLEAK),h,Gamma,1.4E-07,3.50,2.43E+07
+,Heating and Ventilation (HVAC),Air Damper (DMP),Internal Rupture (INRUPT), Air Damper (DMP) Internal Rupture (INRUPT),h,Gamma,2.9E-09,0.30,1.04E+08
+,Heating and Ventilation (HVAC),Air Damper (DMP),Fails to Open or Close (FTOC), Air Damper (DMP) Fails to Open or Close (FTOC),d,Beta,7.4E-04,4.50,6.11E+03
+,Heating and Ventilation (HVAC),Air Damper (DMP),Spurious Operation (SPUR), Air Damper (DMP) Spurious Operation (SPUR),h,Gamma,1.5E-07,2.50,1.65E+07
+,Heating and Ventilation (HVAC),Air Damper (DMP),Internal Leakage (INLEAK), Air Damper (DMP) Internal Leakage (INLEAK),h,Gamma,3.0E-08,0.50,1.65E+07
+,Heating and Ventilation (HVAC),Air Damper (DMP),Internal Rupture (INRUPT), Air Damper (DMP) Internal Rupture (INRUPT),h,Gamma,6.1E-10,0.30,4.93E+08
+,Heating and Ventilation (HVAC),Air Damper (DMP),Fails to Open or Close (FTOC), Air Damper (DMP) Fails to Open or Close (FTOC),d,Beta,3.6E-04,0.98,2.76E+03
+,Heating and Ventilation (HVAC),Air Damper (DMP),Spurious Operation (SPUR), Air Damper (DMP) Spurious Operation (SPUR),h,Gamma,3.5E-08,0.50,1.41E+07
+,Heating and Ventilation (HVAC),Air Damper (DMP),Internal Leakage (INLEAK), Air Damper (DMP) Internal Leakage (INLEAK),h,Gamma,3.5E-08,0.50,1.41E+07
+,Heating and Ventilation (HVAC),Air Damper (DMP),Internal Rupture (INRUPT), Air Damper (DMP) Internal Rupture (INRUPT),h,Gamma,7.1E-10,0.30,4.24E+08
+,Heating and Ventilation (HVAC),Air Handling (AIR),Fails to Restart (FTRESTART), Air Handling (AIR) Fails to Restart (FTRESTART),d,Beta,1.5E-03,23.50,1.60E+04
+,Heating and Ventilation (HVAC),Air Handling (AIR),Fails to Continue Runing (FTCR), Air Handling (AIR) Fails to Continue Runing (FTCR),h,Gamma,2.6E-06,39.50,1.51E+07
+,Heating and Ventilation (HVAC),Air Handling (AIR),Fails to Start while in Standby (FTS), Air Handling (AIR) Fails to Start while in Standby (FTS),d,Beta,2.1E-04,33.50,1.59E+05
+,Heating and Ventilation (HVAC),Air Handling (AIR),Fails to Run in First Hour (FTRFH), Air Handling (AIR) Fails to Run in First Hour (FTRFH),h,Gamma,3.4E-06,0.50,1.48E+05
+,Heating and Ventilation (HVAC),Air Handling (AIR),Fails to Run after First Hour (FTR), Air Handling (AIR) Fails to Run after First Hour (FTR),h,Gamma,2.8E-06,27.50,9.93E+06
+,Heating and Ventilation (HVAC),Chiller (CHL),Fails to Restart (FTRESTART), Chiller (CHL) Fails to Restart (FTRESTART),d,Beta,5.1E-03,0.44,8.56E+01
+,Heating and Ventilation (HVAC),Chiller (CHL),Fails to Run (FTR), Chiller (CHL) Fails to Run (FTR),h,Gamma,3.9E-05,0.52,1.35E+04
+,Heating and Ventilation (HVAC),Chiller (CHL),Fails to Start while in Standby (FTS), Chiller (CHL) Fails to Start while in Standby (FTS),d,Beta,2.8E-05,0.50,1.80E+04
+,Heating and Ventilation (HVAC),Chiller (CHL),Fails to Run in First Hour (FTRFH), Chiller (CHL) Fails to Run in First Hour (FTRFH),h,Gamma,1.5E-04,34.50,2.34E+05
+,Heating and Ventilation (HVAC),Chiller (CHL),Fails to Run after First Hour (FTR), Chiller (CHL) Fails to Run after First Hour (FTR),h,Gamma,1.5E-04,34.50,2.34E+05
+,Heating and Ventilation (HVAC),Fan (FAN),Fails to Start while in Standby (FTS), Fan (FAN) Fails to Start while in Standby (FTS),d,Beta,2.8E-04,17.50,6.35E+04
+,Heating and Ventilation (HVAC),Fan (FAN),Fails to Run in First Hour (FTRFH), Fan (FAN) Fails to Run in First Hour (FTRFH),h,Gamma,4.4E-04,17.50,3.94E+04
+,Heating and Ventilation (HVAC),Fan (FAN),Fails to Run after First Hour (FTR), Fan (FAN) Fails to Run after First Hour (FTR),h,Gamma,2.9E-05,3.50,1.20E+05
+,Heating and Ventilation (HVAC),Fan (FAN),Fails to Restart (FTRESTART), Fan (FAN) Fails to Restart (FTRESTART),d,Beta,7.2E-04,0.46,6.36E+02
+,Heating and Ventilation (HVAC),Fan (FAN),Fails to Continue Runing (FTCR), Fan (FAN) Fails to Continue Runing (FTCR),h,Gamma,3.2E-06,0.67,2.09E+05
+,Air Compressor (CMP),Motor Driven (MD),Fails to Restart (FTRESTART), Motor Driven (MD) Fails to Restart (FTRESTART),d,Beta,1.4E-02,0.46,3.31E+01
+,Air Compressor (CMP),Motor Driven (MD),Fails to Run (FTR), Motor Driven (MD) Fails to Run (FTR),h,Gamma,4.0E-05,2.69,6.68E+04
+,Air Compressor (CMP),Motor Driven (MD),Fails to Start while in Standby (FTS), Motor Driven (MD) Fails to Start while in Standby (FTS),d,Beta,2.9E-03,0.85,2.89E+02
+,Air Compressor (CMP),Motor Driven (MD),Fails to Run in First Hour (FTRFH), Motor Driven (MD) Fails to Run in First Hour (FTRFH),h,Gamma,7.4E-05,1.50,2.02E+04
+,Air Compressor (CMP),Motor Driven (MD),Fails to Run after First Hour (FTR), Motor Driven (MD) Fails to Run after First Hour (FTR),h,Gamma,5.8E-05,90.50,1.57E+06
+,Air Compressor (CMP),Engine Driven (ED),Fails to Start while in Standby (FTS), Engine Driven (ED) Fails to Start while in Standby (FTS),d,Beta,9.9E-03,14.50,1.45E+03
+,Air Compressor (CMP),Engine Driven (ED),Fails to Run in First Hour (FTRFH), Engine Driven (ED) Fails to Run in First Hour (FTRFH),h,Gamma,1.0E-03,1.50,1.46E+03
+,Air Compressor (CMP),Engine Driven (ED),Fails to Run after First Hour (FTR), Engine Driven (ED) Fails to Run after First Hour (FTR),h,Gamma,7.8E-03,12.50,1.61E+03
+,Air Compressor (CMP),Engine Driven (ED),Fails to Run (FTR), Engine Driven (ED) Fails to Run (FTR),h,Gamma,6.4E-05,10.50,1.63E+05
+Instrument Air (IAS),Air Compressor (CMP),Motor Driven (MD),Fails to Run (FTR),Instrument Air (IAS) Motor Driven (MD) Fails to Run (FTR),h,Gamma,4.9E-05,7.62,1.54E+05
+Containment Instrument Air (CIA),Air Compressor (CMP),Motor Driven (MD),Fails to Run (FTR),Containment Instrument Air (CIA) Motor Driven (MD) Fails to Run (FTR),h,Gamma,5.1E-06,0.50,9.86E+04
+Instrument Air (IAS),Air Compressor (CMP),Air Drier Unit (ADU),Fails to Operate (FTOP),Instrument Air (IAS) Air Drier Unit (ADU) Fails to Operate (FTOP),h,Gamma,5.0E-06,0.30,6.00E+04
+PWR Primary (PRIM),Accumulator (ACC),Accumulator (ACC),Fails to Operate (FTOP),PWR Primary (PRIM) Accumulator (ACC) Fails to Operate (FTOP),h,Gamma,1.5E-07,11.50,7.93E+07
+PWR Primary (PRIM),Accumulator (ACC),Accumulator (ACC),External Leakage (EXLEAK),PWR Primary (PRIM) Accumulator (ACC) External Leakage (EXLEAK),h,Gamma,1.1E-07,8.50,7.93E+07
+PWR Primary (PRIM),Accumulator (ACC),Accumulator (ACC),External Rupture (EXRUPT),PWR Primary (PRIM) Accumulator (ACC) External Rupture (EXRUPT),h,Gamma,7.5E-09,0.30,4.01E+07
+,Cooling Tower (CT),Fan (FAN),Fails to Start while in Standby (FTS), Fan (FAN) Fails to Start while in Standby (FTS),d,Beta,3.9E-04,14.50,3.73E+04
+,Cooling Tower (CT),Fan (FAN),Fails to Run in First Hour (FTRFH), Fan (FAN) Fails to Run in First Hour (FTRFH),h,Gamma,1.3E-05,0.50,3.72E+04
+,Cooling Tower (CT),Fan (FAN),Fails to Run after First Hour (FTR), Fan (FAN) Fails to Run after First Hour (FTR),h,Gamma,5.6E-07,0.50,8.95E+05
+,Cooling Tower (CT),Fan (FAN),Fails to Start while in Standby (FTS), Fan (FAN) Fails to Start while in Standby (FTS),d,Beta,6.7E-04,1.50,2.24E+03
+,Cooling Tower (CT),Fan (FAN),Fails to Run (FTR), Fan (FAN) Fails to Run (FTR),h,Gamma,5.2E-06,6.50,1.25E+06
+,Tank (TNK),Pressurized (PRES),External Rupture (EXRUPT), Pressurized (PRES) External Rupture (EXRUPT),h,Gamma,4.2E-07,0.42,1.00E+06
+Pressurized Liquid (ELS),Tank (TNK),Small Pressurized Liquid (SPL),External Leakage (EXLEAK),Pressurized Liquid (ELS) Small Pressurized Liquid (SPL) External Leakage (EXLEAK),h,Gamma,2.5E-07,0.49,1.95E+06
+Pressurized Liquid (ELL),Tank (TNK),Small Pressurized Liquid (SPL),External Rupture (EXRUPT),Pressurized Liquid (ELL) Small Pressurized Liquid (SPL) External Rupture (EXRUPT),h,Gamma,1.8E-08,0.30,1.71E+07
+Unpressurized Liquid (ELS),Tank (TNK),Small Unpressurized Liquid (SUL),External Leakage (EXLEAK),Unpressurized Liquid (ELS) Small Unpressurized Liquid (SUL) External Leakage (EXLEAK),h,Gamma,2.0E-07,4.50,2.27E+07
+Unpressurized Liquid (ELL),Tank (TNK),Small Unpressurized Liquid (SUL),External Rupture (EXRUPT),Unpressurized Liquid (ELL) Small Unpressurized Liquid (SUL) External Rupture (EXRUPT),h,Gamma,1.4E-08,0.30,2.16E+07
+Instrument Air (IAS),Tank (TNK),Air Tank (AIR),Fails to Control (FTC),Instrument Air (IAS) Air Tank (AIR) Fails to Control (FTC),h,Gamma,1.5E-07,0.50,3.29E+06
+Service Water (SWS),Tank (TNK),Water Tank (WAT),Fails to Control (FTC),Service Water (SWS) Water Tank (WAT) Fails to Control (FTC),h,Gamma,5.7E-07,0.50,8.81E+05
+,Tank (TNK),Tank (TNK),External Leakage (EXLEAK), Tank (TNK) External Leakage (EXLEAK),h,Gamma,1.2E-07,0.50,4.21E+06
+,Tank (TNK),Tank (TNK),External Rupture (EXRUPT), Tank (TNK) External Rupture (EXRUPT),h,Gamma,8.3E-09,0.30,3.60E+07
+,Pipe (PIPE),Orifice (ORF),Plugging (PLUG), Orifice (ORF) Plugging (PLUG),h,Gamma,1.0E-06,0.30,3.00E+05
+,Pipe (PIPE),Normal Pipe (NPIPE),External Leakage (EXLEAK), Normal Pipe (NPIPE) External Leakage (EXLEAK),h-ft,Gamma,2.5E-10,0.50,1.98E+09
+,Pipe (PIPE),Normal Pipe (NPIPE),External Rupture (EXRUPT), Normal Pipe (NPIPE) External Rupture (EXRUPT),h-ft,Gamma,2.5E-11,0.30,1.19E+10
+,Pipe (PIPE),Normal Pipe (NPIPE),External Leakage (EXLEAK), Normal Pipe (NPIPE) External Leakage (EXLEAK),h-ft,Gamma,6.9E-10,0.50,7.26E+08
+,Pipe (PIPE),Normal Pipe (NPIPE),External Rupture (EXRUPT), Normal Pipe (NPIPE) External Rupture (EXRUPT),h-ft,Gamma,1.4E-10,0.30,2.18E+09
+,Heat Exchanger (HTX),Heat Exchanger (HTX),Plugging (PLUG), Heat Exchanger (HTX) Plugging (PLUG),h,Gamma,3.4E-07,0.48,1.42E+06
+,Heat Exchanger (HTX),Heat Exchanger (HTX),External Leakage (EXLEAK), Heat Exchanger (HTX) External Leakage (EXLEAK),h,Gamma,2.8E-07,61.50,2.23E+08
+,Heat Exchanger (HTX),Heat Exchanger (HTX),External Rupture (EXRUPT), Heat Exchanger (HTX) External Rupture (EXRUPT),h,Gamma,5.5E-09,0.30,5.43E+07
+,Heat Exchanger (HTX),Heat Exchanger (HTX),External Leakage (EXLEAK), Heat Exchanger (HTX) External Leakage (EXLEAK),h,Gamma,1.9E-07,0.83,4.35E+06
+,Heat Exchanger (HTX),Heat Exchanger (HTX),External Rupture (EXRUPT), Heat Exchanger (HTX) External Rupture (EXRUPT),h,Gamma,2.9E-08,0.30,1.05E+07
+,Heat Exchanger (HTX),Heat Exchanger (HTX),Plugging (PLUG), Heat Exchanger (HTX) Plugging (PLUG),h,Gamma,3.0E-07,8.50,2.83E+07
+Component Cooling Water (CCW),Heat Exchanger (HTX),Heat Exchanger (HTX),Plugging (PLUG),Component Cooling Water (CCW) Heat Exchanger (HTX) Plugging (PLUG),h,Gamma,1.2E-07,3.50,2.83E+07
