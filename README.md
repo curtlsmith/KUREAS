@@ -51,11 +51,11 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 |--------|------|---------|---------|
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.1 | Hazard analysis, initiating event frequency quantification, and screening |
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.1 | Fault tree logic editing, visualization, and analysis |
-| **KUREAS-ETL** | `KUREAS-ETL.html` | v2.0 | Event tree logic visualization with SAPHIRE file import |
+| **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.0 | System modeling, FMEA, failure analysis, and importance measures |
-| **KUREAS-SEQ** | `KUREAS-SEQ.html` | v1.0 | Process Operational Logic (POL) diagrams and event tree generation |
-| **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from all module outputs |
-| **KUREAS-KNOW** | `KUREAS-KNOW.html` | v1.0 | General-purpose `.KNOW` file viewer and editor |
+| **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | v1.0 | Process Operational Logic (POL) diagrams and event tree generation |
+| **KUREAS-REPORT (planned)** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from all module outputs |
+| **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | v1.0 | General-purpose `.KNOW` file viewer and editor |
 
 ---
 
