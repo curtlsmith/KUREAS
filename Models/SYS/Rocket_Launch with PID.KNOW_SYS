@@ -1,0 +1,1025 @@
+{
+  "systemName": "Rocket_Launch",
+  "systemAcronym": "ROCKET",
+  "systemDescription": "",
+  "sscsInSystem": [
+    {
+      "id": "ssc_1773010043764_e9vc6b6hm",
+      "name": "TPump_1",
+      "label": "TPump_1",
+      "description": "The key part of the rocket, spinning at tens of thousands of RPM to move liquid oxygen (LOX) and fuel into the combustion chamber.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "TPump_1",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".01",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "pump-liquid-ring"
+    },
+    {
+      "id": "ssc_1773010043764_tbuqqnv1m",
+      "name": "TPump_2",
+      "label": "TPump_2",
+      "description": "The key part of the rocket, spinning at tens of thousands of RPM to move liquid oxygen (LOX) and fuel into the combustion chamber.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "TPump_2",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".01",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "pump-liquid-ring"
+    },
+    {
+      "id": "ssc_1773010043764_q6s81zyhs",
+      "name": "TPump_3",
+      "label": "TPump_3",
+      "description": "The key part of the rocket, spinning at tens of thousands of RPM to move liquid oxygen (LOX) and fuel into the combustion chamber.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "demandProb": "",
+          "demandN": "1",
+          "lambda": "",
+          "missionTime": "",
+          "inspInterval": "",
+          "tauRepair": "",
+          "logicFlag": "T",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "TPump_3",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".01",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "pump-liquid-ring"
+    },
+    {
+      "id": "ssc_1773010043764_9mdtfk1pn",
+      "name": "N_Cooling_1",
+      "label": "N_Cooling_1",
+      "description": "Regenerative circulation of cold fuel through the walls of the nozzle to keep the metal from vaporizing.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "N_Cooling_1",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".04",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "cooler"
+    },
+    {
+      "id": "ssc_1773010043764_l5b4pm36o",
+      "name": "N_Cooling_2",
+      "label": "N_Cooling_2",
+      "description": "Regenerative circulation of cold fuel through the walls of the nozzle to keep the metal from vaporizing.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "N_Cooling_2",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".04",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "cooler"
+    },
+    {
+      "id": "ssc_1773010043764_hgk2ev3yn",
+      "name": "O2_Tank",
+      "label": "O2_Tank",
+      "description": "The tank that contains the liquid oxygen.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "O2_Tank",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".006",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "vessel-vertical"
+    },
+    {
+      "id": "ssc_1773010043764_31k8b8xc3",
+      "name": "O2_Piping",
+      "label": "O2_Piping",
+      "description": "The piping that transports the liquid oxygen from the tank to the nozzles.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "O2_Piping",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".005",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "pipe-main"
+    },
+    {
+      "id": "ssc_1773010043764_eywhjkrik",
+      "name": "Methane_Tank",
+      "label": "Methane_Tank",
+      "description": "The tank that contains the methane fuel.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "Methane_Tank",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".005",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "vessel-vertical"
+    },
+    {
+      "id": "ssc_1773010043764_k6k99m9il",
+      "name": "Fuel_Piping",
+      "label": "Fuel_Piping",
+      "description": "The piping that transports the fuel from the fuel tank to the nozzles.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "Fuel_Piping",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".002",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "pipe-main"
+    },
+    {
+      "id": "ssc_1773010043764_vqb3zvu0w",
+      "name": "Injector",
+      "label": "Injector",
+      "description": "The plate has hundreds of tiny holes. Streams of fuel and oxidizer are aimed so they collide in mid-air, atomizing the liquids into a uniform spray.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "Injector",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".03",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "flow-nozzle"
+    },
+    {
+      "id": "ssc_1773010043764_fte5q1tcb",
+      "name": "Baffles",
+      "label": "Baffles",
+      "description": "Physical dividers on the plate that prevent pressure waves from traveling across the face of the injector. Without them, the engine can develop \"combustion instability,\" which can shake the engine apart in milliseconds.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "Baffles",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": "0.01",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "heat-exchanger"
+    },
+    {
+      "id": "ssc_1773010043764_qedurr61e",
+      "name": "Mixing_Controller",
+      "label": "Mixing_Controller",
+      "description": "The controller that managed the mixing in the nozzle.",
+      "sscType": "Component",
+      "componentType": "Generic",
+      "failureModes": [
+        {
+          "mode": "Fails on Demand",
+          "probabilityType": "probability",
+          "failureModel": "0",
+          "data": {
+            "system": "System_Name",
+            "ssc_type": "Component",
+            "component_type": "Mixing_Controller",
+            "failure_mode": "Fails on Demand",
+            "description": "",
+            "units": "d",
+            "distribution_type": "CNI",
+            "mean": ".009",
+            "distribution_shape_parameter": "",
+            "distribution_scale_parameter": ""
+          },
+          "applicable": true,
+          "effects": [
+            {
+              "description": "Single point failure, the system will fail catastrophically."
+            }
+          ]
+        }
+      ],
+      "pidSymbol": "mixer"
+    }
+  ],
+  "superComponents": [],
+  "boundaryConditions": [],
+  "systemLogic": [
+    {
+      "type": "module_def",
+      "value": "Turbo_Pumps",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "TPump_1",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "TPump_2",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "TPump_3",
+      "deletable": true
+    },
+    {
+      "type": "eol",
+      "value": ";",
+      "deletable": true
+    },
+    {
+      "type": "module_def",
+      "value": "Nozzle_Cooling",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "N_Cooling_1",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "N_Cooling_2",
+      "deletable": true
+    },
+    {
+      "type": "eol",
+      "value": ";",
+      "deletable": true
+    },
+    {
+      "type": "module_def",
+      "value": "Liquid_Oxygen",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "O2_Tank",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "O2_Piping",
+      "deletable": true
+    },
+    {
+      "type": "eol",
+      "value": ";",
+      "deletable": true
+    },
+    {
+      "type": "module_def",
+      "value": "Fuel",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "Methane_Tank",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "Fuel_Piping",
+      "deletable": true
+    },
+    {
+      "type": "eol",
+      "value": ";",
+      "deletable": true
+    },
+    {
+      "type": "module_def",
+      "value": "Combustion",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "Injector",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "Baffles",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "Mixing_Controller",
+      "deletable": true
+    },
+    {
+      "type": "eol",
+      "value": ";",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "SYSTEM WORKS =",
+      "deletable": false
+    },
+    {
+      "type": "module_ref",
+      "value": "Turbo_Pumps",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "module_ref",
+      "value": "Turbo_Pumps",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "module_ref",
+      "value": "Nozzle_Cooling",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "module_ref",
+      "value": "Liquid_Oxygen",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "module_ref",
+      "value": "Fuel",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "AND",
+      "deletable": true
+    },
+    {
+      "type": "module_ref",
+      "value": "Combustion",
+      "deletable": true
+    },
+    {
+      "type": "eol",
+      "value": ";",
+      "deletable": true
+    }
+  ],
+  "failureLogicTree": {
+    "id": "top",
+    "label": "Rocket_Launch fails",
+    "type": "OR",
+    "children": [
+      {
+        "id": "gate-6",
+        "label": "GATE-6",
+        "type": "OR",
+        "children": [
+          {
+            "id": "turbo-pumps",
+            "label": "Turbo_Pumps",
+            "type": "OR",
+            "children": [
+              {
+                "id": "tpump-1",
+                "label": "TPump_1",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "tpump-2",
+                "label": "TPump_2",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "tpump-3",
+                "label": "TPump_3",
+                "type": "BASIC",
+                "children": []
+              }
+            ],
+            "isNotGate": false
+          },
+          {
+            "id": "turbo-pumps",
+            "label": "Turbo_Pumps",
+            "type": "OR",
+            "children": [
+              {
+                "id": "tpump-1",
+                "label": "TPump_1",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "tpump-2",
+                "label": "TPump_2",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "tpump-3",
+                "label": "TPump_3",
+                "type": "BASIC",
+                "children": []
+              }
+            ],
+            "isNotGate": false
+          },
+          {
+            "id": "nozzle-cooling",
+            "label": "Nozzle_Cooling",
+            "type": "OR",
+            "children": [
+              {
+                "id": "n-cooling-1",
+                "label": "N_Cooling_1",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "n-cooling-2",
+                "label": "N_Cooling_2",
+                "type": "BASIC",
+                "children": []
+              }
+            ],
+            "isNotGate": false
+          },
+          {
+            "id": "liquid-oxygen",
+            "label": "Liquid_Oxygen",
+            "type": "OR",
+            "children": [
+              {
+                "id": "o2-tank",
+                "label": "O2_Tank",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "o2-piping",
+                "label": "O2_Piping",
+                "type": "BASIC",
+                "children": []
+              }
+            ],
+            "isNotGate": false
+          },
+          {
+            "id": "fuel",
+            "label": "Fuel",
+            "type": "OR",
+            "children": [
+              {
+                "id": "methane-tank",
+                "label": "Methane_Tank",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "fuel-piping",
+                "label": "Fuel_Piping",
+                "type": "BASIC",
+                "children": []
+              }
+            ],
+            "isNotGate": false
+          },
+          {
+            "id": "combustion",
+            "label": "Combustion",
+            "type": "OR",
+            "children": [
+              {
+                "id": "injector",
+                "label": "Injector",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "baffles",
+                "label": "Baffles",
+                "type": "BASIC",
+                "children": []
+              },
+              {
+                "id": "mixing-controller",
+                "label": "Mixing_Controller",
+                "type": "BASIC",
+                "children": []
+              }
+            ],
+            "isNotGate": false
+          }
+        ],
+        "isNotGate": false
+      }
+    ]
+  },
+  "pidDiagram": {
+    "nodes": [
+      {
+        "id": "n_1775621207416",
+        "x": 720,
+        "y": 60,
+        "symbolKey": "heat-exchanger",
+        "label": "Baffles",
+        "tag": "",
+        "sscId": "ssc_1773010043764_fte5q1tcb"
+      },
+      {
+        "id": "n_1775621208617",
+        "x": 540,
+        "y": 60,
+        "symbolKey": "mixer",
+        "label": "Mixing_Controller",
+        "tag": "",
+        "sscId": "ssc_1773010043764_qedurr61e"
+      },
+      {
+        "id": "n_1775621209381",
+        "x": 360,
+        "y": 180,
+        "symbolKey": "vessel-vertical",
+        "label": "Methane_Tank",
+        "tag": "",
+        "sscId": "ssc_1773010043764_eywhjkrik"
+      },
+      {
+        "id": "n_1775661043453",
+        "x": 900,
+        "y": 120,
+        "symbolKey": "pump-liquid-ring",
+        "label": "TPump_1",
+        "tag": "",
+        "sscId": "ssc_1773010043764_e9vc6b6hm"
+      },
+      {
+        "id": "n_1775661049385",
+        "x": 900,
+        "y": 240,
+        "symbolKey": "pump-liquid-ring",
+        "label": "TPump_2",
+        "tag": "",
+        "sscId": "ssc_1773010043764_tbuqqnv1m"
+      },
+      {
+        "id": "n_1775661051364",
+        "x": 900,
+        "y": 360,
+        "symbolKey": "pump-liquid-ring",
+        "label": "TPump_3",
+        "tag": "",
+        "sscId": "ssc_1773010043764_q6s81zyhs"
+      },
+      {
+        "id": "n_1775661053044",
+        "x": 600,
+        "y": 420,
+        "symbolKey": "cooler",
+        "label": "N_Cooling_1",
+        "tag": "",
+        "sscId": "ssc_1773010043764_9mdtfk1pn"
+      },
+      {
+        "id": "n_1775661055095",
+        "x": 720,
+        "y": 420,
+        "symbolKey": "cooler",
+        "label": "N_Cooling_2",
+        "tag": "",
+        "sscId": "ssc_1773010043764_l5b4pm36o"
+      },
+      {
+        "id": "n_1775661056937",
+        "x": 360,
+        "y": 360,
+        "symbolKey": "vessel-vertical",
+        "label": "O2_Tank",
+        "tag": "",
+        "sscId": "ssc_1773010043764_hgk2ev3yn"
+      },
+      {
+        "id": "n_1775661058857",
+        "x": 480,
+        "y": 360,
+        "symbolKey": "pipe-main",
+        "label": "O2_Piping",
+        "tag": "",
+        "sscId": "ssc_1773010043764_31k8b8xc3"
+      },
+      {
+        "id": "n_1775661061850",
+        "x": 480,
+        "y": 180,
+        "symbolKey": "pipe-main",
+        "label": "Fuel_Piping",
+        "tag": "",
+        "sscId": "ssc_1773010043764_k6k99m9il"
+      },
+      {
+        "id": "n_1775661063506",
+        "x": 540,
+        "y": 240,
+        "symbolKey": "flow-nozzle",
+        "label": "Injector",
+        "tag": "",
+        "sscId": "ssc_1773010043764_vqb3zvu0w"
+      },
+      {
+        "id": "n_1775661328018",
+        "x": 720,
+        "y": 240,
+        "symbolKey": "boundary",
+        "label": "System Boundary",
+        "tag": "Main Rocket",
+        "sscId": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "n_1775621209381",
+        "to": "n_1775661061850",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661056937",
+        "to": "n_1775661058857",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661043453",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661051364",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661063506",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775621208617",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775621207416",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661049385",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661053044",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661055095",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661058857",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      },
+      {
+        "from": "n_1775661061850",
+        "to": "n_1775661328018",
+        "label": "",
+        "lineStyle": "solid",
+        "color": "#374151"
+      }
+    ],
+    "groups": [
+      {
+        "id": "g_1775697809230",
+        "label": "Turbo Pumps",
+        "desc": "",
+        "nodeIds": [
+          "n_1775661043453",
+          "n_1775661049385",
+          "n_1775661051364"
+        ],
+        "color": "#e0f2fe",
+        "borderColor": "#0369a1",
+        "x": 876,
+        "y": 96,
+        "w": 108,
+        "h": 348
+      }
+    ],
+    "settings": {
+      "lineStyle": "solid",
+      "arrowStyle": "pointed",
+      "textSize": "medium",
+      "fontFamily": "sans-serif",
+      "colorMode": "color",
+      "showLabels": true,
+      "showDescriptions": false,
+      "showProbabilities": false,
+      "connectionPoint": "edge"
+    }
+  }
+}
