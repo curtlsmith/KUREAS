@@ -149,7 +149,7 @@ System-level knowledge management: define structures, systems, and components (S
   - Importance measures table: RIR, RRR, Probability of Contribution (PC), and SWIM
   - Configurable scatter plot of any two importance measures with labeled data points
 - **FMEA editor** — full-screen modal with SSC list and auto-generated Mermaid.js FMEA block diagrams; add effects, severity, detection, and mitigation fields per failure mode
-- **P&ID editor** — full-screen Piping and Instrumenation Diagram editor with SSC icons based upon the ISA5.1 P&ID symbol standard
+- **P&ID editor** — full-screen Piping and Instrumentation Diagram editor with SSC icons based upon the ISA5.1 P&ID symbol standard
 - **Supercomponents** — group SSCs into logical assemblies for organization
 - **Boundary conditions** — import from KUREAS-SEQ files for use in system logic
 - **Reliability database** — load `.relDB` or `.fmeaDB` files into the Component List (Pane A); drag components to add them to the system; export SSC data back to `.relDB` or `.fmeaDB`
