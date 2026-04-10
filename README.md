@@ -91,6 +91,7 @@ Full fault tree authoring, visualization, and analysis environment with SAPHIRE 
 
 - **Create or import** — start a blank project from scratch or import SAPHIRE MAR-D files (.FTL, .BED, .BEI, .GTD, .FTC) via multi-file selection; also loads native `.KNOW_FTL` project files
 - **Full editing** — add, delete, rename, and edit gates and basic events; modify descriptions, probabilities, and notes; copy/paste sub-tree structures; drag-and-drop basic events and fault trees onto the canvas
+- **Graphical and Textual Tree View** — view and edit fault tree logic using a graphics- or text-based editor.
 - **Scope-aware editing** — when editing shared nodes (appearing in multiple locations), choose to apply changes to one instance or all instances across the project; name conflict detection prevents collisions between gates and basic events
 - **Gate types** — AND, OR, NOT, NAND, N-of-M Voting, and Transfer gates; Transfer gates auto-resolve to display referenced sub-trees
 - **Interactive canvas** — zoom, pan, expand/collapse, click-to-edit, right-click-to-pin, and search by name
@@ -148,6 +149,7 @@ System-level knowledge management: define structures, systems, and components (S
   - Importance measures table: RIR, RRR, Probability of Contribution (PC), and SWIM
   - Configurable scatter plot of any two importance measures with labeled data points
 - **FMEA editor** — full-screen modal with SSC list and auto-generated Mermaid.js FMEA block diagrams; add effects, severity, detection, and mitigation fields per failure mode
+- **P&ID editor** — full-screen Piping and Instrumenation Diagram editor with SSC icons based upon the ISA5.1 P&ID symbol standard
 - **Supercomponents** — group SSCs into logical assemblies for organization
 - **Boundary conditions** — import from KUREAS-SEQ files for use in system logic
 - **Reliability database** — load `.relDB` or `.fmeaDB` files into the Component List (Pane A); drag components to add them to the system; export SSC data back to `.relDB` or `.fmeaDB`
