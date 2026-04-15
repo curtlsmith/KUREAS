@@ -1,0 +1,73 @@
+source name: EGG-SSRE-8875
+source description: Component Failure Rate Data with Potential Applicability to a Nuclear Fuel Reprocessing Plant, EG&G Idaho, 1991
+*System,SSC Type,Component Type,Failure Mode,Description,Units (per demand or per hour),Distribution Type,Mean,Distribution Shape Parameter (α),Distribution Scale Parameter (β)
+VALVES,MANUAL,MOV,FTO/FTC,Fail to Open/Close,d,Lognormal,3.0E-04,3.0E-04,5
+VALVES,MANUAL,MOV,PLG,Plug,h,Lognormal,5.0E-08,5.0E-08,10
+VALVES,MANUAL,MOV,ILK,Internal Leakage,h,Lognormal,5.0E-08,5.0E-08,10
+VALVES,MANUAL,MOV,IRU,Internal Rupture,h,Lognormal,1.0E-08,1.0E-08,10
+VALVES,MANUAL,MOV,ELK,External Leakage,h,Lognormal,3.0E-07,3.0E-07,10
+VALVES,MANUAL,MOV,ERU,External Rupture,h,Lognormal,1.0E-08,1.0E-08,10
+VALVES,MOTOR-OPERATED,MOV,FTO/FTC,Fail to Open/Close,d,Lognormal,1.0E-03,1.0E-03,5
+VALVES,MOTOR-OPERATED,MOV,SPO,Spurious Operation,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,MOTOR-OPERATED,MOV,PLG,Plug,h,Lognormal,5.0E-08,5.0E-08,10
+VALVES,MOTOR-OPERATED,MOV,ILK,Internal Leakage,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,MOTOR-OPERATED,MOV,IRU,Internal Rupture,h,Lognormal,5.0E-08,5.0E-08,10
+VALVES,MOTOR-OPERATED,MOV,ELK,External Leakage,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,MOTOR-OPERATED,MOV,ERU,External Rupture,h,Lognormal,5.0E-08,5.0E-08,10
+VALVES,PNEUMATIC/HYDRAULIC,AOV,FTO/FTC,Fail to Open/Close,d,Lognormal,3.0E-03,3.0E-03,5
+VALVES,PNEUMATIC/HYDRAULIC,AOV,SPO,Spurious Operation,h,Lognormal,3.0E-07,3.0E-07,10
+VALVES,PNEUMATIC/HYDRAULIC,AOV,PLG,Plug,h,Lognormal,3.0E-08,3.0E-08,10
+VALVES,PNEUMATIC/HYDRAULIC,AOV,ILK,Internal Leakage,h,Lognormal,1.0E-07,1.0E-07,10
+VALVES,PNEUMATIC/HYDRAULIC,AOV,IRU,Internal Rupture,h,Lognormal,3.0E-08,3.0E-08,10
+VALVES,PNEUMATIC/HYDRAULIC,AOV,ELK,External Leakage,h,Lognormal,1.0E-06,1.0E-06,10
+VALVES,PNEUMATIC/HYDRAULIC,AOV,ERU,External Rupture,h,Lognormal,3.0E-08,3.0E-08,10
+VALVES,SOLENOID,SOV,FTO/FTC,Fail to Open/Close,d,Lognormal,3.0E-03,3.0E-03,5
+VALVES,SOLENOID,SOV,SPO,Spurious Operation,h,Lognormal,3.0E-07,3.0E-07,10
+VALVES,SOLENOID,SOV,PLG,Plug,h,Lognormal,3.0E-08,3.0E-08,10
+VALVES,SOLENOID,SOV,ILK,Internal Leakage,h,Lognormal,1.0E-07,1.0E-07,10
+VALVES,SOLENOID,SOV,IRU,Internal Rupture,h,Lognormal,3.0E-08,3.0E-08,10
+VALVES,SOLENOID,SOV,ELK,External Leakage,h,Lognormal,1.0E-06,1.0E-06,10
+VALVES,SOLENOID,SOV,ERU,External Rupture,h,Lognormal,3.0E-08,3.0E-08,10
+VALVES,CHECK,CKV,FTO,Fail to Open,d,Lognormal,1.0E-04,1.0E-04,5
+VALVES,CHECK,CKV,PLG,Plug,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,CHECK,CKV,FTC,Fail to Close,d,Lognormal,1.0E-04,1.0E-04,5
+VALVES,CHECK,CKV,ILK,Internal Leakage,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,CHECK,CKV,IRU,Internal Rupture,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,CHECK,CKV,ELK,External Leakage,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,CHECK,CKV,ERU,External Rupture,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,RUPTURE DISC,RUP,FTO,Fail to Open,h,Lognormal,5.0E-07,5.0E-07,10
+VALVES,RUPTURE DISC,RUP,PRE,Premature Opening,h,Lognormal,1.0E-05,1.0E-05,10
+PUMPS,MOTOR-DRIVEN,MDP,FTS,Fails to Start,d,Lognormal,5.0E-03,5.0E-03,5
+PUMPS,MOTOR-DRIVEN,MDP,FTR,Fail to Run,h,Lognormal,5.0E-05,5.0E-05,10
+PUMPS,MOTOR-DRIVEN,MDP,ELK,External Leakage,h,Lognormal,3.0E-06,3.0E-06,10
+PUMPS,MOTOR-DRIVEN,MDP,ERU,External Rupture,h,Lognormal,5.0E-07,5.0E-07,10
+PUMPS,ELECTROMAGNETIC,EMP,FTS,Fails to Start,d,Lognormal,3.0E-03,3.0E-03,5
+PUMPS,ELECTROMAGNETIC,EMP,FTR,Fail to Run,h,Lognormal,1.0E-05,1.0E-05,10
+PUMPS,ELECTROMAGNETIC,EMP,ELK,External Leakage,h,Lognormal,3.0E-06,3.0E-06,10
+PUMPS,ELECTROMAGNETIC,EMP,ERU,External Rupture,h,Lognormal,3.0E-07,3.0E-07,10
+HEAT EXCHANGERS,IHX SHELL,HTX,ELK,External Leakage,h,Lognormal,1.0E-06,1.0E-06,10
+HEAT EXCHANGERS,IHX SHELL,HTX,ERU,External Rupture,h,Lognormal,1.0E-06,1.0E-06,10
+HEAT EXCHANGERS,IHX TUBES (PER UNIT),HTX,LKG,Leakage,h,Lognormal,1.0E-06,1.0E-06,10
+HEAT EXCHANGERS,IHX TUBES (PER UNIT),HTX,RUP,Rupture,h,Lognormal,1.0E-06,1.0E-06,10
+HEAT EXCHANGERS,IHX TUBES (PER UNIT),HTX,PLG,Plug,h,Lognormal,1.0E-06,1.0E-06,10
+HEAT EXCHANGERS,STEAM GENERATOR SHELL,SGN,ELK,External Leakage,h,Lognormal,1.0E-06,1.0E-06,10
+HEAT EXCHANGERS,STEAM GENERATOR TUBE (PER UNIT),SGN,LKS,Leakage (Small),h,Lognormal,5.0E-06,5.0E-06,10
+HEAT EXCHANGERS,STEAM GENERATOR TUBE (PER UNIT),SGN,LKM,Leakage (Medium),h,Lognormal,1.0E-06,1.0E-06,10
+HEAT EXCHANGERS,STEAM GENERATOR TUBE (PER UNIT),SGN,LKL,Leakage (Large),h,Lognormal,3.0E-07,3.0E-07,10
+VESSELS,TANK,TNK,ELK,External Leakage,h,Lognormal,1.0E-06,1.0E-06,10
+VESSELS,TANK,TNK,ERU,External Rupture,h,Lognormal,1.0E-07,1.0E-07,10
+VESSELS,REACTOR VESSEL,RVS,ELK,External Leakage,h,Lognormal,1.0E-08,1.0E-08,10
+VESSELS,REACTOR VESSEL,RVS,ERU,External Rupture,h,Lognormal,1.0E-10,1.0E-10,10
+VESSELS,GUARD VESSEL,GVS,ELK,External Leakage,h,Lognormal,1.0E-08,1.0E-08,10
+VESSELS,GUARD VESSEL,GVS,ERU,External Rupture,h,Lognormal,1.0E-10,1.0E-10,10
+PIPES,1-4 INCH (PER FOOT),PIP,LKG,Leakage,hft,Lognormal,3.0E-09,3.0E-09,10
+PIPES,1-4 INCH (PER FOOT),PIP,RUP,Rupture,hft,Lognormal,3.0E-10,3.0E-10,10
+PIPES,1-4 INCH (PER FOOT),PIP,PLG,Plug,hft,Lognormal,1.0E-09,1.0E-09,10
+PIPES,>4 INCH (PER FOOT),PIP,LKG,Leakage,hft,Lognormal,3.0E-09,3.0E-09,10
+PIPES,>4 INCH (PER FOOT),PIP,RUP,Rupture,hft,Lognormal,3.0E-10,3.0E-10,10
+TRAPS AND STRAINERS,STRAINER/FILTER,STR,PLG,Plug,h,Lognormal,3.0E-06,3.0E-06,10
+TRAPS AND STRAINERS,STRAINER/FILTER,STR,FOP,Fail Open,h,Lognormal,3.0E-06,3.0E-06,10
+TRAPS AND STRAINERS,COLD TRAP,CTR,FAL,Failure,h,Lognormal,5.0E-07,5.0E-07,10
+TRAPS AND STRAINERS,COLD TRAP,CTR,ELK,External Leakage,h,Lognormal,5.0E-07,5.0E-07,10
+TRAPS AND STRAINERS,COLD TRAP,CTR,ERU,External Rupture,h,Lognormal,5.0E-07,5.0E-07,10
+TRAPS AND STRAINERS,COLD TRAP,CTR,PLG,Plug,h,Lognormal,1.0E-05,1.0E-05,10
