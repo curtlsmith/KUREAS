@@ -52,7 +52,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.1 | Hazard analysis, initiating event frequency quantification, and screening |
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.2 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
-| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.1 | System modeling, FMEA, failure analysis, and importance measures |
+| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.2 | System modeling, P&ID, FMEA, failure analysis, and importance measures |
 | **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | v1.0 | Process Operational Logic (POL) diagrams and event tree generation |
 | **KUREAS-REPORT (planned)** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from all module outputs |
 | **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | v1.0 | General-purpose `.KNOW` file viewer and editor |
@@ -132,12 +132,13 @@ System-level knowledge management: define structures, systems, and components (S
 - **6-pane workspace** — Component List (Pane A), System Info bar (Pane B), SSCs in System (Pane C), Supercomponents (Pane D), "How the System Works" logic editor (Pane E), and Edit SSC details (Pane F); all panes are resizable
 - **SSC management** — define SSCs with name, description, SSC type, and component type; add multiple failure modes per SSC with individual probability data; duplicate, edit, and delete SSCs and failure modes
 - **Probability types:**
-  - **FM0: Direct Probability** — mean value with distribution parameters (CNI, Lognormal, Normal, Gamma, Beta, Uniform, etc.)
-  - **FM1: Demand (Binomial)** — demand probability and number of demands
-  - **FM2: Fails While Operating (Poisson)** — failure rate × mission time
-  - **FM3: Fails in Standby** — failure rate × inspection interval
-  - **FM4: Fails While Operating with Repair** — failure rate, mission time, and repair time
-  - **FM5: Logic T/F Flag** — house events (TRUE/FALSE)
+  - **Direct Probability** — mean value with distribution parameters (CNI, Lognormal, Normal, Gamma, Beta, Uniform, etc.)
+  - **Demand (Binomial)** — demand probability and number of demands
+  - **Fails While Operating (Poisson)** — failure rate and mission time
+  - **Fails While Operating (Poisson) with a per-feet failure rate ** — failure rate, mission time, and lenth of component (e.g., piping)
+  - **Fails in Standby** — failure rate and inspection interval
+  - **Fails While Operating with Repair** — failure rate, mission time, and repair time
+  - **Logic T/F Flag** — house events (TRUE/FALSE)
   - **Qualitative** — Low / Medium / High mapped to configurable probability values in Settings
   - **Linked System** — probability computed from another `.KNOW_SYS` file (resolved automatically in failure analysis)
   - **Screened** — excluded from analysis (probability = 0)
