@@ -52,7 +52,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.1 | Hazard analysis, initiating event frequency quantification, and screening |
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.2 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
-| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.2 | System modeling, P&ID, FMEA, failure analysis, and importance measures |
+| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.3 | System modeling, P&ID, FMEA, failure analysis, CCF, importance measures, and comparison function |
 | **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | v1.0 | Process Operational Logic (POL) diagrams and event tree generation |
 | **KUREAS-REPORT (planned)** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from all module outputs |
 | **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | v1.0 | General-purpose `.KNOW` file viewer and editor |
@@ -125,7 +125,7 @@ Event tree visualization tool implementing a backwards-recursive algorithm that 
 
 ## KUREAS-SYS — System Evaluation
 
-System-level knowledge management: define structures, systems, and components (SSCs), analyze failure modes, model system success logic, derive fault trees, and calculate importance measures.
+System-level knowledge management: define structures, systems, and components (SSCs), analyze failure modes, model system success logic, derive fault trees, include common-cause failures (CCF), and calculate importance measures.
 
 ### Features
 
@@ -152,6 +152,8 @@ System-level knowledge management: define structures, systems, and components (S
 - **FMEA editor** — full-screen modal with SSC list and auto-generated Mermaid.js FMEA block diagrams; add effects, severity, detection, and mitigation fields per failure mode
 - **P&ID editor** — full-screen Piping and Instrumentation Diagram editor with SSC icons based upon the ISA5.1 P&ID symbol standard
 - **Supercomponents** — group SSCs into logical assemblies for organization
+- **Common-Cause Failures** — automatically apply a beta-factor based CCF events to cut sets
+- **Comparison** — Compare two system designs to support risk-informed decision making
 - **Boundary conditions** — import from KUREAS-SEQ files for use in system logic
 - **Reliability database** — load `.relDB` or `.fmeaDB` files into the Component List (Pane A); drag components to add them to the system; export SSC data back to `.relDB` or `.fmeaDB`
 - **Import** — boundary conditions from SEQ files; basic events from `.KNOW_FTL` files (creates SSCs with probability data)
