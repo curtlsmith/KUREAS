@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KUREAS-SYS Workflow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root, [data-theme="light"] {
+    --bg: #f4f6f9; --bg2: #ffffff; --bg3: #edf0f4;
+    --border: #d0d7e3; --border2: #b0bcd0;
+    --text: #1a2030; --text2: #4a5568; --text3: #7a8ba0;
+    --accent: #1a6ef5;
+  }
+  [data-theme="dark"] {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #1c2333;
+    --border: #30363d; --border2: #444c56;
+    --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+    --accent: #388bfd;
+  }
+
+  html, body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; height: 100%; overflow: hidden; transition: background 0.2s, color 0.2s; }
+  .app { display: flex; height: 100vh; }
+
+  .diagram-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .diagram-header { padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; background: var(--bg2); flex-shrink: 0; transition: background 0.2s, border-color 0.2s; }
+  .diagram-header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: 0.05em; }
+  .header-sub { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; flex: 1; }
+
+  .theme-toggle { display: flex; align-items: center; gap: 7px; margin-left: auto; cursor: pointer; background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px 4px 8px; transition: background 0.2s, border-color 0.2s; user-select: none; }
+  .theme-toggle:hover { border-color: var(--border2); }
+  .toggle-track { width: 28px; height: 16px; background: var(--border2); border-radius: 8px; position: relative; transition: background 0.2s; flex-shrink: 0; }
+  [data-theme="dark"] .toggle-track { background: var(--accent); }
+  .toggle-thumb { position: absolute; width: 12px; height: 12px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  [data-theme="dark"] .toggle-thumb { transform: translateX(12px); }
+  .toggle-icon { font-size: 13px; line-height: 1; }
+  .toggle-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.06em; }
+
+  .diagram-scroll { flex: 1; overflow-y: auto; overflow-x: auto; padding: 20px 20px 32px; background: var(--bg); transition: background 0.2s; }
+  .diagram-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .diagram-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  .detail-panel { width: 340px; flex-shrink: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg2); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), background 0.2s, border-color 0.2s; }
+  .detail-panel.hidden { transform: translateX(340px); }
+
+  .detail-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .detail-header .label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .close-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 15px; padding: 2px 6px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+  .close-btn:hover { color: var(--text); background: var(--bg3); }
+
+  .detail-body { flex: 1; overflow-y: auto; padding: 18px 16px 24px; }
+  .detail-body::-webkit-scrollbar { width: 4px; }
+  .detail-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .detail-category { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 5px; }
+  .detail-title { font-size: 15px; font-weight: 600; line-height: 1.3; margin-bottom: 9px; color: var(--text); }
+  .detail-desc { font-size: 13px; line-height: 1.7; color: var(--text2); margin-bottom: 16px; }
+  .detail-section { margin-bottom: 16px; }
+  .detail-section-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 7px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid; line-height: 1.4; }
+  .detail-item { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text2); }
+  .detail-item:last-child { border-bottom: none; }
+  .detail-item .dot { width: 5px; height: 5px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .note-box { background: var(--bg3); border: 1px solid var(--border); border-left: 3px solid; border-radius: 4px; padding: 10px 12px; font-size: 12px; color: var(--text2); line-height: 1.6; font-style: italic; }
+
+  .node { cursor: pointer; }
+  .node:hover .nr { filter: brightness(0.93); }
+  [data-theme="dark"] .node:hover .nr { filter: brightness(1.18); }
+  .node.active .nr { stroke-width: 2.5 !important; }
+
+  .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: var(--text3); text-align: center; padding: 24px; }
+  .placeholder .icon { font-size: 26px; opacity: 0.35; }
+  .placeholder p { font-size: 12px; line-height: 1.6; max-width: 200px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="diagram-panel">
+    <div class="diagram-header">
+      <h1>KUREAS-SYS</h1>
+      <span class="header-sub">System Knowledge &amp; Reliability Analysis — Module Workflow</span>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark theme">
+        <span class="toggle-icon" id="toggle-icon">☾</span>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        <span class="toggle-label" id="toggle-label">DARK</span>
+      </button>
+    </div>
+
+    <div class="diagram-scroll">
+      <svg id="diagram" width="100%" viewBox="0 0 680 1060" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif; min-width:540px;">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+
+        <!-- Solid connectors -->
+        <g id="g-conn">
+          <line x1="340" y1="74"  x2="340" y2="104" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="160" x2="340" y2="192" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="248" x2="340" y2="280" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="336" x2="340" y2="368" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="416" x2="340" y2="448" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="448" x2="129" y2="476" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="448" x2="320" y2="476" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="448" x2="521" y2="476" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="129" y1="532" x2="129" y2="660" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="320" y1="532" x2="320" y2="660" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="521" y1="532" x2="521" y2="660" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="628" x2="340" y2="660" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="704" x2="340" y2="736" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="792" x2="340" y2="824" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="824" x2="106" y2="848" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="824" x2="246" y2="848" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="824" x2="391" y2="848" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="340" y1="824" x2="553" y2="848" stroke-width="1.5" marker-end="url(#arr)"/>
+        </g>
+        <!-- Dashed connectors -->
+        <g id="g-dash">
+          <line x1="94"  y1="133" x2="108" y2="133" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+          <line x1="500" y1="308" x2="578" y2="308" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+          <path d="M340,448 L20,448 L20,600 L185,600" fill="none" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+          <path d="M495,600 L660,600 L660,764 L470,764" fill="none" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+        </g>
+        <!-- Band borders -->
+        <g id="g-bands">
+          <rect x="30" y="448" width="620" height="268" rx="10" fill="none" stroke-width="1" stroke-dasharray="5 4"/>
+          <text id="bl-analysis" x="48" y="464" font-size="10" font-family="'IBM Plex Mono',monospace" dominant-baseline="central">ANALYSIS</text>
+          <rect x="30" y="824" width="620" height="136" rx="10" fill="none" stroke-width="1" stroke-dasharray="5 4"/>
+          <text id="bl-exports" x="48" y="840" font-size="10" font-family="'IBM Plex Mono',monospace" dominant-baseline="central">EXPORTS</text>
+        </g>
+        <!-- Side labels -->
+        <g id="g-side">
+          <text x="52" y="124" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono',monospace">Import from</text>
+          <text x="52" y="140" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono',monospace">.KNOW_SYS/FTL</text>
+          <text x="622" y="300" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono',monospace">Modules [M]</text>
+          <text x="622" y="314" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono',monospace">Variables</text>
+        </g>
+
+        <!-- NODES -->
+        <g class="node" id="n-project" data-node="project">
+          <rect class="nr" x="220" y="30"  width="240" height="44" rx="6" stroke-width="1"/>
+          <text class="nt" x="340" y="48"  text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">Project setup</text>
+          <text class="ns" x="340" y="64"  text-anchor="middle" dominant-baseline="central" font-size="11">Name, description, file</text>
+        </g>
+        <g class="node" id="n-ssc" data-node="ssc">
+          <rect class="nr" x="110" y="104" width="460" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="340" y="124" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">System, Structure, and Component (SSC) definition</text>
+          <text class="ns" x="340" y="144" text-anchor="middle" dominant-baseline="central" font-size="11">Name, type, label, failure modes</text>
+        </g>
+        <g class="node" id="n-fm" data-node="fm">
+          <rect class="nr" x="190" y="192" width="300" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="340" y="212" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">Failure model configuration</text>
+          <text class="ns" x="340" y="232" text-anchor="middle" dominant-baseline="central" font-size="11">Failure Mode type, λ, T, Q, distribution params</text>
+        </g>
+        <g class="node" id="n-logic" data-node="logic">
+          <rect class="nr" x="180" y="280" width="320" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="340" y="300" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">System design editor</text>
+          <text class="ns" x="340" y="320" text-anchor="middle" dominant-baseline="central" font-size="11">SYSTEM WORKS = … (system functional expression)</text>
+        </g>
+        <g class="node" id="n-super" data-node="super">
+          <rect class="nr" x="208" y="368" width="264" height="48" rx="6" stroke-width="1" stroke-dasharray="5 3"/>
+          <text class="nt" x="340" y="386" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="500">Supercomponents</text>
+          <text class="ns" x="340" y="403" text-anchor="middle" dominant-baseline="central" font-size="11">Grouped SSC logic blocks</text>
+        </g>
+        <text id="opt-label" x="484" y="376" font-size="10" font-style="italic" font-family="'IBM Plex Mono',monospace">optional</text>
+        <g class="node" id="n-ft" data-node="ft">
+          <rect class="nr" x="46"  y="476" width="166" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="129" y="496" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">Fault tree</text>
+          <text class="ns" x="129" y="515" text-anchor="middle" dominant-baseline="central" font-size="11">From SYSTEM WORKS</text>
+        </g>
+        <g class="node" id="n-fmea" data-node="fmea">
+          <rect class="nr" x="237" y="476" width="166" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="320" y="496" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">FMEA editor</text>
+          <text class="ns" x="320" y="515" text-anchor="middle" dominant-baseline="central" font-size="11">Modes, effects, flowcharts</text>
+        </g>
+        <g class="node" id="n-imp" data-node="imp">
+          <rect class="nr" x="428" y="476" width="186" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="521" y="496" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">Importance measures</text>
+          <text class="ns" x="521" y="515" text-anchor="middle" dominant-baseline="central" font-size="11">RIR, RRR, PC, SWIM</text>
+        </g>
+        <g class="node" id="n-pid" data-node="pid">
+          <rect class="nr" x="185" y="572" width="310" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="340" y="592" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">P&amp;ID editor</text>
+          <text class="ns" x="340" y="611" text-anchor="middle" dominant-baseline="central" font-size="11">ISA 5.1 symbols, SSC placement, piping connections</text>
+        </g>
+        <g class="node" id="n-rel" data-node="rel">
+          <rect class="nr" x="46"  y="660" width="588" height="44" rx="6" stroke-width="1"/>
+          <text class="nt" x="340" y="678" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">Reliability summary</text>
+          <text class="ns" x="340" y="694" text-anchor="middle" dominant-baseline="central" font-size="11">System Q(t), top event probability, cut set generation</text>
+        </g>
+        <g class="node" id="n-report" data-node="report">
+          <rect class="nr" x="210" y="736" width="260" height="56" rx="6" stroke-width="1"/>
+          <text class="nt" x="340" y="756" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="600">Report generation</text>
+          <text class="ns" x="340" y="774" text-anchor="middle" dominant-baseline="central" font-size="11">Word-compatible HTML / Markdown</text>
+        </g>
+        <g class="node" id="n-exp-know" data-node="exp-know">
+          <rect class="nr" x="46"  y="848" width="120" height="44" rx="6" stroke-width="1"/>
+          <text class="nt" x="106" y="866" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600">.KNOW_SYS</text>
+          <text class="ns" x="106" y="882" text-anchor="middle" dominant-baseline="central" font-size="10">Native format</text>
+        </g>
+        <g class="node" id="n-exp-saphire" data-node="exp-saphire">
+          <rect class="nr" x="186" y="848" width="120" height="44" rx="6" stroke-width="1"/>
+          <text class="nt" x="246" y="866" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600">SAPHIRE .FTL</text>
+          <text class="ns" x="246" y="882" text-anchor="middle" dominant-baseline="central" font-size="10">.BEI / .BED</text>
+        </g>
+        <g class="node" id="n-exp-rel" data-node="exp-rel">
+          <rect class="nr" x="326" y="848" width="130" height="44" rx="6" stroke-width="1"/>
+          <text class="nt" x="391" y="866" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600">.relDB / .fmeaDB</text>
+          <text class="ns" x="391" y="882" text-anchor="middle" dominant-baseline="central" font-size="10">Reliability DB</text>
+        </g>
+        <g class="node" id="n-exp-ftl" data-node="exp-ftl">
+          <rect class="nr" x="476" y="848" width="154" height="44" rx="6" stroke-width="1"/>
+          <text class="nt" x="553" y="866" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600">KUREAS-FTL</text>
+          <text class="ns" x="553" y="882" text-anchor="middle" dominant-baseline="central" font-size="10">Fault tree logic</text>
+        </g>
+
+        <!-- Legend -->
+        <g id="g-legend" transform="translate(30,960)">
+          <rect id="leg-bg" width="620" height="60" rx="6" stroke-width="1"/>
+          <text id="leg-title" x="12" y="14" font-size="9" font-family="'IBM Plex Mono',monospace" font-weight="600" letter-spacing="0.08em">LEGEND</text>
+          <circle id="lc-gray"  cx="20"  cy="32" r="5" stroke-width="1"/>
+          <text    id="lt-gray"  x="30"  y="36"  font-size="11">SSC / Failure models</text>
+          <circle id="lc-teal"  cx="160" cy="32" r="5" stroke-width="1"/>
+          <text    id="lt-teal"  x="170" y="36"  font-size="11">System logic</text>
+          <circle id="lc-coral" cx="270" cy="32" r="5" stroke-width="1"/>
+          <text    id="lt-coral" x="280" y="36"  font-size="11">Analysis</text>
+          <circle id="lc-amber" cx="350" cy="32" r="5" stroke-width="1"/>
+          <text    id="lt-amber" x="360" y="36"  font-size="11">Results</text>
+          <circle id="lc-blue"  cx="420" cy="32" r="5" stroke-width="1"/>
+          <text    id="lt-blue"  x="430" y="36"  font-size="11">Reports</text>
+          <circle id="lc-green" cx="490" cy="32" r="5" stroke-width="1"/>
+          <text    id="lt-green" x="500" y="36"  font-size="11">Exports</text>
+          <line id="leg-dash" x1="12" y1="50" x2="32" y2="50" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <text id="lt-misc1" x="38"  y="54" font-size="11">Optional / import path</text>
+          <text id="lt-misc2" x="380" y="54" font-size="11">Click any node for details</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="detail-panel hidden" id="detail-panel">
+    <div class="detail-header">
+      <span class="label" id="detail-category">Details</span>
+      <button class="close-btn" id="close-btn">&#x2715;</button>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div class="placeholder">
+        <div class="icon">&#x25A1;</div>
+        <p>Click a node in the diagram to see details here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Theme palettes ────────────────────────────────────────────────────────────
+const T = {
+  light: {
+    conn:'#9daec4', dash:'#b8c8d8', band:'#c8d4e4', bandLbl:'#8a9ab0',
+    side:'#8a9ab0', legBg:'#edf0f4', legBrd:'#d0d7e3', legTxt:'#6a7a90', opt:'#8a9ab0',
+    nodes:{
+      project:      {f:'#e8ecf2',s:'#8a9ab0',t:'#2a3a50',u:'#5a6a80'},
+      ssc:          {f:'#ede8fb',s:'#7c3aed',t:'#4a1d96',u:'#6d28d9'},
+      fm:           {f:'#ede8fb',s:'#7c3aed',t:'#4a1d96',u:'#6d28d9'},
+      logic:        {f:'#e0f7f4',s:'#0d9488',t:'#0f4c45',u:'#0d7a70'},
+      super:        {f:'#f0f3f8',s:'#9daec4',t:'#4a5a70',u:'#7a8ba0'},
+      ft:           {f:'#fff0e6',s:'#ea6c0a',t:'#7c2d00',u:'#c25008'},
+      fmea:         {f:'#fff0e6',s:'#ea6c0a',t:'#7c2d00',u:'#c25008'},
+      imp:          {f:'#fff0e6',s:'#ea6c0a',t:'#7c2d00',u:'#c25008'},
+      pid:          {f:'#fff0e6',s:'#ea6c0a',t:'#7c2d00',u:'#c25008'},
+      rel:          {f:'#fef3cd',s:'#d97706',t:'#6b3a00',u:'#b45309'},
+      report:       {f:'#e6f0ff',s:'#1a6ef5',t:'#0c2d6b',u:'#1a56c4'},
+      'exp-know':   {f:'#e4f7ec',s:'#16a34a',t:'#0a3d1e',u:'#15803d'},
+      'exp-saphire':{f:'#e4f7ec',s:'#16a34a',t:'#0a3d1e',u:'#15803d'},
+      'exp-rel':    {f:'#e4f7ec',s:'#16a34a',t:'#0a3d1e',u:'#15803d'},
+      'exp-ftl':    {f:'#e4f7ec',s:'#16a34a',t:'#0a3d1e',u:'#15803d'},
+    },
+    leg:{
+      gray: {f:'#e8ecf2',s:'#8a9ab0'}, teal: {f:'#e0f7f4',s:'#0d9488'},
+      coral:{f:'#fff0e6',s:'#ea6c0a'}, amber:{f:'#fef3cd',s:'#d97706'},
+      blue: {f:'#e6f0ff',s:'#1a6ef5'}, green:{f:'#e4f7ec',s:'#16a34a'},
+    }
+  },
+  dark: {
+    conn:'#30363d', dash:'#444c56', band:'#30363d', bandLbl:'#6e7681',
+    side:'#6e7681', legBg:'#161b22', legBrd:'#30363d', legTxt:'#8b949e', opt:'#6e7681',
+    nodes:{
+      project:      {f:'#1c2333',s:'#444c56',t:'#e6edf3',u:'#8b949e'},
+      ssc:          {f:'#2d1f4e',s:'#8b5cf6',t:'#c4b5fd',u:'#a78bfa'},
+      fm:           {f:'#2d1f4e',s:'#8b5cf6',t:'#c4b5fd',u:'#a78bfa'},
+      logic:        {f:'#0d2e2b',s:'#14b8a6',t:'#5eead4',u:'#2dd4bf'},
+      super:        {f:'#161b22',s:'#444c56',t:'#8b949e',u:'#6e7681'},
+      ft:           {f:'#2d1500',s:'#f97316',t:'#fb923c',u:'#f97316'},
+      fmea:         {f:'#2d1500',s:'#f97316',t:'#fb923c',u:'#f97316'},
+      imp:          {f:'#2d1500',s:'#f97316',t:'#fb923c',u:'#f97316'},
+      pid:          {f:'#2d1500',s:'#f97316',t:'#fb923c',u:'#f97316'},
+      rel:          {f:'#2d1f00',s:'#f59e0b',t:'#fcd34d',u:'#f59e0b'},
+      report:       {f:'#0d1f3c',s:'#388bfd',t:'#79c0ff',u:'#388bfd'},
+      'exp-know':   {f:'#0d2b1a',s:'#22c55e',t:'#86efac',u:'#22c55e'},
+      'exp-saphire':{f:'#0d2b1a',s:'#22c55e',t:'#86efac',u:'#22c55e'},
+      'exp-rel':    {f:'#0d2b1a',s:'#22c55e',t:'#86efac',u:'#22c55e'},
+      'exp-ftl':    {f:'#0d2b1a',s:'#22c55e',t:'#86efac',u:'#22c55e'},
+    },
+    leg:{
+      gray: {f:'#1c2333',s:'#444c56'}, teal: {f:'#0d2e2b',s:'#14b8a6'},
+      coral:{f:'#2d1500',s:'#f97316'}, amber:{f:'#2d1f00',s:'#f59e0b'},
+      blue: {f:'#0d1f3c',s:'#388bfd'}, green:{f:'#0d2b1a',s:'#22c55e'},
+    }
+  }
+};
+
+const NODE_KEY = {
+  'n-project':'project','n-ssc':'ssc','n-fm':'fm','n-logic':'logic','n-super':'super',
+  'n-ft':'ft','n-fmea':'fmea','n-imp':'imp','n-pid':'pid','n-rel':'rel',
+  'n-report':'report','n-exp-know':'exp-know','n-exp-saphire':'exp-saphire',
+  'n-exp-rel':'exp-rel','n-exp-ftl':'exp-ftl'
+};
+
+function applyTheme(name) {
+  const p = T[name];
+  document.documentElement.setAttribute('data-theme', name);
+  document.getElementById('toggle-icon').textContent  = name === 'light' ? '☾' : '☀';
+  document.getElementById('toggle-label').textContent = name === 'light' ? 'DARK' : 'LIGHT';
+
+  document.querySelectorAll('#g-conn line, #g-conn path').forEach(e => e.setAttribute('stroke', p.conn));
+  document.querySelectorAll('#g-dash line, #g-dash path').forEach(e => e.setAttribute('stroke', p.dash));
+  document.querySelectorAll('#g-bands rect').forEach(e => e.setAttribute('stroke', p.band));
+  document.querySelectorAll('#g-bands text').forEach(e => e.setAttribute('fill',   p.bandLbl));
+  document.querySelectorAll('#g-side  text').forEach(e => e.setAttribute('fill',   p.side));
+  const opt = document.getElementById('opt-label');
+  if (opt) opt.setAttribute('fill', p.opt);
+
+  Object.entries(NODE_KEY).forEach(([nid, key]) => {
+    const g = document.getElementById(nid); if (!g) return;
+    const c = p.nodes[key]; if (!c) return;
+    const r = g.querySelector('.nr');
+    if (r) { r.setAttribute('fill', c.f); r.setAttribute('stroke', c.s); }
+    const tx = g.querySelectorAll('text');
+    tx.forEach((t, i) => t.setAttribute('fill', i === 0 ? c.t : c.u));
+  });
+
+  const lb = document.getElementById('leg-bg');
+  if (lb) { lb.setAttribute('fill', p.legBg); lb.setAttribute('stroke', p.legBrd); }
+  document.getElementById('leg-title')?.setAttribute('fill', p.legTxt);
+  ['gray','teal','coral','amber','blue','green'].forEach(k => {
+    document.getElementById('lc-'+k)?.setAttribute('fill',   p.leg[k].f);
+    document.getElementById('lc-'+k)?.setAttribute('stroke', p.leg[k].s);
+    document.getElementById('lt-'+k)?.setAttribute('fill',   p.legTxt);
+  });
+  document.getElementById('leg-dash')?.setAttribute('stroke', p.dash);
+  ['lt-misc1','lt-misc2'].forEach(id => document.getElementById(id)?.setAttribute('fill', p.legTxt));
+}
+
+let theme = 'light';
+applyTheme(theme);
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  theme = theme === 'light' ? 'dark' : 'light';
+  applyTheme(theme);
+  if (activeNode) renderDetail(activeNode); // refresh detail colours
+});
+
+// ── Node data ────────────────────────────────────────────────────────────────
+const ND = {
+  project:{
+    cat:'Setup', lc:'#5a6a80', dc:'#8b949e',
+    title:'Project setup',
+    desc:'The starting point for any KUREAS-SYS analysis. Each project encapsulates a single system or system boundary and stores all SSCs, logic, and computed results in a single .KNOW_SYS file.',
+    secs:[
+      {h:'Fields',items:['System name — short identifier used in reports and exports','System acronym — abbreviated label for cross-module references','Extended description — rich-text field for narrative context','File path — the .KNOW_SYS output file location']},
+      {h:'Notes',note:'Project data persists in localStorage and can be saved/loaded as a .KNOW_SYS file at any time.'}
+    ]
+  },
+  ssc:{
+    cat:'SSC / Failure models', lc:'#6d28d9', dc:'#a78bfa',
+    title:'System, Structure, and Component (SSC) definition',
+    desc:'Each SSC represents a physical or logical component in the system boundary. SSCs are the atomic units used in the SYSTEM WORKS expression, FMEA, fault tree, and P&ID editor.',
+    secs:[
+      {h:'Fields per SSC',items:['Name — unique identifier used in SYSTEM WORKS and exports','Label / description — human-readable component description','SSC type — System, Structure, or Component classification','Component type — functional category (e.g. pump, valve, sensor)','Failure modes — one or more failure mode entries with FM type','P&ID symbol — ISA 5.1 symbol assigned for the P&ID canvas']},
+      {h:'Import sources',items:['.KNOW_SYS — full project reload','KUREAS-FTL basic events — imports BEs as SSC stubs','KUREAS-SEQ boundary conditions — imports SSCs from sequence files']}
+    ]
+  },
+  fm:{
+    cat:'SSC / Failure models', lc:'#6d28d9', dc:'#a78bfa',
+    title:'Failure model configuration',
+    desc:'Each SSC failure mode is assigned a failure model type that determines how the unreliability Q(t) is computed. Parameters propagate into the fault tree and importance measure calculations.',
+    secs:[
+      {h:'Failure Mode types',tags:['FM0 — Fixed Q','FM1 — Exponential λ·T','FM2 — Standby λs·T','FM3 — Demand p','FM4 — Lognormal','FM5 — Beta/CCF']},
+      {h:'Parameters',items:['λ — failure rate (failures per hour)','T — mission time or test interval (hours)','Q — fixed unreliability (dimensionless)','Distribution parameters — mean, EF, α, β depending on FM type']},
+      {h:'Notes',note:'CCF expansion (FM5/Beta factor) is applied during cut set generation. The computeFMProb helper resolves Q(t) for any FM type at evaluation time.'}
+    ]
+  },
+  logic:{
+    cat:'System logic', lc:'#0d7a70', dc:'#2dd4bf',
+    title:'System design editor',
+    desc:'A token-based Boolean expression editor where the analyst defines when the system succeeds. The SYSTEM WORKS expression drives fault tree generation, cut set enumeration, and importance measure calculations.',
+    secs:[
+      {h:'Syntax elements',tags:['SYSTEM WORKS =','AND','OR','NOT','( )','[module]','variable =','IF … THEN','IS TRUE / FALSE']},
+      {h:'Capabilities',items:['Named modules — [M] = … reusable sub-expressions','Variables — intermediate named expressions','IF-THEN rules — conditional house event assignments','Validation — unknown identifiers flagged in real time','Live fault tree preview as expression is edited']},
+      {h:'Notes',note:'The expression is translated to a failure (TOP event) fault tree by inverting the success logic. Transfer gates are inserted for each named module.'}
+    ]
+  },
+  super:{
+    cat:'System logic — optional', lc:'#5a6a80', dc:'#6e7681',
+    title:'Supercomponents',
+    desc:'Named groups of SSCs that behave as a single logical unit in the SYSTEM WORKS expression. Optional — used when a sub-assembly or train is referenced multiple times.',
+    secs:[
+      {h:'Use cases',items:['Representing a pump train (motor + pump + check valve) as one block','Modelling shared utility systems referenced by multiple trains','Simplifying complex redundant configurations']},
+      {h:'Notes',note:'Supercomponents appear as named identifiers in the SYSTEM WORKS expression and are expanded during fault tree generation.'}
+    ]
+  },
+  ft:{
+    cat:'Analysis', lc:'#c25008', dc:'#f97316',
+    title:'Fault tree generation',
+    desc:'KUREAS-SYS automatically translates the SYSTEM WORKS success expression into a fault tree with a TOP event representing system failure. Rendered on an HTML5 canvas with full pan/zoom.',
+    secs:[
+      {h:'Gate types generated',tags:['OR','AND','VOTING (k/n)','NOT','TRAN (transfer)']},
+      {h:'Outputs',items:['Interactive graphical fault tree canvas','Minimal cut sets via MCUB / BDD / inclusion-exclusion','Top event probability Q(mission time)','Cut set listing with individual probabilities','Export to SAPHIRE .FTL, .BEI, .BED formats','Export to OpenPSA MEF XML']},
+      {h:'Notes',note:'CCF expansion is applied before cut set enumeration when FM5 (Beta factor) failure modes are present.'}
+    ]
+  },
+  fmea:{
+    cat:'Analysis', lc:'#c25008', dc:'#f97316',
+    title:'FMEA editor',
+    desc:'The Failure Modes and Effects Analysis editor lets analysts document failure modes, effects, severity, detectability, and mitigation actions for each SSC.',
+    secs:[
+      {h:'Columns per failure mode',items:['Failure mode description','Local effect — effect on the component itself','System effect — effect on the overall system function','Severity / criticality rating','Detection method','Recommended action / mitigation']},
+      {h:'Outputs',items:['FMEA table included in Word/HTML report','Flowchart view of failure cause-effect chains','.fmeaDB export for cross-module use']}
+    ]
+  },
+  imp:{
+    cat:'Analysis', lc:'#c25008', dc:'#f97316',
+    title:'Importance measures',
+    desc:'Quantitative measures that rank SSCs by their contribution to system risk. Computed from cut sets and component unreliabilities after the fault tree is solved.',
+    secs:[
+      {h:'Measures calculated',tags:['RIR — Risk Increase Ratio','RRR — Risk Reduction Ratio','PC — Probability of Criticality','SWIM — Single Weighted Importance Measure']},
+      {h:'Outputs',items:['Importance measures table sorted by RIR (default)','Bar chart graphic embedded in report','Identifies dominant risk contributors at a glance']},
+      {h:'Notes',note:'RIR = Q(top | component fails) / Q(top). RRR = Q(top) / Q(top | component perfect). Both require solved cut sets and component Q values.'}
+    ]
+  },
+  pid:{
+    cat:'Analysis', lc:'#c25008', dc:'#f97316',
+    title:'P&ID editor',
+    desc:'A canvas-based Piping and Instrumentation Diagram editor using ISA 5.1 standard symbols. SSCs are dragged from a palette onto the canvas and connected with process lines.',
+    secs:[
+      {h:'Symbol categories',tags:['Equipment','Pumps','Valves','Instruments','Piping','Heat exchangers','Tanks / vessels']},
+      {h:'Capabilities',items:['Drag SSCs from project palette — symbol auto-assigned from SSC type','Place standard ISA 5.1 P&ID symbols from the full library','Draw main process lines, instrument lines, and signal lines','Tag instruments with ISA balloon notation','Pan, zoom, and grid snap','Export canvas as base64 PNG embedded in Word/HTML report']},
+      {h:'Notes',note:'The P&ID diagram is stored in the .KNOW_SYS file and rendered via HTML5 Canvas. It feeds directly into the report as an embedded graphic section.'}
+    ]
+  },
+  rel:{
+    cat:'Results', lc:'#b45309', dc:'#f59e0b',
+    title:'Reliability summary',
+    desc:'The consolidated quantitative output of the analysis. Displays system-level results computed from the fault tree, cut sets, and component failure data.',
+    secs:[
+      {h:'Outputs',items:['System unreliability Q(t) — probability of failure by mission time T','Top event probability — MCUB or exact BDD result','Cut set list — minimal cut sets ranked by probability','Cut set order distribution — 1st order, 2nd order, etc.','CCF contribution summary']},
+      {h:'Calculation methods',tags:['MCUB (Rare Event)','BDD (Exact)','Inclusion-Exclusion']}
+    ]
+  },
+  report:{
+    cat:'Reports', lc:'#1a56c4', dc:'#388bfd',
+    title:'Report generation',
+    desc:'Generates a structured technical report in two formats: a Word-compatible HTML file and a Markdown file for version-controlled documentation.',
+    secs:[
+      {h:'Selectable report sections',items:['System name and extended description','SSC information table (name, type, failure modes)','FMEA information','SYSTEM WORKS expression','Supercomponent definitions','Fault tree logic (translated Boolean)','Fault tree graphic (base64 embedded image)','Fault tree cut sets with probabilities','CCF expansion table','Importance measures graphic and table','P&ID diagram (embedded in HTML/Word)']},
+      {h:'Notes',note:'Quantitative sections are automatically suppressed if no failure probability data has been entered. The P&ID graphic section is independent of quantitative results.'}
+    ]
+  },
+  'exp-know':{
+    cat:'Export', lc:'#15803d', dc:'#22c55e',
+    title:'.KNOW_SYS — native format',
+    desc:'The primary save/load format for KUREAS-SYS. A JSON-structured file capturing all project data: SSCs, failure models, system logic, supercomponents, P&ID diagram, and computed results.',
+    secs:[
+      {h:'Contents',items:['System metadata (name, acronym, description)','SSC array with all failure mode parameters','System logic token array','Supercomponent definitions','P&ID node/edge graph','Cached cut sets and importance measure results']},
+      {h:'Notes',note:'File naming convention: SystemName.KNOW_SYS. Can be loaded by KUREAS-REPORT as a knowledge source for multi-system reports.'}
+    ]
+  },
+  'exp-saphire':{
+    cat:'Export', lc:'#15803d', dc:'#22c55e',
+    title:'SAPHIRE export — .FTL / .BEI / .BED',
+    desc:"Exports the fault tree and basic event data in SAPHIRE MAR-D format for import into the NRC's SAPHIRE PRA software.",
+    secs:[
+      {h:'Files produced',items:['.FTL — fault tree logic file (gate definitions)','.BEI — basic event information (names, descriptions)','.BED — basic event data (failure probabilities, model types)']},
+      {h:'Notes',note:'The export dialog allows selection of individual SSCs/components to include. Whole-system export builds from the complete SYSTEM WORKS expression.'}
+    ]
+  },
+  'exp-rel':{
+    cat:'Export', lc:'#15803d', dc:'#22c55e',
+    title:'.relDB / .fmeaDB — reliability database',
+    desc:'Exports SSC reliability data and FMEA content in structured database formats for cross-module use or archival.',
+    secs:[
+      {h:'Files',items:['.relDB — SSC reliability records (name, FM type, parameters, Q values)','.fmeaDB — FMEA table records (modes, effects, severity, actions)']},
+      {h:'Notes',note:'These formats can be imported by other KUREAS modules or used as reference data when building new system models.'}
+    ]
+  },
+  'exp-ftl':{
+    cat:'Export', lc:'#15803d', dc:'#22c55e',
+    title:'KUREAS-FTL — fault tree logic handoff',
+    desc:'Exports the translated fault tree structure and basic event parameters directly to KUREAS-FTL for further editing, visualisation, and quantification.',
+    secs:[
+      {h:'Data transferred',items:['Gate hierarchy derived from SYSTEM WORKS expression','Basic events with FM type, failure rate, and Q values','Transfer gate structure for multi-tree projects']},
+      {h:'Notes',note:'Primary integration point between KUREAS-SYS (system reliability modelling) and KUREAS-FTL (dedicated fault tree analysis). Enables round-trip workflows.'}
+    ]
+  }
+};
+
+// ── Render detail ────────────────────────────────────────────────────────────
+let activeNode = null;
+
+function renderDetail(id) {
+  const d = ND[id]; if (!d) return;
+  const col = theme === 'dark' ? d.dc : d.lc;
+  document.getElementById('detail-category').textContent = d.cat;
+  document.getElementById('detail-category').style.color = col;
+  let h = `<div class="detail-category" style="color:${col}">${d.cat}</div>
+            <div class="detail-title">${d.title}</div>
+            <div class="detail-desc">${d.desc}</div>`;
+  (d.secs||[]).forEach(s => {
+    h += `<div class="detail-section"><div class="detail-section-title">${s.h}</div>`;
+    if (s.tags) {
+      h += `<div class="tag-list">`;
+      s.tags.forEach(t => { h += `<span class="tag" style="border-color:${col}44;color:${col};background:${col}14">${t}</span>`; });
+      h += `</div>`;
+    }
+    if (s.items) s.items.forEach(item => { h += `<div class="detail-item"><div class="dot" style="background:${col}"></div><span>${item}</span></div>`; });
+    if (s.note) h += `<div class="note-box" style="border-left-color:${col}">${s.note}</div>`;
+    h += `</div>`;
+  });
+  document.getElementById('detail-body').innerHTML = h;
+  document.getElementById('detail-panel').classList.remove('hidden');
+}
+
+document.querySelectorAll('.node[data-node]').forEach(el => {
+  el.addEventListener('click', () => {
+    const id = el.getAttribute('data-node');
+    if (activeNode) document.getElementById('n-'+activeNode)?.classList.remove('active');
+    activeNode = id;
+    el.classList.add('active');
+    renderDetail(id);
+  });
+});
+document.getElementById('close-btn').addEventListener('click', () => {
+  document.getElementById('detail-panel').classList.add('hidden');
+  if (activeNode) { document.getElementById('n-'+activeNode)?.classList.remove('active'); activeNode = null; }
+});
+</script>
+</body>
+</html>
