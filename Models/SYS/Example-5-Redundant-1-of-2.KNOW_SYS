@@ -1,0 +1,122 @@
+{
+  "format": "KUREAS-SYS",
+  "version": "1.3",
+  "savedAt": "2026-04-18T16:22:00Z",
+  "systemName": "Pump with 1-of-2 Redundancy",
+  "systemAcronym": "PUMP-1-OF-2",
+  "systemDescription": "A pump system with series redundancy (1-of-2). System fails when any pump fails (all 2 must work) - worst case for redundancy.",
+  "systemLogic": [
+    {
+      "type": "keyword",
+      "value": "SYSTEM WORKS =",
+      "deletable": false
+    },
+    {
+      "type": "text",
+      "value": "COMBINE",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "(",
+      "deletable": true
+    },
+    {
+      "type": "number",
+      "value": "1",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-A",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-B",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": ")",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": ";",
+      "deletable": true
+    },
+    {
+      "type": "eol"
+    }
+  ],
+  "sscsInSystem": [
+    {
+      "id": "pump-a",
+      "name": "PUMP-A",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Primary pump in 1-of-2 series redundancy",
+      "tag": "PUMP-A",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.0001",
+          "missionTime": "1",
+          "data": {
+            "units": "h",
+            "mean": "0.0001"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-b",
+      "name": "PUMP-B",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Backup pump in 1-of-2 series redundancy",
+      "tag": "PUMP-B",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.0001",
+          "missionTime": "1",
+          "data": {
+            "units": "h",
+            "mean": "0.0001"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    }
+  ],
+  "superComponents": [],
+  "boundaryConditions": [],
+  "pidDiagram": {
+    "nodes": [],
+    "edges": [],
+    "groups": [],
+    "settings": {}
+  },
+  "projectSettings": {
+    "showProbability": "1",
+    "quantificationMethod": "mcub",
+    "ccfModel": "none"
+  }
+}

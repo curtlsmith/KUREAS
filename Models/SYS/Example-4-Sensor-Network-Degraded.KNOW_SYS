@@ -1,0 +1,455 @@
+{
+  "$SCHEMA": {
+    "format": "KUREAS-SYS",
+    "version": "1.0",
+    "appVersion": "1.3",
+    "savedAt": "2026-04-19T01:00:34.267Z",
+    "generator": "KUREAS-SYS",
+    "description": "System Knowledge Management / Reliability Analysis file for the KUREAS suite",
+    "fields": {
+      "systemName": {
+        "type": "string",
+        "description": "Full name of the system being modeled"
+      },
+      "systemAcronym": {
+        "type": "string",
+        "description": "Short acronym / identifier for the system"
+      },
+      "systemDescription": {
+        "type": "string",
+        "description": "Narrative description of the system"
+      },
+      "sscsInSystem": {
+        "type": "array",
+        "description": "Structures, Systems, and Components (SSCs) within this system",
+        "itemSchema": {
+          "id": {
+            "type": "string",
+            "description": "Unique SSC identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "SSC display name"
+          },
+          "type": {
+            "type": "string",
+            "description": "SSC type (e.g. Pump, Valve, Sensor, etc.)"
+          },
+          "failureModel": {
+            "type": "string",
+            "description": "Failure model code: FM0=Const Lambda, FM1=Demands, FM2=Unavailability, FM3=Lognormal, FM4=Gamma, FM5=Beta"
+          },
+          "lambda": {
+            "type": "number",
+            "description": "Failure rate (per hour) for FM0"
+          },
+          "demands": {
+            "type": "number",
+            "description": "Demand count for FM1"
+          },
+          "pfd": {
+            "type": "number",
+            "description": "Probability of failure on demand for FM1"
+          },
+          "unavailability": {
+            "type": "number",
+            "description": "Mean unavailability fraction for FM2"
+          },
+          "mean": {
+            "type": "number",
+            "description": "Distribution mean for FM3/FM4/FM5"
+          },
+          "errorFactor": {
+            "type": "number",
+            "description": "Error factor (EF) for lognormal distribution (FM3)"
+          },
+          "alpha": {
+            "type": "number",
+            "description": "Alpha parameter for Gamma/Beta distribution (FM4/FM5)"
+          },
+          "beta": {
+            "type": "number",
+            "description": "Beta parameter for Gamma/Beta distribution (FM4/FM5)"
+          },
+          "fmeaEntries": {
+            "type": "array",
+            "description": "FMEA failure mode entries for this SSC"
+          }
+        }
+      },
+      "superComponents": {
+        "type": "array",
+        "description": "Higher-level groupings of SSCs (super-components / trains)",
+        "itemSchema": {
+          "id": {
+            "type": "string",
+            "description": "Unique super-component identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Super-component display name"
+          },
+          "sscIds": {
+            "type": "array",
+            "description": "Array of SSC ids belonging to this super-component"
+          }
+        }
+      },
+      "boundaryConditions": {
+        "type": "array",
+        "description": "System boundary conditions (inputs/outputs/interfaces)",
+        "itemSchema": {
+          "id": {
+            "type": "string",
+            "description": "Unique boundary condition identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Boundary condition name"
+          },
+          "type": {
+            "type": "string",
+            "description": "Direction or type: INPUT | OUTPUT | INTERFACE"
+          },
+          "description": {
+            "type": "string",
+            "description": "Narrative description of the boundary condition"
+          }
+        }
+      },
+      "systemLogic": {
+        "type": "array",
+        "description": "Tokenised system success logic expression (SYSTEM WORKS = ...)"
+      },
+      "failureLogicTree": {
+        "type": "object",
+        "description": "Auto-generated fault-tree structure derived from systemLogic; compatible with KUREAS-FTL gate/BE schema"
+      },
+      "pidDiagram": {
+        "type": "object",
+        "description": "P&ID canvas data",
+        "fields": {
+          "nodes": {
+            "type": "array",
+            "description": "Canvas node objects (SSC representations)"
+          },
+          "edges": {
+            "type": "array",
+            "description": "Canvas edge/connection objects"
+          },
+          "groups": {
+            "type": "array",
+            "description": "Node grouping objects"
+          },
+          "settings": {
+            "type": "object",
+            "description": "Canvas display settings"
+          }
+        }
+      },
+      "projectSettings": {
+        "type": "object",
+        "description": "Project-level quantification and CCF settings",
+        "fields": {
+          "showProbability": {
+            "type": "boolean",
+            "description": "Whether to display computed probabilities in the UI"
+          },
+          "quantificationMethod": {
+            "type": "string",
+            "description": "Quantification method: MCUB | RareEvent | InclusionExclusion"
+          },
+          "qualitativeProbLow": {
+            "type": "number",
+            "description": "Upper boundary for LOW qualitative probability band"
+          },
+          "qualitativeProbMedium": {
+            "type": "number",
+            "description": "Upper boundary for MEDIUM qualitative probability band"
+          },
+          "qualitativeProbHigh": {
+            "type": "number",
+            "description": "Upper boundary for HIGH qualitative probability band"
+          },
+          "ccfModel": {
+            "type": "string",
+            "description": "Common Cause Failure model: none | beta"
+          },
+          "ccfBetaFactor": {
+            "type": "number",
+            "description": "Point-estimate beta factor for CCF"
+          },
+          "ccfBetaDistribution": {
+            "type": "string",
+            "description": "Distribution type for beta uncertainty: point | lognormal | beta"
+          },
+          "ccfBetaEF": {
+            "type": "number",
+            "description": "Error factor for CCF beta lognormal distribution"
+          },
+          "ccfBetaDistAlpha": {
+            "type": "number",
+            "description": "Alpha parameter for CCF beta distribution"
+          },
+          "ccfBetaDistBeta": {
+            "type": "number",
+            "description": "Beta parameter for CCF beta distribution"
+          },
+          "ccfBetaDistLow": {
+            "type": "number",
+            "description": "5th-percentile for CCF beta distribution"
+          },
+          "ccfBetaDistHigh": {
+            "type": "number",
+            "description": "95th-percentile for CCF beta distribution"
+          },
+          "ccfBetaSource": {
+            "type": "string",
+            "description": "Citation or source for the CCF beta value"
+          }
+        }
+      }
+    }
+  },
+  "systemName": "Sensor Network (3-of-5 Degradation)",
+  "systemAcronym": "SENSOR-NET",
+  "systemDescription": "A temperature monitoring system has 5 temperature sensors. System requires at least 3 sensors to operate (can tolerate 2 sensor failures).",
+  "sscsInSystem": [
+    {
+      "id": "sensor-1",
+      "name": "SENSOR-1",
+      "type": "Sensor",
+      "componentType": "Temperature Sensor (TS)",
+      "description": "Temperature sensor 1 (distributed)",
+      "tag": "SENSOR-1",
+      "failureModes": [
+        {
+          "mode": "Fails to Transmit",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00003",
+          "missionTime": "1000",
+          "data": {
+            "units": "h",
+            "mean": "0.00003"
+          }
+        }
+      ],
+      "pidSymbol": "sensor-temperature"
+    },
+    {
+      "id": "sensor-2",
+      "name": "SENSOR-2",
+      "type": "Sensor",
+      "componentType": "Temperature Sensor (TS)",
+      "description": "Temperature sensor 2 (distributed)",
+      "tag": "SENSOR-2",
+      "failureModes": [
+        {
+          "mode": "Fails to Transmit",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00003",
+          "missionTime": "1000",
+          "data": {
+            "units": "h",
+            "mean": "0.00003"
+          }
+        }
+      ],
+      "pidSymbol": "sensor-temperature"
+    },
+    {
+      "id": "sensor-3",
+      "name": "SENSOR-3",
+      "type": "Sensor",
+      "componentType": "Temperature Sensor (TS)",
+      "description": "Temperature sensor 3 (distributed)",
+      "tag": "SENSOR-3",
+      "failureModes": [
+        {
+          "mode": "Fails to Transmit",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00003",
+          "missionTime": "1000",
+          "data": {
+            "units": "h",
+            "mean": "0.00003"
+          }
+        }
+      ],
+      "pidSymbol": "sensor-temperature"
+    },
+    {
+      "id": "sensor-4",
+      "name": "SENSOR-4",
+      "type": "Sensor",
+      "componentType": "Temperature Sensor (TS)",
+      "description": "Temperature sensor 4 (distributed)",
+      "tag": "SENSOR-4",
+      "failureModes": [
+        {
+          "mode": "Fails to Transmit",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00003",
+          "missionTime": "1000",
+          "data": {
+            "units": "h",
+            "mean": "0.00003"
+          }
+        }
+      ],
+      "pidSymbol": "sensor-temperature"
+    },
+    {
+      "id": "sensor-5",
+      "name": "SENSOR-5",
+      "type": "Sensor",
+      "componentType": "Temperature Sensor (TS)",
+      "description": "Temperature sensor 5 (distributed)",
+      "tag": "SENSOR-5",
+      "failureModes": [
+        {
+          "mode": "Fails to Transmit",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00003",
+          "missionTime": "1000",
+          "data": {
+            "units": "h",
+            "mean": "0.00003"
+          }
+        }
+      ],
+      "pidSymbol": "sensor-temperature"
+    }
+  ],
+  "superComponents": [],
+  "boundaryConditions": [],
+  "systemLogic": [
+    {
+      "type": "keyword",
+      "value": "SYSTEM WORKS =",
+      "deletable": false
+    },
+    {
+      "type": "keyword",
+      "value": "COMBINE",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "(",
+      "deletable": true
+    },
+    {
+      "type": "number",
+      "value": "3",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "SENSOR-1",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "SENSOR-2",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "SENSOR-3",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "SENSOR-4",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "SENSOR-5",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": ")",
+      "deletable": true
+    },
+    {
+      "type": "eol",
+      "value": ";",
+      "deletable": true
+    }
+  ],
+  "failureLogicTree": {
+    "id": "top",
+    "label": "Sensor_Network_(3-of-5_Degradation)_Fails",
+    "type": "OR",
+    "children": [
+      {
+        "id": "combine-3of5-1",
+        "label": "COMBINE-3OF5-1",
+        "type": "3/5",
+        "children": [
+          {
+            "id": "sensor-1",
+            "label": "SENSOR-1",
+            "type": "BASIC",
+            "children": []
+          },
+          {
+            "id": "sensor-2",
+            "label": "SENSOR-2",
+            "type": "BASIC",
+            "children": []
+          },
+          {
+            "id": "sensor-3",
+            "label": "SENSOR-3",
+            "type": "BASIC",
+            "children": []
+          },
+          {
+            "id": "sensor-4",
+            "label": "SENSOR-4",
+            "type": "BASIC",
+            "children": []
+          },
+          {
+            "id": "sensor-5",
+            "label": "SENSOR-5",
+            "type": "BASIC",
+            "children": []
+          }
+        ],
+        "isNotGate": false
+      }
+    ]
+  },
+  "pidDiagram": {
+    "nodes": [],
+    "edges": [],
+    "groups": [],
+    "settings": {}
+  },
+  "projectSettings": {
+    "showProbability": "1",
+    "quantificationMethod": "bdd",
+    "qualitativeProbLow": "1E-5",
+    "qualitativeProbMedium": "1E-3",
+    "qualitativeProbHigh": "1E-1",
+    "ccfModel": "none",
+    "ccfBetaFactor": "0.02",
+    "ccfBetaDistribution": "CNI",
+    "ccfBetaEF": "3",
+    "ccfBetaDistAlpha": "",
+    "ccfBetaDistBeta": "",
+    "ccfBetaDistLow": "",
+    "ccfBetaDistHigh": "",
+    "ccfBetaSource": "Based upon 1-alpha_2 from Table 12 in the report INL/EXT-21-43723."
+  }
+}

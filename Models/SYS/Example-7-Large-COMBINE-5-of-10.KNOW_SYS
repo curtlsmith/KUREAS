@@ -1,0 +1,378 @@
+{
+  "format": "KUREAS-SYS",
+  "version": "1.3",
+  "savedAt": "2026-04-18T16:30:00Z",
+  "systemName": "Large Pump System (5-of-10)",
+  "systemAcronym": "PUMP-LARGE",
+  "systemDescription": "Testing large COMBINE gate: System with 10 redundant pumps requiring 6 to operate (can tolerate 4 pump failures). This tests performance with large voting gates.",
+  "systemLogic": [
+    {
+      "type": "keyword",
+      "value": "SYSTEM WORKS =",
+      "deletable": false
+    },
+    {
+      "type": "text",
+      "value": "COMBINE",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": "(",
+      "deletable": true
+    },
+    {
+      "type": "number",
+      "value": "5",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-1",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-2",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-3",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-4",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-5",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-6",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-7",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-8",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-9",
+      "deletable": true
+    },
+    {
+      "type": "text",
+      "value": ",",
+      "deletable": true
+    },
+    {
+      "type": "ssc",
+      "value": "PUMP-10",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": ")",
+      "deletable": true
+    },
+    {
+      "type": "keyword",
+      "value": ";",
+      "deletable": true
+    },
+    {
+      "type": "eol"
+    }
+  ],
+  "sscsInSystem": [
+    {
+      "id": "pump-1",
+      "name": "PUMP-1",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 1 of 10",
+      "tag": "PUMP-1",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-2",
+      "name": "PUMP-2",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 2 of 10",
+      "tag": "PUMP-2",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-3",
+      "name": "PUMP-3",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 3 of 10",
+      "tag": "PUMP-3",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-4",
+      "name": "PUMP-4",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 4 of 10",
+      "tag": "PUMP-4",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-5",
+      "name": "PUMP-5",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 5 of 10",
+      "tag": "PUMP-5",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-6",
+      "name": "PUMP-6",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 6 of 10",
+      "tag": "PUMP-6",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-7",
+      "name": "PUMP-7",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 7 of 10",
+      "tag": "PUMP-7",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-8",
+      "name": "PUMP-8",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 8 of 10",
+      "tag": "PUMP-8",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-9",
+      "name": "PUMP-9",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 9 of 10",
+      "tag": "PUMP-9",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    },
+    {
+      "id": "pump-10",
+      "name": "PUMP-10",
+      "type": "Pump",
+      "componentType": "Centrifugal Pump (CP)",
+      "description": "Pump 10 of 10",
+      "tag": "PUMP-10",
+      "failureModes": [
+        {
+          "mode": "Fails to Run",
+          "probabilityType": "numeric",
+          "failureModel": "2",
+          "lambda": "0.00008",
+          "missionTime": "100",
+          "data": {
+            "units": "h",
+            "mean": "0.00008"
+          }
+        }
+      ],
+      "pidSymbol": "pump-centrifugal"
+    }
+  ],
+  "superComponents": [],
+  "boundaryConditions": [],
+  "pidDiagram": {
+    "nodes": [],
+    "edges": [],
+    "groups": [],
+    "settings": {}
+  },
+  "projectSettings": {
+    "showProbability": "1",
+    "quantificationMethod": "rare",
+    "ccfModel": "none"
+  }
+}
