@@ -3607,7 +3607,7 @@
             );
         }
 
-        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion }) {
+        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildImportanceEngine }) {
             const [fileFormat, setFileFormat] = useState(() => {
                 return localStorage.getItem('KUREAS_SYS_reportFormat') || 'word';
             });
@@ -6248,7 +6248,33 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 }));
             });
             const [error, setError] = useState('');
+            const [showAddFMModal, setShowAddFMModal] = useState(false);
             const fmContainerRef = useRef(null);
+            
+            const handleAddFMFromModal = (updatedSSC, isUpdate) => {
+                // NewSSCModal in fm mode returns the full updated SSC; extract the last FM
+                if (isUpdate && updatedSSC.failureModes && updatedSSC.failureModes.length > 0) {
+                    const newFM = updatedSSC.failureModes[updatedSSC.failureModes.length - 1];
+                    setFailureModes(prev => [...prev, {
+                        ...newFM,
+                        probabilityType: newFM.probabilityType || 'probability',
+                        failureModel: newFM.failureModel || '0',
+                        demandProb: newFM.demandProb !== undefined ? String(newFM.demandProb) : '',
+                        demandN: newFM.demandN !== undefined ? String(newFM.demandN) : '1',
+                        lambda: newFM.lambda !== undefined ? String(newFM.lambda) : '',
+                        missionTime: newFM.missionTime !== undefined ? String(newFM.missionTime) : '',
+                        inspInterval: newFM.inspInterval !== undefined ? String(newFM.inspInterval) : '',
+                        tauRepair: newFM.tauRepair !== undefined ? String(newFM.tauRepair) : '',
+                        logicFlag: newFM.logicFlag || 'T',
+                    }]);
+                    setShowAddFMModal(false);
+                    setTimeout(() => {
+                        if (fmContainerRef.current) {
+                            fmContainerRef.current.scrollTop = fmContainerRef.current.scrollHeight;
+                        }
+                    }, 50);
+                }
+            };
             
             // Scroll to target failure mode on mount
             useEffect(() => {
@@ -6433,6 +6459,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             };
             
             return (
+                <React.Fragment>
                 <div className="modal-overlay">
                     <div className="modal-content" style={{
                         backgroundColor: backgroundStyle.paneBackground,
@@ -6554,7 +6581,15 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             
                             {/* Failure Modes Section - scrollable */}
                             <div className="flex-1 min-h-0 mt-4 flex flex-col">
-                                <label className="block font-bold mb-2 text-sm flex-shrink-0">Failure Modes</label>
+                                <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+                                    <label className="block font-bold text-sm">Failure Modes</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddFMModal(true)}
+                                        className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 font-semibold"
+                                        title="Add New Failure Mode"
+                                    >+FM</button>
+                                </div>
                                 <div ref={fmContainerRef} className="flex-1 overflow-y-auto border rounded p-2" style={{
                                     borderColor: backgroundStyle.borderColor
                                 }}>
@@ -7001,6 +7036,19 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         </div>
                     </div>
                 </div>
+                {showAddFMModal && (
+                    <NewSSCModal
+                        systemName={systemName}
+                        onSave={handleAddFMFromModal}
+                        onCancel={() => setShowAddFMModal(false)}
+                        backgroundStyle={backgroundStyle}
+                        existingSSCs={existingSSCs}
+                        mode="fm"
+                        selectedSSC={ssc}
+                        settings={settings}
+                    />
+                )}
+                </React.Fragment>
             );
         }
 
@@ -13813,19 +13861,27 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ maxWidth: '500px', backgroundColor: backgroundStyle.paneBackground, color: backgroundStyle.color }}>
                         <div className="p-4">
-                            <h3 className="text-lg font-bold mb-4">Add New Failure Mode</h3>
+                            <h3 className="text-lg font-bold mb-3">Add New Failure Mode</h3>
                             
                             <div className="mb-4">
                                 <label className="block font-bold mb-1 text-sm">Failure Mode Name <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => { setName(e.target.value); setError(''); }}
-                                    className="w-full px-3 py-2 border rounded"
-                                    placeholder="e.g., Fails to Start (FTS)"
-                                    style={{ backgroundColor: backgroundStyle.backgroundColor, color: backgroundStyle.color, borderColor: backgroundStyle.borderColor }}
-                                    autoFocus
-                                />
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => { setName(e.target.value); setError(''); }}
+                                        className="flex-1 min-w-0 px-3 py-2 border rounded"
+                                        placeholder="e.g., Fails to Start (FTS)"
+                                        style={{ backgroundColor: backgroundStyle.backgroundColor, color: backgroundStyle.color, borderColor: backgroundStyle.borderColor }}
+                                        autoFocus
+                                    />
+                                    <button onClick={onCancel} className="px-3 py-2 border rounded hover:bg-gray-100 text-sm whitespace-nowrap flex-shrink-0" style={{ borderColor: backgroundStyle.borderColor }}>
+                                        Cancel
+                                    </button>
+                                    <button onClick={handleSave} className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap flex-shrink-0">
+                                        Save
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="mb-4">
@@ -13916,16 +13972,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                 </div>
                             )}
                             
-                            {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-                            
-                            <div className="flex gap-2 justify-end">
-                                <button onClick={onCancel} className="px-4 py-2 border rounded hover:bg-gray-100" style={{ borderColor: backgroundStyle.borderColor }}>
-                                    Cancel
-                                </button>
-                                <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                                    Add Failure Mode
-                                </button>
-                            </div>
+                            {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
                         </div>
                     </div>
                 </div>
@@ -16385,7 +16432,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     return { expandedCutSets: minimalCutSets, ccfBasicEvents: {} };
                 }
                 
-                const betaFactor = parseFloat(settings.ccfBetaFactor) || 0.02;
+                const parsedBeta = parseFloat(settings.ccfBetaFactor);
+                const betaFactor = (!isNaN(parsedBeta) && settings.ccfBetaFactor !== '' && settings.ccfBetaFactor !== undefined) ? parsedBeta : 0.02;
                 const betaDistribution = settings.ccfBetaDistribution || 'CNI';
                 const betaEF = parseFloat(settings.ccfBetaEF) || 3;
                 
@@ -22627,6 +22675,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             settings={settings}
                             pidDiagram={pidDiagram}
                             applyCCFExpansion={applyCCFExpansion}
+                            buildImportanceEngine={buildImportanceEngine}
                         />
                     )}
 
