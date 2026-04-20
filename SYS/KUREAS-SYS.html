@@ -2991,13 +2991,13 @@
             const plotWidth = canvas.width - margin.left - margin.right;
             const plotHeight = canvas.height - margin.top - margin.bottom;
             
-            // Get data for axes - filter out invalid values
+            // Get data for axes - filter out invalid values (null, NaN, Infinity)
             const validData = importanceMeasures.filter(m => {
                 const xVal = m[plotXAxis];
                 const yVal = m[plotYAxis];
                 return xVal != null && yVal != null && 
                        isFinite(xVal) && isFinite(yVal) && 
-                       xVal > 0 && yVal > 0;
+                       xVal >= 0 && yVal >= 0;
             });
             
             if (validData.length === 0) {
@@ -3018,9 +3018,9 @@
             const yMin = Math.min(...yData);
             const yMax = Math.max(...yData);
             
-            // Add padding to ranges
-            const xPadding = (xMax - xMin) * 0.1 || xMax * 0.1;
-            const yPadding = (yMax - yMin) * 0.1 || yMax * 0.1;
+            // Add padding to ranges; ensure at least a minimal range so scale doesn't collapse
+            const xPadding = (xMax - xMin) * 0.1 || xMax * 0.1 || 0.1;
+            const yPadding = (yMax - yMin) * 0.1 || yMax * 0.1 || 0.1;
             const xMinPadded = Math.max(0, xMin - xPadding);
             const xMaxPadded = xMax + xPadding;
             const yMinPadded = Math.max(0, yMin - yPadding);
@@ -3133,10 +3133,10 @@
         }
         
         // ==================== EXPORT MODAL ====================
-        function ExportModal({ onClose, sscsInSystem, systemName, systemLogic, superComponents, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, settings }) {
+        function ExportModal({ onClose, sscsInSystem, systemName, systemDescription, systemLogic, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion }) {
             const allSSCs = sscsInSystem || [];
             const [selectedSSCs, setSelectedSSCs] = React.useState(() => new Set(allSSCs.map((_, i) => i)));
-            const [format, setFormat] = React.useState('relDB');
+            const [format, setFormat] = React.useState('knowRPT');
 
             const toggleSSC = (idx) => {
                 setSelectedSSCs(prev => {
@@ -3242,10 +3242,14 @@
                 URL.revokeObjectURL(url);
             }
 
-            const handleExport = () => {
+            const handleExport = async () => {
                 if (format === 'knowFTL') {
-                    // KNOW_FTL does not filter by selectedSSCs — it uses the whole fault tree
                     exportKUREASFTL();
+                    onClose();
+                    return;
+                }
+                if (format === 'knowRPT') {
+                    await exportKNOWRPT();
                     onClose();
                     return;
                 }
@@ -3513,7 +3517,609 @@
                 URL.revokeObjectURL(url);
             }
 
+            // ── KUREAS-REPORT (.KNOW_RPT) export ──────────────────────────────────
+            async function exportKNOWRPT() {
+                const safeSysName = (systemName || 'System').replace(/[^a-zA-Z0-9_\-]/g, '_');
+                const exportedAt = new Date().toISOString();
+
+                // ── Build basicEventData (same logic as ReportModal) ──────────────
+                const getProb = (fm) => {
+                    if (fm.probabilityType === 'screened') return { prob: 0, isLinked: false, isScreened: true };
+                    if (fm.probabilityType === 'qualitative') {
+                        const level = fm.qualitativeLevel || 'medium';
+                        const map = { low: parseFloat(settings?.qualitativeProbLow||'1E-5'), medium: parseFloat(settings?.qualitativeProbMedium||'1E-3'), high: parseFloat(settings?.qualitativeProbHigh||'1E-1') };
+                        return { prob: map[level] ?? 1e-3, isLinked: false };
+                    }
+                    if (fm.probabilityType === 'linkedSystem') {
+                        return { prob: null, isLinked: true, linkedSystemName: fm.linkedSystemName || fm.linkedSystemFile };
+                    }
+                    const model = fm.failureModel || '0';
+                    if (model === '1') {
+                        const dp = parseFloat(fm.demandProb), dN = parseFloat(fm.demandN) || 1;
+                        if (!isNaN(dp) && dp >= 0 && dN >= 1) return { prob: 1 - Math.pow(1 - dp, dN), isLinked: false };
+                    }
+                    if (model === '2') {
+                        const lam = parseFloat(fm.lambda) || 0, mt = parseFloat(fm.missionTime) || 0;
+                        if (lam > 0 && mt > 0) return { prob: 1 - Math.exp(-lam * mt), isLinked: false };
+                    }
+                    if (model === '3') {
+                        const lam = parseFloat(fm.lambda) || 0, ii = parseFloat(fm.inspInterval) || 0;
+                        if (lam > 0 && ii > 0) { const li = lam * ii; return { prob: 1 + (Math.exp(-li) - 1) / li, isLinked: false }; }
+                    }
+                    if (model === '4') {
+                        const lam = parseFloat(fm.lambda) || 0, mt = parseFloat(fm.missionTime) || 0, tau = parseFloat(fm.tauRepair) || 0;
+                        if (lam > 0 && mt > 0 && tau > 0) return { prob: (lam*tau)*(1-Math.exp(-(lam+tau)*mt))/(1+lam*tau), isLinked: false };
+                    }
+                    const mean = parseFloat(fm.data?.mean || 0);
+                    const units = fm.data?.units || 'd';
+                    let prob = isNaN(mean) ? 0 : mean;
+                    if (units === 'h') prob = 1 - Math.exp(-mean * (fm.timeToOperate || 24));
+                    else if (units === 'y') prob = 1 - Math.exp(-mean * (fm.timeToOperate || 24) / 8760);
+                    else if (units === 'hft') { const pl = fm.pipeLength || 0, mt2 = fm.timeToOperate || 24; if (pl > 0) prob = 1 - Math.exp(-pl * mean * mt2); }
+                    return { prob, isLinked: false };
+                };
+
+                const basicEventData = {};
+                const buildDesc = (a, b) => { let s = (a||'').trim(); if (s.endsWith('.')) s = s.slice(0,-1); const t = (b||'').trim(); return s && t ? s + ' ' + t : s || t || ''; };
+                for (const ssc of allSSCs) {
+                    const fms = (ssc.failureModes || []).filter(fm => fm.applicable !== false && fm.probabilityType !== 'screened');
+                    if (fms.length === 0) continue;
+                    if (fms.length > 1) {
+                        const fmKeys = fms.map((fm, i) => `${ssc.name}__${(fm.mode||`FM${i+1}`).replace(/\s+/g,'_')}`);
+                        basicEventData[ssc.name] = { probability: null, description: ssc.description || '', hasMultipleModes: true, failureModeNames: fmKeys };
+                        fms.forEach((fm, i) => {
+                            const r = getProb(fm);
+                            basicEventData[fmKeys[i]] = { probability: r.prob, description: buildDesc(ssc.description, fm.data?.description), parentSSC: ssc.name, isLinked: r.isLinked, linkedSystemName: r.linkedSystemName, probabilityType: fm.probabilityType, qualitativeLevel: fm.qualitativeLevel };
+                        });
+                    } else {
+                        const r = getProb(fms[0]);
+                        basicEventData[ssc.name] = { probability: r.prob, description: buildDesc(ssc.description, fms[0].data?.description), isLinked: r.isLinked, linkedSystemName: r.linkedSystemName, probabilityType: fms[0].probabilityType, qualitativeLevel: fms[0].qualitativeLevel };
+                    }
+                }
+
+                // ── Build fault tree & cut sets ────────────────────────────────────
+                let failureLogicTree = null;
+                let cutSetRows = [];
+                let mcubValue = null;
+                let ccfEvents = {};
+                let importanceMeasures = [];
+                const hasLogic = hasFailureInfo && systemLogic && systemLogic.length > 1;
+
+                if (hasLogic) {
+                    try {
+                        const parsed = parseSystemWorksExpression(systemLogic, systemName, superComponents);
+                        if (parsed) {
+                            const expandMulti = (node) => {
+                                if (node.type === 'BASIC') {
+                                    const ed = basicEventData[node.label];
+                                    if (ed?.hasMultipleModes) return { id: `or_${node.label}`, type: 'OR', label: `${node.label} fails`, description: ed.description || '', children: ed.failureModeNames.map((n,i) => ({ id:`${node.label}_fm${i}`, type:'BASIC', label:n, description: basicEventData[n]?.description||'', probability: basicEventData[n]?.probability||0 })) };
+                                    if (ed) node.probability = ed.probability;
+                                }
+                                if (node.children) node.children = node.children.map(expandMulti);
+                                return node;
+                            };
+                            failureLogicTree = expandMulti(parsed);
+
+                            const enrich = (node) => {
+                                if (node.type === 'BASIC' && basicEventData[node.label]) {
+                                    node.description = basicEventData[node.label].description || '';
+                                    if (!node.probability) node.probability = basicEventData[node.label].probability;
+                                }
+                                if (node.children) node.children.forEach(enrich);
+                                return node;
+                            };
+                            enrich(failureLogicTree);
+
+                            if (failureLogicTree.children && failureLogicTree.children.length > 0) {
+                                const minCS = generateMinimalCutSets(failureLogicTree, basicEventData);
+                                const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(minCS, basicEventData, allSSCs, settings);
+                                ccfEvents = ccfBasicEvents;
+                                const combinedEventData = { ...basicEventData, ...ccfBasicEvents };
+
+                                const csWithProb = expandedCutSets.map((cs, idx) => {
+                                    const r = calculateCutSetProbability(cs, combinedEventData);
+                                    const descs = cs.map(e => (combinedEventData[e]?.description) || e);
+                                    return { id: idx+1, events: cs, probability: r.probability, hasLinked: r.hasLinked, linkedEvents: r.linkedEvents, description: descs.length===1?descs[0]:descs.join(' & '), hasCCF: cs.some(e => ccfBasicEvents[e]) };
+                                });
+                                csWithProb.sort((a,b) => { if(a.hasLinked&&!b.hasLinked)return 1; if(!a.hasLinked&&b.hasLinked)return -1; if(a.probability!==null&&b.probability!==null)return b.probability-a.probability; if(a.probability===null)return 1; if(b.probability===null)return -1; return 0; });
+
+                                cutSetRows = csWithProb;
+                                const validProbs = csWithProb.filter(cs => !cs.hasLinked && cs.probability !== null).map(cs => cs.probability);
+                                if (validProbs.length > 0) mcubValue = calculateMCUB(validProbs);
+
+                                // Importance measures
+                                if (mcubValue !== null) {
+                                    const allEventNames = new Set();
+                                    csWithProb.forEach(cs => cs.events.forEach(e => allEventNames.add(e)));
+                                    allEventNames.forEach(evtName => {
+                                        const evtData = combinedEventData[evtName];
+                                        if (!evtData || evtData.probability === null || evtData.probability === undefined || evtData.isLinked) return;
+                                        const p = evtData.probability;
+                                        const csContaining = csWithProb.filter(cs => cs.events.includes(evtName) && !cs.hasLinked && cs.probability !== null);
+                                        if (csContaining.length === 0) return;
+                                        const csWithout = csWithProb.filter(cs => !cs.events.includes(evtName) && !cs.hasLinked && cs.probability !== null).map(cs => cs.probability);
+                                        const mcubWithout = csWithout.length > 0 ? calculateMCUB(csWithout) : 0;
+                                        const rrr = mcubWithout > 0 ? mcubValue / mcubWithout : Infinity;
+                                        const csWithEvent = csWithProb.filter(cs => cs.events.includes(evtName) && !cs.hasLinked && cs.probability !== null);
+                                        const pGivenEvent = csWithEvent.length > 0 ? calculateMCUB(csWithEvent.map(cs => { const prod = cs.events.filter(e=>e!==evtName).reduce((acc,e2) => { const d2 = combinedEventData[e2]; return acc*(d2&&d2.probability!==null?d2.probability:0); },1); return prod; })) : 0;
+                                        const rir = p > 0 ? pGivenEvent / mcubValue : 0;
+                                        const pc = pGivenEvent * p;
+                                        const swim = mcubValue > 0 ? pc / mcubValue : 0;
+                                        importanceMeasures.push({ event: evtName, description: evtData.description || '', probability: p, rir: isFinite(rir)?rir:0, rrr: isFinite(rrr)?rrr:999, pc, swim });
+                                    });
+                                    importanceMeasures.sort((a,b) => b.swim - a.swim);
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('KNOW_RPT: error building fault tree data:', e);
+                    }
+                }
+
+                // ── Format helpers ─────────────────────────────────────────────────
+                const fmtProb = (p) => {
+                    if (p === null || p === undefined || isNaN(p)) return null;
+                    const mode = settings?.showProbability || '1';
+                    if (mode === '2') return (p*100).toFixed(4)+'%';
+                    if (mode === '3') return p.toFixed(6);
+                    return p.toExponential(2);
+                };
+
+                // ── Serialize system works expression to text ──────────────────────
+                let systemWorksText = '';
+                if (systemLogic && systemLogic.length > 1) {
+                    let currentLine = '';
+                    systemLogic.forEach(token => {
+                        if (token.type === 'eol') { systemWorksText += currentLine + '\n'; currentLine = ''; }
+                        else if (token.type === 'module_def') { if (currentLine) currentLine += ' '; currentLine += '[' + token.value + '] ='; }
+                        else if (token.type === 'module_ref') { if (currentLine) currentLine += ' '; currentLine += '[' + token.value + ']'; }
+                        else { if (currentLine && token.value !== '(' && token.value !== ')' && token.value !== ';') currentLine += ' '; currentLine += token.value; }
+                    });
+                    if (currentLine) systemWorksText += currentLine + '\n';
+                }
+
+                // ── Render fault tree graphic ──────────────────────────────────────
+                let ftGraphicBase64 = null;
+                if (failureLogicTree) {
+                    try { ftGraphicBase64 = generateFaultTreeImageBase64(failureLogicTree, basicEventData, { background: 'light', showProbability: settings?.showProbability || '1' }); } catch(e) { console.warn('KNOW_RPT: ft graphic error', e); }
+                }
+
+                // ── Render importance measure graphic ──────────────────────────────
+                let impGraphicBase64 = null;
+                if (importanceMeasures.length > 0) {
+                    try { impGraphicBase64 = generateImportanceMeasureImageBase64(importanceMeasures, 'swim', 'rir'); } catch(e) { console.warn('KNOW_RPT: imp graphic error', e); }
+                }
+
+                // ── Image rendering helpers ────────────────────────────────────────
+                const renderMermaidToPng = async (mermaidCode) => {
+                    try {
+                        mermaid.initialize({ startOnLoad: false, theme: 'default', flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }, securityLevel: 'loose' });
+                        const uniqueId = 'know-rpt-mmid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                        const { svg } = await mermaid.render(uniqueId, mermaidCode);
+                        const parser = new DOMParser();
+                        const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+                        const svgElement = svgDoc.documentElement;
+                        let cw = 800, ch = 600;
+                        const vb = svgElement.getAttribute('viewBox');
+                        if (vb) { const p = vb.split(/[\s,]+/).map(Number); if (p.length === 4) { cw = p[2]||800; ch = p[3]||600; } }
+                        else { cw = parseFloat(svgElement.getAttribute('width'))||800; ch = parseFloat(svgElement.getAttribute('height'))||600; }
+                        cw = Math.max(cw, 100); ch = Math.max(ch, 100);
+                        svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                        svgElement.setAttribute('width', cw); svgElement.setAttribute('height', ch);
+                        const svgData = new XMLSerializer().serializeToString(svgElement);
+                        const svgBase64 = btoa(unescape(encodeURIComponent(svgData)));
+                        const dataUrl = 'data:image/svg+xml;base64,' + svgBase64;
+                        return new Promise((resolve) => {
+                            const canvas = document.createElement('canvas');
+                            const scale = 2;
+                            canvas.width = cw * scale; canvas.height = ch * scale;
+                            const ctx2 = canvas.getContext('2d');
+                            ctx2.fillStyle = 'white'; ctx2.fillRect(0, 0, canvas.width, canvas.height);
+                            const img = new Image();
+                            img.onload = () => { try { ctx2.drawImage(img, 0, 0, canvas.width, canvas.height); resolve(canvas.toDataURL('image/png')); } catch(e) { resolve(dataUrl); } };
+                            img.onerror = () => resolve(dataUrl);
+                            img.src = dataUrl;
+                        });
+                    } catch(e) { console.warn('KNOW_RPT: mermaid render error', e); return null; }
+                };
+
+                const renderPidToPng = () => {
+                    if (!pidDiagram || !pidDiagram.nodes || pidDiagram.nodes.length === 0) return null;
+                    try {
+                        const nodes = pidDiagram.nodes || [];
+                        const edges = pidDiagram.edges || [];
+                        const groups = pidDiagram.groups || [];
+                        const CW = typeof CELL_W !== 'undefined' ? CELL_W : 60;
+                        const CH = typeof CELL_H !== 'undefined' ? CELL_H : 60;
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        nodes.forEach(n => {
+                            const labelAtTop = n.labelPosition === 'top';
+                            // Symbol bounds
+                            minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + CW);
+                            // Vertical: symbol + label + prob text + tag, each side
+                            const topExtra = labelAtTop ? 30 : 14; // label+prob above, or just tag above
+                            const botExtra = labelAtTop ? 14 : 38; // tag below, or label+prob below
+                            minY = Math.min(minY, n.y - topExtra);
+                            maxY = Math.max(maxY, n.y + CH + botExtra);
+                        });
+                        groups.forEach(g => { if (g.x!=null) { minX=Math.min(minX,g.x); minY=Math.min(minY,g.y); maxX=Math.max(maxX,g.x+g.w); maxY=Math.max(maxY,g.y+g.h); } });
+                        const pad = 20;
+                        const W = Math.max(400, maxX-minX+pad*2);
+                        const H = Math.max(200, maxY-minY+pad*2);
+                        const scale = 2;
+                        const offCanvas = document.createElement('canvas');
+                        offCanvas.width = W * scale; offCanvas.height = H * scale;
+                        const ctx = offCanvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+                        ctx.scale(scale, scale);
+                        ctx.save(); ctx.translate(pad-minX, pad-minY);
+                        groups.forEach(g => {
+                            if (!g.w||!g.h) return;
+                            ctx.save(); ctx.beginPath(); ctx.rect(g.x,g.y,g.w,g.h);
+                            ctx.fillStyle=(g.color||'#e0f2fe')+'38'; ctx.fill();
+                            ctx.setLineDash([8,5]); ctx.strokeStyle=g.borderColor||'#0369a1'; ctx.lineWidth=1.5; ctx.stroke(); ctx.setLineDash([]);
+                            if (g.label) { ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; const tw=ctx.measureText(g.label).width; ctx.fillStyle=(g.color||'#e0f2fe')+'ee'; ctx.fillRect(g.x+6,g.y-1,tw+10,16); ctx.fillStyle='#0c4a6e'; ctx.fillText(g.label,g.x+11,g.y+11); }
+                            ctx.restore();
+                        });
+                        const _ep = (node, sym, tx, ty) => { const cx=node.x+sym.w/2,cy=node.y+sym.h/2,hw=sym.w/2,hh=sym.h/2,dx=tx-cx,dy=ty-cy; if(dx===0&&dy===0)return{x:cx,y:cy}; const s=Math.min(dx!==0?hw/Math.abs(dx):Infinity,dy!==0?hh/Math.abs(dy):Infinity); return{x:cx+dx*s,y:cy+dy*s}; };
+                        edges.forEach(e => {
+                            const fn=nodes.find(n=>n.id===e.from), tn=nodes.find(n=>n.id===e.to);
+                            if(!fn||!tn)return;
+                            const s1=(PID_SYMBOLS&&PID_SYMBOLS[fn.symbolKey])||{w:56,h:40}, s2=(PID_SYMBOLS&&PID_SYMBOLS[tn.symbolKey])||{w:56,h:40};
+                            const cx1=fn.x+s1.w/2,cy1=fn.y+s1.h/2,cx2=tn.x+s2.w/2,cy2=tn.y+s2.h/2;
+                            const p1=_ep(fn,s1,cx2,cy2),p2=_ep(tn,s2,cx1,cy1);
+                            ctx.save(); ctx.setLineDash(e.lineStyle==='dashed'?[8,5]:[]); ctx.strokeStyle=e.color||'#374151'; ctx.lineWidth=2;
+                            ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke(); ctx.setLineDash([]);
+                            const angle=Math.atan2(p2.y-p1.y,p2.x-p1.x); ctx.fillStyle=e.color||'#374151'; ctx.beginPath();
+                            ctx.moveTo(p2.x,p2.y); ctx.lineTo(p2.x-16*Math.cos(angle-0.45),p2.y-16*Math.sin(angle-0.45)); ctx.lineTo(p2.x-16*Math.cos(angle+0.45),p2.y-16*Math.sin(angle+0.45)); ctx.closePath(); ctx.fill();
+                            if(e.label){const mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2; ctx.font='10px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#374151'; ctx.fillText(e.label,mx,my-4);}
+                            ctx.restore();
+                        });
+                        nodes.forEach(n => {
+                            const sym = PID_SYMBOLS && PID_SYMBOLS[n.symbolKey];
+                            if(sym){sym.draw(ctx,n.x,n.y,CW,CH,n.label,n.tag||n.label);}
+                            else{ctx.strokeStyle='#6b7280';ctx.lineWidth=2;ctx.strokeRect(n.x,n.y,56,40);}
+                            const labelX=n.x+(sym?sym.w/2:28), labelAtTop=n.labelPosition==='top';
+                            let labelCY=labelAtTop?n.y-5:n.y+(sym?sym.h:40)+12;
+                            ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+                            const lw=ctx.measureText(n.label).width; ctx.fillStyle='rgba(255,255,255,0.85)';
+                            if(labelAtTop){ctx.fillRect(labelX-lw/2-2,labelCY-9,lw+4,12);ctx.fillStyle='#111827';ctx.fillText(n.label,labelX,labelCY);labelCY-=13;}
+                            else{ctx.fillRect(labelX-lw/2-2,labelCY-9,lw+4,12);ctx.fillStyle='#111827';ctx.fillText(n.label,labelX,labelCY);labelCY+=13;}
+                            const sscObj=allSSCs.find(s=>s.id===n.sscId);
+                            if(sscObj&&sscObj.failureModes&&sscObj.failureModes.length>0){
+                                const applied=sscObj.failureModes.filter(fm=>fm.applicable!==false);
+                                if(applied.length>0){let probStr=''; const fm=applied[0];
+                                    if(fm.probabilityType==='screened')probStr='SCREENED';
+                                    else if(fm.probabilityType==='qualitative')probStr=(fm.qualitativeLevel||'unknown').toUpperCase();
+                                    else if(fm.data&&fm.data.mean){const mv=parseFloat(fm.data.mean);probStr='P='+(isNaN(mv)?fm.data.mean:mv.toExponential(2));}
+                                    if(probStr){ctx.font='9px monospace';ctx.textAlign='center';const pw=ctx.measureText(probStr).width;ctx.fillStyle='rgba(255,255,230,0.85)';ctx.fillRect(labelX-pw/2-2,labelCY-8,pw+4,10);ctx.fillStyle='#b45309';ctx.fillText(probStr,labelX,labelCY);}
+                                }
+                            }
+                            if(n.tag&&n.tag!==n.label){ctx.font='9px monospace';ctx.textAlign='center';const tw=ctx.measureText(n.tag).width;ctx.fillStyle='rgba(255,255,255,0.75)';if(labelAtTop){ctx.fillRect(labelX-tw/2-1,n.y+(sym?sym.h:40)+2,tw+2,11);ctx.fillStyle='#6b7280';ctx.fillText(n.tag,labelX,n.y+(sym?sym.h:40)+11);}else{ctx.fillRect(labelX-tw/2-1,n.y-12,tw+2,11);ctx.fillStyle='#6b7280';ctx.fillText(n.tag,labelX,n.y-4);}}
+                        });
+                        ctx.restore();
+                        return offCanvas.toDataURL('image/png');
+                    } catch(e) { console.warn('KNOW_RPT: P&ID render error', e); return null; }
+                };
+
+                // ── Render P&ID to PNG ─────────────────────────────────────────────
+                const pidImageDataUrl = renderPidToPng();
+
+                // ── Build FMEA diagram mermaid codes and render to PNG ─────────────
+                const fmeaDiagrams = [];
+                for (const ssc of allSSCs) {
+                    if (!ssc.failureModes || ssc.failureModes.length === 0) continue;
+                    // Generate FMEA mermaid code inline (duplicate of existing logic)
+                    const escM = t => (t||'').replace(/"/g,"'").replace(/\n/g,' ').replace(/[[\]]/g,'');
+                    const wrapM = (t, w=40) => { const words = escM(t).split(' '); const lines=[]; let cur=''; words.forEach(word=>{ if(cur.length+word.length+1<=w) cur+=(cur?' ':'')+word; else { if(cur)lines.push(cur); cur=word; } }); if(cur)lines.push(cur); return lines.join('\\n'); };
+                    let code = 'flowchart TB\n';
+                    const sscLabel = escM(ssc.name) + (ssc.description ? '\\n'+wrapM(ssc.description,40) : '');
+                    code += `    SSC["${sscLabel}"]\n`;
+                    code += `    style SSC fill:#3b82f6,stroke:#1e40af,color:#fff\n`;
+                    code += `    subgraph FM_GROUP["Failure Modes"]\n`;
+                    (ssc.failureModes||[]).forEach((fm,fmIndex) => {
+                        const fmId = `FM${fmIndex}`;
+                        const fmLabel = escM(fm.mode||'Unnamed')+(fm.data?.description?'\\n'+escM(fm.data.description.substring(0,30)):'');
+                        let probInfo = '';
+                        if (fm.probabilityType==='screened') probInfo='\\n[SCREENED]';
+                        else if (fm.probabilityType==='qualitative') probInfo='\\n['+(fm.qualitativeLevel||'Unknown').toUpperCase()+']';
+                        else if (fm.probabilityType==='linkedSystem') probInfo='\\n[LINKED: '+escM((fm.linkedSystemName||'System').substring(0,20))+']';
+                        else if (fm.data?.mean) { const mv=parseFloat(fm.data.mean); probInfo='\\nP='+(isNaN(mv)?fm.data.mean:mv.toExponential(2)); }
+                        code += `        ${fmId}["${fmLabel}${probInfo}"]\n`;
+                        const applicable = fm.applicable!==false;
+                        const bgColor = !applicable?'#f3f4f6':fm.probabilityType==='screened'?'#f3f4f6':'#dbeafe';
+                        const textColor = !applicable?'#9ca3af':'#1e3a8a';
+                        code += `        style ${fmId} fill:${bgColor},stroke:#93c5fd,color:${textColor}\n`;
+                    });
+                    code += `    end\n    style FM_GROUP fill:#f0f9ff,stroke:#bae6fd\n`;
+                    code += `    SSC --> FM_GROUP\n`;
+                    // Effects subgraph if any
+                    const fmsWithEffects = (ssc.failureModes||[]).filter(fm=>fm.effect&&fm.effect.trim());
+                    if (fmsWithEffects.length > 0) {
+                        code += `    subgraph EFF_GROUP["Effects"]\n`;
+                        fmsWithEffects.forEach((fm,idx)=>{ code += `        EFF${idx}["${wrapM(fm.effect,35)}"]\n`; code += `        style EFF${idx} fill:#fef9c3,stroke:#fbbf24\n`; });
+                        code += `    end\n    style EFF_GROUP fill:#fffbeb,stroke:#fde68a\n`;
+                        fmsWithEffects.forEach((fm,idx)=>{ const fmIdx=(ssc.failureModes||[]).indexOf(fm); code += `    FM${fmIdx} --> EFF${idx}\n`; });
+                    }
+                    // Render to PNG
+                    const imageDataUrl = await renderMermaidToPng(code);
+                    fmeaDiagrams.push({ sscName: ssc.name, sscDescription: ssc.description||'', mermaidCode: code, imageDataUrl });
+                }
+
+                // ── Build serializable fault tree structure ────────────────────────
+                const serializeTree = (node) => {
+                    if (!node) return null;
+                    const out = { type: node.type, label: node.label||node.id||'', description: node.description||'' };
+                    if (node.probability !== undefined && node.probability !== null) out.probability = node.probability;
+                    if (node.votingN !== undefined) out.votingN = node.votingN;
+                    if (node.children && node.children.length > 0) out.children = node.children.map(serializeTree);
+                    return out;
+                };
+
+                // ── Assemble the .KNOW_RPT document ───────────────────────────────
+                const doc = {
+                    $schema: {
+                        format: 'KUREAS-REPORT',
+                        version: '1.0',
+                        sourceModule: 'KUREAS-SYS',
+                        appVersion: '1.3',
+                        exportedAt
+                    },
+                    // ── Rendering contract ─────────────────────────────────────────
+                    // Each section has: { available: bool, title: string, content: {...} }
+                    // Tables use: { type:'table', headers:[{label,width?,align?}], rows:[[cell,...]], headerStyle:'blue' }
+                    // Graphics use: { type:'image', dataUrl: 'data:image/png;base64,...', caption? }
+                    // Text uses: { type:'text', value: string }
+                    // Code/preformatted: { type:'code', value: string }
+                    // Sections are independent — KUREAS-REPORT may include/exclude/reorder them.
+
+                    sections: {
+
+                        systemName: {
+                            available: true,
+                            title: 'System Name',
+                            content: [
+                                { type: 'text', value: systemName || '' }
+                            ]
+                        },
+
+                        extendedDescription: {
+                            available: !!(systemDescription && (systemDescription.replace(/<[^>]+>/g,'').trim())),
+                            title: 'Extended Description',
+                            content: (() => {
+                                if (!systemDescription) return [];
+                                const div = document.createElement('div');
+                                div.innerHTML = systemDescription;
+                                const plain = (div.textContent || div.innerText || '').trim();
+                                return plain ? [{ type: 'text', value: plain }, { type: 'html', value: systemDescription }] : [];
+                            })()
+                        },
+
+                        sscInformation: {
+                            available: allSSCs.length > 0,
+                            title: 'SSC Information',
+                            content: [
+                                {
+                                    type: 'table',
+                                    caption: 'System SSC Summary',
+                                    headerStyle: 'blue',
+                                    headers: [
+                                        { label: 'SSC Name' },
+                                        { label: 'Description' },
+                                        { label: 'Component Type' },
+                                        { label: 'SSC Type' },
+                                        { label: 'Failure Modes' }
+                                    ],
+                                    rows: allSSCs.map(ssc => [
+                                        ssc.name || '',
+                                        ssc.description || '',
+                                        ssc.label || '',
+                                        ssc.sscType || '',
+                                        (ssc.failureModes||[]).map(fm=>fm.mode).join(', ')
+                                    ])
+                                },
+                                {
+                                    type: 'table',
+                                    caption: 'Detailed Failure Mode Information',
+                                    headerStyle: 'blue',
+                                    headers: [
+                                        { label: 'SSC Name' },
+                                        { label: 'Failure Mode' },
+                                        { label: 'Description' },
+                                        { label: 'Failure Probability' },
+                                        { label: 'Failure Rate' },
+                                        { label: 'Operating Time' },
+                                        { label: 'Source' },
+                                        { label: 'Notes' }
+                                    ],
+                                    rows: (() => {
+                                        const rows = [];
+                                        allSSCs.forEach(ssc => {
+                                            (ssc.failureModes||[]).forEach(fm => {
+                                                let failProb = '';
+                                                if (fm.probabilityType==='screened') failProb='SCREENED';
+                                                else if (fm.probabilityType==='qualitative') failProb=(fm.qualitativeLevel||'unknown').toUpperCase();
+                                                else if (fm.data?.mean) failProb = fmtProb(parseFloat(fm.data.mean)) || fm.data.mean;
+                                                const units = fm.data?.units || '';
+                                                let failRate = '';
+                                                if (fm.lambda) failRate = fm.lambda + ' /hr';
+                                                else if (fm.data?.mean && (units==='h'||units==='y'||units==='hft')) failRate = fm.data.mean + (units==='h'?' /hr':units==='y'?' /yr':' /hr/ft');
+                                                else if (units==='d' && fm.data?.mean) failRate = fm.data.mean + ' /demand';
+                                                let opTime = '';
+                                                if (fm.timeToOperate) opTime = fm.timeToOperate + ' hrs';
+                                                else if (fm.missionTime) opTime = fm.missionTime + ' hrs';
+                                                const notes = [];
+                                                if (fm.data?.distribution_type) notes.push('Dist: '+fm.data.distribution_type);
+                                                if (units==='hft' && fm.pipeLength) notes.push('Pipe: '+fm.pipeLength+' ft');
+                                                if (fm.failureModel && fm.failureModel!=='0') notes.push('FM'+fm.failureModel);
+                                                if (fm.inspInterval) notes.push('Insp: '+fm.inspInterval+' hrs');
+                                                if (fm.tauRepair) notes.push('Tau: '+fm.tauRepair+' hrs');
+                                                rows.push([ ssc.name||'', fm.mode||'', fm.data?.description||'', failProb, failRate, opTime, fm.source||'', notes.join('; ') ]);
+                                            });
+                                        });
+                                        return rows;
+                                    })()
+                                }
+                            ]
+                        },
+
+                        commonCauseFailure: {
+                            available: Object.keys(ccfEvents).length > 0,
+                            title: 'Common-Cause Failure Table',
+                            content: Object.keys(ccfEvents).length === 0 ? [] : [
+                                {
+                                    type: 'table',
+                                    caption: 'Common-Cause Failure Events',
+                                    headerStyle: 'blue',
+                                    headers: [
+                                        { label: 'CCF Event Name' },
+                                        { label: 'Description' },
+                                        { label: 'Failure Probability' },
+                                        { label: 'Beta Factor' },
+                                        { label: 'Affected Components' }
+                                    ],
+                                    rows: Object.entries(ccfEvents).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,d]) => [
+                                        name,
+                                        d.description || '',
+                                        fmtProb(d.probability) || '',
+                                        d.ccfBeta !== undefined ? d.ccfBeta.toFixed(3) : '',
+                                        (d.ccfGroup||[]).join(', ')
+                                    ])
+                                }
+                            ]
+                        },
+
+                        pidDiagram: {
+                            available: !!(pidDiagram && pidDiagram.nodes && pidDiagram.nodes.length > 0),
+                            title: 'P&ID Diagram',
+                            content: pidDiagram && pidDiagram.nodes && pidDiagram.nodes.length > 0
+                                ? [
+                                    { type: 'pidData', nodes: pidDiagram.nodes, edges: pidDiagram.edges||[], groups: pidDiagram.groups||[], settings: pidDiagram.settings||{} },
+                                    ...(pidImageDataUrl ? [{ type: 'image', dataUrl: pidImageDataUrl, caption: `P&ID Diagram — ${systemName||'System'}` }] : [])
+                                  ]
+                                : []
+                        },
+
+                        fmeaInformation: {
+                            available: fmeaDiagrams.length > 0,
+                            title: 'FMEA Information',
+                            content: fmeaDiagrams.map(fd => ({
+                                type: 'fmeaDiagram',
+                                sscName: fd.sscName,
+                                sscDescription: fd.sscDescription,
+                                mermaidCode: fd.mermaidCode,
+                                ...(fd.imageDataUrl ? { imageDataUrl: fd.imageDataUrl } : {})
+                            }))
+                        },
+
+                        systemWorksExpression: {
+                            available: systemWorksText.trim().length > 0,
+                            title: 'System Works Expression',
+                            content: systemWorksText.trim() ? [{ type: 'code', value: systemWorksText }] : []
+                        },
+
+                        supercomponentInformation: {
+                            available: superComponents.length > 0,
+                            title: 'Supercomponent Information',
+                            content: superComponents.map(sc => ({
+                                type: 'supercomponent',
+                                name: sc.name,
+                                description: sc.description || '',
+                                sscNames: (sc.sscs||[]).map(s => s.name)
+                            }))
+                        },
+
+                        faultTreeLogic: {
+                            available: !!failureLogicTree,
+                            title: 'Fault Tree Logic',
+                            content: failureLogicTree ? [{ type: 'faultTree', tree: serializeTree(failureLogicTree) }] : []
+                        },
+
+                        faultTreeGraphic: {
+                            available: !!ftGraphicBase64,
+                            title: 'Fault Tree Graphic',
+                            content: ftGraphicBase64 ? [{ type: 'image', dataUrl: ftGraphicBase64, caption: `Fault Tree — ${systemName||'System'}` }] : []
+                        },
+
+                        faultTreeCutSets: {
+                            available: cutSetRows.length > 0,
+                            title: 'Fault Tree Cut Sets',
+                            content: cutSetRows.length === 0 ? [] : [
+                                {
+                                    type: 'table',
+                                    caption: `Minimal Cut Sets (${cutSetRows.length} total)`,
+                                    headerStyle: 'blue',
+                                    headers: [
+                                        { label: '#', width: 'narrow' },
+                                        { label: 'Cut Set' },
+                                        { label: 'Description' },
+                                        { label: 'Probability', align: 'right' }
+                                    ],
+                                    rows: cutSetRows.map((cs,i) => [
+                                        String(i+1),
+                                        cs.events.join(' \u00D7 '),
+                                        cs.description || '',
+                                        cs.probability !== null ? cs.probability.toExponential(2) : 'N/A'
+                                    ]),
+                                    footer: mcubValue !== null ? `MCUB (System Failure Probability): ${mcubValue.toExponential(2)}` : null
+                                }
+                            ]
+                        },
+
+                        importanceMeasureGraphic: {
+                            available: !!impGraphicBase64,
+                            title: 'Importance Measure Graphic',
+                            content: impGraphicBase64 ? [{ type: 'image', dataUrl: impGraphicBase64, caption: 'Importance Measures (SWIM vs RIR)' }] : []
+                        },
+
+                        importanceMeasureTable: {
+                            available: importanceMeasures.length > 0,
+                            title: 'Importance Measure Table',
+                            content: importanceMeasures.length === 0 ? [] : [
+                                {
+                                    type: 'table',
+                                    caption: 'Component Importance Measures',
+                                    headerStyle: 'blue',
+                                    headers: [
+                                        { label: 'Event' },
+                                        { label: 'Description' },
+                                        { label: 'Probability', align: 'right' },
+                                        { label: 'RIR', align: 'right' },
+                                        { label: 'RRR', align: 'right' },
+                                        { label: 'PC', align: 'right' },
+                                        { label: 'SWIM', align: 'right' }
+                                    ],
+                                    rows: importanceMeasures.map(m => [
+                                        m.event,
+                                        m.description || '',
+                                        fmtProb(m.probability) || '',
+                                        m.rir.toFixed(1),
+                                        m.rrr >= 999 ? '\u221E' : m.rrr.toFixed(1),
+                                        fmtProb(m.pc) || '',
+                                        fmtProb(m.swim) || ''
+                                    ])
+                                }
+                            ]
+                        }
+                    }
+                };
+
+                const json = JSON.stringify(doc, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `SYS_${safeSysName}.KNOW_RPT`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
             const FORMAT_INFO = {
+                knowRPT: {
+                    label: 'KUREAS-REPORT (.KNOW_RPT)',
+                    color: '#b45309',
+                    desc: 'Report package for KUREAS-REPORT. Contains all section data (text, tables, graphics) needed to compose a multi-module report: SSC info, FMEA diagrams, fault tree, cut sets, importance measures, P&ID, and more.'
+                },
                 relDB: {
                     label: 'Reliability Database (.relDB)',
                     color: '#1d4ed8',
@@ -3534,12 +4140,12 @@
             return (
                 <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}}
                     onClick={e => { if(e.target===e.currentTarget) onClose(); }}>
-                    <div style={{background:'white',borderRadius:'12px',boxShadow:'0 8px 40px rgba(0,0,0,0.3)',width:'500px',maxWidth:'95vw',maxHeight:'90vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                    <div style={{background:'white',borderRadius:'12px',boxShadow:'0 8px 40px rgba(0,0,0,0.3)',width:'660px',maxWidth:'95vw',maxHeight:'90vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
                         {/* Header */}
                         <div style={{background:'#1e3a8a',color:'white',padding:'14px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
                             <span style={{fontWeight:'700',fontSize:'15px'}}>
                                 <svg style={{display:'inline',marginRight:'7px',verticalAlign:'-3px'}} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Export Components
+                                Export System Information
                             </span>
                             <button onClick={onClose} style={{background:'none',border:'none',color:'white',fontSize:'18px',cursor:'pointer',lineHeight:1}}>&#x00D7;</button>
                         </div>
@@ -3561,8 +4167,8 @@
                                 </div>
                             </div>
 
-                            {/* Component selection — not applicable for KNOW_FTL */}
-                            {format !== 'knowFTL' ? (
+                            {/* Component selection — not applicable for KNOW_FTL or KNOW_RPT */}
+                            {format !== 'knowFTL' && format !== 'knowRPT' ? (
                             <div>
                                 <div style={{fontSize:'11px',fontWeight:'700',color:'#6b7280',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'0.05em',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                                     <span>Components to Export</span>
@@ -3576,9 +4182,9 @@
                                     ) : allSSCs.map((ssc, idx) => (
                                         <label key={idx} style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 12px',borderBottom: idx<allSSCs.length-1 ? '1px solid #f3f4f6':'none',cursor:'pointer',background: selectedSSCs.has(idx) ? '#eff6ff' : 'white'}}>
                                             <input type="checkbox" checked={selectedSSCs.has(idx)} onChange={() => toggleSSC(idx)} style={{accentColor:'#1e3a8a'}}/>
-                                            <div style={{flex:1,minWidth:0}}>
-                                                <div style={{fontSize:'12px',fontFamily:'monospace',fontWeight:'600',color:'#374151',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ssc.name}</div>
-                                                {ssc.label && <div style={{fontSize:'10px',color:'#9ca3af'}}>{ssc.sscType ? `${ssc.sscType} \u2013 ` : ''}{ssc.label}</div>}
+                                            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'baseline',gap:'8px',overflow:'hidden'}}>
+                                                <span style={{fontSize:'12px',fontFamily:'monospace',fontWeight:'600',color:'#374151',whiteSpace:'nowrap',flexShrink:0}}>{ssc.name}</span>
+                                                {ssc.label && <span style={{fontSize:'10px',color:'#9ca3af',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ssc.sscType ? `${ssc.sscType} \u2013 ` : ''}{ssc.label}</span>}
                                             </div>
                                             <span style={{fontSize:'10px',color:'#9ca3af',flexShrink:0}}>
                                                 {(ssc.failureModes||[]).filter(fm=>fm.applicable!==false).length} FM{(ssc.failureModes||[]).filter(fm=>fm.applicable!==false).length!==1?'s':''}
@@ -3589,8 +4195,11 @@
                                 <div style={{fontSize:'11px',color:'#6b7280',marginTop:'5px'}}>{selectedSSCs.size} of {allSSCs.length} component{allSSCs.length!==1?'s':''} selected</div>
                             </div>
                             ) : (
-                            <div style={{padding:'14px 16px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'8px',fontSize:'12px',color:'#166534'}}>
-                                <strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-FTL file is built from the complete system fault tree and includes all basic events derived from the SYSTEM WORKS expression. The component selection above does not apply.
+                            <div style={{padding:'14px 16px',background: format==='knowRPT' ? '#fffbeb' : '#f0fdf4',border:`1px solid ${format==='knowRPT'?'#fde68a':'#bbf7d0'}`,borderRadius:'8px',fontSize:'12px',color: format==='knowRPT'?'#92400e':'#166534'}}>
+                                {format === 'knowRPT'
+                                    ? <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-REPORT package captures all system data: SSC table, failure modes, FMEA diagrams, fault tree, cut sets, importance measures, and P&amp;ID.</>
+                                    : <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-FTL file is built from the complete system fault tree and includes all basic events derived from the SYSTEM WORKS expression. The component selection above does not apply.</>
+                                }
                             </div>
                             )}
                         </div>
@@ -3598,8 +4207,8 @@
                         {/* Footer */}
                         <div style={{borderTop:'1px solid #e5e7eb',padding:'12px 20px',display:'flex',justifyContent:'flex-end',gap:'8px',flexShrink:0}}>
                             <button onClick={onClose} style={{padding:'8px 18px',background:'#f3f4f6',border:'1px solid #d1d5db',borderRadius:'6px',cursor:'pointer',fontSize:'13px',fontWeight:'600',color:'#374151'}}>Cancel</button>
-                            <button onClick={handleExport} style={{padding:'8px 20px',background:'#1e3a8a',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'13px',fontWeight:'700',color:'white'}}>
-                                &#x2193; Export {selectedSSCs.size > 0 ? `(${selectedSSCs.size})` : ''}
+                            <button onClick={handleExport} style={{padding:'8px 20px',background: format==='knowRPT'?'#b45309':'#1e3a8a',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'13px',fontWeight:'700',color:'white'}}>
+                                &#x2193; Export {(format==='knowFTL'||format==='knowRPT') ? '' : selectedSSCs.size > 0 ? `(${selectedSSCs.size})` : ''}
                             </button>
                         </div>
                     </div>
@@ -3607,7 +4216,7 @@
             );
         }
 
-        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildImportanceEngine }) {
+        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion }) {
             const [fileFormat, setFileFormat] = useState(() => {
                 return localStorage.getItem('KUREAS_SYS_reportFormat') || 'word';
             });
@@ -4048,20 +4657,74 @@
                 if (!mcubValue || !cutSets || cutSets.length === 0 || !basicEventData) {
                     return [];
                 }
-                
-                // Create combined event data including CCF events
+
+                // Combined event data (SSC events + CCF events)
                 const combinedEventData = { ...basicEventData, ...ccfEvents };
 
-                // Build engine once — BDD tree built once / MCUB products precomputed
-                const appImpEngine = buildImportanceEngine(cutSets, combinedEventData, mcubValue, settings);
-                const allEvents = new Set();
-                cutSets.forEach(cs => cs.events.forEach(e => allEvents.add(e)));
+                // Valid cut sets only (no linked, no null probability)
+                const validCutSets = cutSets.filter(cs => !cs.hasLinked && cs.probability !== null);
+                if (validCutSets.length === 0) return [];
 
-                // Calculate RIR, RRR, PC, SWIM for each event
+                const method = settings?.quantificationMethod || 'mcub';
+
+                // ── Shared formula ────────────────────────────────────────────────
+                const calcMeasures = (origProb, prob1, prob0, systemProb, ed, eventName) => {
+                    const rir  = prob1 !== null ? prob1 / systemProb : null;
+                    const rrrRaw = prob0 === 0 ? Infinity : (prob0 !== null ? systemProb / prob0 : null);
+                    const pc   = rrrRaw === Infinity ? 1.0 : (rrrRaw !== null ? (1 - (1 / rrrRaw)) : null);
+                    const swim = (pc !== null && rir !== null) ? pc + Math.pow(1 - (1 / rir), 7.64) : null;
+                    return {
+                        event: eventName,
+                        name: eventName,
+                        description: ed.description || '',
+                        probability: origProb,
+                        rir,
+                        rrr: rrrRaw === Infinity ? 999 : rrrRaw,
+                        pc,
+                        swim,
+                        isCCF: ed.isCCF || false
+                    };
+                };
+
+                // ── MCUB / rare-event path (inline, no external dependency) ──────
+                const calcSystemProb = (probs) => {
+                    if (method === 'rare') return Math.min(1.0, probs.reduce((s, p) => s + p, 0));
+                    return 1 - probs.reduce((prod, p) => prod * (1 - p), 1.0); // MCUB
+                };
+
+                // Precompute per-cut-set products
+                const csProbs = validCutSets.map(cs =>
+                    cs.events.reduce((prod, ev) => prod * (combinedEventData[ev]?.probability ?? 0), 1.0)
+                );
+
+                // Map: event name → indices of cut sets containing it
+                const eventToCutSets = new Map();
+                validCutSets.forEach((cs, i) => {
+                    cs.events.forEach(ev => {
+                        if (!eventToCutSets.has(ev)) eventToCutSets.set(ev, []);
+                        eventToCutSets.get(ev).push(i);
+                    });
+                });
+
+                const allEvents = new Set();
+                validCutSets.forEach(cs => cs.events.forEach(e => allEvents.add(e)));
+
                 const measures = Array.from(allEvents).map(eventName => {
-                    const r = appImpEngine(eventName);
-                    if (!r) return null;
-                    return { ...r, event: r.name };
+                    const ed = combinedEventData[eventName];
+                    if (!ed || ed.probability === null || ed.probability === undefined || ed.isLinked) return null;
+
+                    const origProb = ed.probability;
+                    const affectedIndices = eventToCutSets.get(eventName) || [];
+                    const ratio = origProb > 0 ? 1.0 / origProb : null;
+
+                    const patchedProbs = (overrideVal) => csProbs.map((p, i) => {
+                        if (!affectedIndices.includes(i)) return p;
+                        return origProb > 0 ? p * (overrideVal / origProb) : overrideVal;
+                    });
+
+                    const prob1 = calcSystemProb(patchedProbs(1.0));
+                    const prob0 = calcSystemProb(patchedProbs(0.0));
+                    return calcMeasures(origProb, prob1, prob0, mcubValue, ed, eventName);
                 }).filter(m => m !== null);
 
                 // Sort by SWIM descending
@@ -5188,8 +5851,12 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     const CH = typeof CELL_H !== 'undefined' ? CELL_H : 60;
                     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                     nodes.forEach(n => {
-                        minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-                        maxX = Math.max(maxX, n.x + CW); maxY = Math.max(maxY, n.y + CH + 20);
+                        const labelAtTop = n.labelPosition === 'top';
+                        minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + CW);
+                        const topExtra = labelAtTop ? 30 : 14;
+                        const botExtra = labelAtTop ? 14 : 38;
+                        minY = Math.min(minY, n.y - topExtra);
+                        maxY = Math.max(maxY, n.y + CH + botExtra);
                     });
                     // Extend bounds to include group boxes
                     groups.forEach(g => {
@@ -5198,9 +5865,9 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             maxX = Math.max(maxX, g.x+g.w); maxY = Math.max(maxY, g.y+g.h);
                         }
                     });
-                    const pad = 60;
-                    const W = Math.max(800, maxX - minX + pad*2);
-                    const H = Math.max(400, maxY - minY + pad*2);
+                    const pad = 20;
+                    const W = Math.max(400, maxX - minX + pad*2);
+                    const H = Math.max(200, maxY - minY + pad*2);
                     const offCanvas = document.createElement('canvas');
                     offCanvas.width = W; offCanvas.height = H;
                     const ctx = offCanvas.getContext('2d');
@@ -22647,13 +23314,18 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             onClose={() => setShowExportModal(false)}
                             sscsInSystem={sscsInSystem}
                             systemName={systemName}
+                            systemDescription={systemDescription}
                             systemLogic={systemLogic}
                             superComponents={superComponents}
+                            hasFailureInfo={systemLogic && systemLogic.length > 1}
                             parseSystemWorksExpression={parseSystemWorksExpression}
                             generateMinimalCutSets={generateMinimalCutSets}
                             calculateCutSetProbability={calculateCutSetProbability}
                             calculateMCUB={calculateMCUB}
+                            calculateBDD={calculateBDD}
                             settings={settings}
+                            pidDiagram={pidDiagram}
+                            applyCCFExpansion={applyCCFExpansion}
                         />
                     )}
 
@@ -22675,7 +23347,6 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             settings={settings}
                             pidDiagram={pidDiagram}
                             applyCCFExpansion={applyCCFExpansion}
-                            buildImportanceEngine={buildImportanceEngine}
                         />
                     )}
 
