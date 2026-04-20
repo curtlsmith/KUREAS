@@ -25,7 +25,7 @@ The suite includes full [SAPHIRE](https://saphire.inl.gov) file format interoper
 - [KUREAS-ETL — Event Tree Logic](#kureas-etl--event-tree-logic)
 - [KUREAS-SYS — System Evaluation](#kureas-sys--system-evaluation)
 - [KUREAS-SEQ — Process Operational Logic (coming soon)](#kureas-seq--process-operational-logic)
-- [KUREAS-REPORT — Report Generator (coming soon)](#kureas-report--report-generator)
+- [KUREAS-REPORT — Report Generator](#kureas-report--report-generator)
 - [KUREAS-KNOW — Knowledge Base Editor (coming soon)](#kureas-know--knowledge-base-editor)
 - [Data Flow](#data-flow)
 - [File Formats](#file-formats)
@@ -54,7 +54,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.3 | System modeling, P&ID, FMEA, failure analysis, CCF, importance measures, and comparison function |
 | **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | v1.0 | Process Operational Logic (POL) diagrams and event tree generation |
-| **KUREAS-REPORT (planned)** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from all module outputs |
+| **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
 | **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | v1.0 | General-purpose `.KNOW` file viewer and editor |
 
 ---
@@ -186,13 +186,16 @@ Central integration hub that assembles data from all other KUREAS modules into c
 
 ### Features
 
-- **Multi-source loading** — load `.KNOW` files from any KUREAS module (HA, SYS, SEQ); auto-detects file type and extracts available elements
+- **Multi-source loading** — load project or `.KNOW_RPT` files from any KUREAS module (HA, SYS, SEQ); auto-detects file type and extracts available elements
 - **Drag-and-drop assembly** — drag elements from loaded files into the report; reorder by dragging within the report structure
 - **Custom elements** — add free-form text sections with rich text editing, tables, and formatted content
 - **Insertable elements** — create reusable report sections (boilerplate text, standard tables); save to `.ELEMENTS` files and load into any future report
 - **Reference manager** — grid-based reference editor with save/load to `.KNOW` files
-- **Word export** — generate Word-compatible (.doc) reports with proper font sizing and embedded content
-- **Project persistence** — save editable report as `REPORT_*.KNOW` for continued editing
+- **Acronym generator** — feature to auto-generate all acronyms found in the report text
+- **Captions and Numbering** — use of Word page numbering, figure/table numbering, and table of contents
+- **Word export** — generate Word (.docx) reports with proper font sizing, styles, page numbering, margin control, captions, and embedded content
+- **Project persistence** — save editable report as `*.KNOW_REPORT` for continued editing
+- **Auto Updating** — loading an updated .KNOW_RPT file will update the associated report section
 
 ---
 
@@ -222,15 +225,15 @@ General-purpose viewer and editor for the `.KNOW` file format used across all KU
   ┌──────────────┐           ┌──────────────┐
   │  KUREAS-SEQ  │           │  KUREAS-FTL  │
   │  (Sequences) │           │ (Fault Trees)│
-  └──────┬───────┘           └──────┬───────┘
-         │ SEQ_*.KNOW               │ .KNOW_FTL / .FTL
-         ▼                          ▼
+  └──────┬───────┘           └─┬────┬───────┘
+         │ SEQ_*.KNOW          │    │ .KNOW_FTL / .FTL
+         ▼                     │    ▼
   ┌──────────────┐           ┌──────────────┐
-  │  KUREAS-ETL  │◄─────────│  SAPHIRE     │
+  │  KUREAS-ETL  │◄──────────│  SAPHIRE     │
   │ (Event Trees)│  .ETL     │  (external)  │
   └──────┬───────┘           └──────────────┘
          │
-         ▼  All .KNOW files
+         ▼  All .KNOW_RPT files
   ┌──────────────┐
   │ KUREAS-REPORT│
   │  (Reports)   │
@@ -251,7 +254,7 @@ Modules are not strictly sequential — you can start with any module, work in p
 | `*.KNOW_FTL` | KUREAS-FTL | Fault tree logic, basic events, probabilities, notes, cut sets, change log |
 | `*.KNOW_SYS` | KUREAS-SYS | SSC hierarchy, failure modes, system logic, supercomponents, boundary conditions |
 | `SEQ_*.KNOW` | KUREAS-SEQ | POL diagrams, boundary conditions, operating state data |
-| `REPORT_*.KNOW` | KUREAS-REPORT | Report structure, assembled elements, references, source data |
+| `*.KNOW_REPORT` | KUREAS-REPORT | Report structure, assembled elements, references, source data |
 | `*.ELEMENTS` | KUREAS-REPORT | Reusable insertable report elements |
 | `*.relDB` | KUREAS-SYS | CSV-format reliability database (system, SSC type, component type, failure modes, distributions) |
 | `*.fmeaDB` | KUREAS-SYS | JSON-format FMEA database (full round-trip with severity, detection, mitigation) |
@@ -299,19 +302,15 @@ Any modern browser with ES6+ support. Tested on Chrome, Edge, Firefox, and Safar
 KUREAS incorporates data and methodology from the following NRC publications:
 
 - **NUREG-2169** — *Nuclear Power Plant Fire Ignition Frequency and Non-Suppression Probability Estimation Using the Updated Fire Events Database* (Table 4-4 fire ignition frequencies are built into KUREAS-HA)
-
 - **NUREG/CR-7039** — *Systems Analysis Programs for Hands-on Integrated Reliability Evaluations (SAPHIRE) Version 8* (SAPHIRE file format specifications used throughout the suite)
-
 - **NUREG-CR-6883** — *The SPAR-H Human Reliability Analysis Method* (Gertman, Blackman, Byers, Marble, Smith, 2005) — reference document for human reliability analysis
-
 - **INL/EXT-10-18533** — *SPAR-H Step-by-Step Guidance* (Whaley, Kelly, Boring, Galyean, 2011) — procedural guidance for the SPAR-H method
 
 ---
 
 ## License
 
-MIT License — Copyright (c) 2024–2026 Curtis Lee Smith
-
+MIT License — Copyright (c) 2025–2026 Curtis Lee Smith
 See individual module files for full license text.
 
 ---
