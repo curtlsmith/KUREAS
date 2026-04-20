@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KUREAS-REPORT — Quick Reference</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEzUlEQVR4AcRXSUxUWRQ9r4oZmZpBpGkGATdudKUrh5hoXLgEosbExKEdAJV2ionzEDXRxKgxNmgjLETAGIdoTEx04caliImhAYONAgKFNHSoiaq+99f313/1XxVVHZP+4f733rn3vnv+rffvv9jwP18agcrKSv+PliraUyXmOPzsGgGetLW1gaW1uRl/HDmCxj170FhXBx6bz59HW2urpmebiEJ2zRcuoKGmBg27d+P3Xbs04XXTmTPGHhyTxSDAC/j9cH/+jD+3bkXnsmXoXL4c71auxJdr1+BzuTSTiLeZGTieP8c73bdzxQrNv2vVKvQSIe/4uMVdJsBqIgGfD5IwxrpI4vXC8ewZerdtg2tgIGhpsyF18WJUUGbTliwJ4vrMSkBXxDTowXu2b4eLMmj4UvD0pUux4M4dzFm0yIDNEysBIcz6wDxSBjj406fg4O7BwYA93yl4Jv0UC5qakLJwISNKsRJQmqlBPwUfe/IE3XRm3ENDQSMKnrV6Ncpv30ZSRUUQV8wkAn4yEELOgD/M0/s8How9fKg9uXdkhDz1Pwr+07p1KG9oQFJpqQ6GHyQC4c1kjRb8wQP07tgBT0jw3MpKlN+4gcTCQtkpzEoiIIQAZ8Fsy/kwZ4HT7rh/H730fntGRw1TQU+et2kT5l+9ioR58wx8tolEYDZjP6V9lApWz86d8I6NBc0peD69fvMvXUJ8bm4Qj2JmISCEnAV+ei0LHPzePe3Jvd++GVsLux0FtbUopuoXl51t4NFOLARUjn63G19bWtBDafdOTARNiGze5s0oPnUKcRkZQTyGmZUAbSoEP7O+C70Fw1RI+vbuxczkpA7qA+n+fv0azo8fdSD2wUpAsYdvehp8+BQqOLu78enkSfltUBmGwaIiEMZXg/mMOB4/xtDNm+CfSgNjuMVEwJaUhNLLl1HR2Ah7aqoRhrPzhfBx+hLyF9VQRDGJmgAHL6G+oIC+8TlVVZi7ZYu0vYc+tf1Hj2L6wwcJn21hJWA+gLq3FvzcOeRT5RMJCbCnpaGADmXo5/Wft2/x6fRpeB0ORHtZCSg88zZuxFz64NgSEw1tUkkJiujwxefkGBhPRjs6MNzUFPV5UBMIyYJITgao4HAAQ8gmgzqegn37IOLiDJir5cDFi5h49Qp+bmwMjXqiJqC2taCckXzKTNbatZLOMzyM/mPH4Orrk3DVwqYCLRgVHGEBA0B8Xh6K6PAll5UFAP0++eYN/qJMzJgrp64zD9ERMHso5tzz/Xz4MOwpKZJ2pKUFX+/ehY9KuaQwLX4IAT4DufRq5qxfD9DZgH75nE4MnD2LKcoGKIs6LA1qArSJEHLSueJJniELe3o6Cg8exBzqgM0kuEPuP34czv5+qPZQE8B/u5LLy/ELnYe4zExpg4mXLzF45Qp8U1MSzgslASHUPQE7RBRqTLLWrAkULHo1uUsCYSxDt25hjNo4SoO0hYWAPTNT26D4xAkUsVCxyaYmkyug5BlmYaOaUVhfj7Lr17U+gYsVS+GhQ2AioW4GgSo6RCwbqLWqpf9w9nd14cD79zhA46/UXldTNWR9NLKBGpe6Fy9QT6V5f2cnWH6jec2jR6iqrgbv8Z2IRqC9vV1I0tEh2gj7LpKO8FjWkWyZxL8AAAD//4MEZNkAAAAGSURBVAMAE0k4X2fO1c4AAAAASUVORK5CYII=" type="image/png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --blue: #1e3a5f;
+    --blue-mid: #2e5a8a;
+    --blue-light: #dbeafe;
+    --blue-accent: #3b82f6;
+    --indigo: #3730a3;
+    --green: #065f46;
+    --green-light: #d1fae5;
+    --amber: #92400e;
+    --amber-light: #fef3c7;
+    --gray-dark: #111827;
+    --gray-mid: #374151;
+    --gray: #6b7280;
+    --gray-light: #f8fafc;
+    --border: #e2e8f0;
+    --white: #ffffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--gray-dark);
+    background: var(--white);
+    width: 8.5in;
+    min-height: 11in;
+    margin: 0 auto;
+    padding: 0.45in 0.5in 0.4in;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    border-bottom: 2.5px solid var(--blue);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .header-left h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--blue);
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+  .header-left .subtitle {
+    font-size: 10px;
+    color: var(--gray);
+    margin-top: 3px;
+    letter-spacing: 0.3px;
+  }
+  .header-right {
+    text-align: right;
+    font-size: 9.5px;
+    color: var(--gray);
+    line-height: 1.6;
+    padding-top: 2px;
+  }
+  .header-right .version {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    background: var(--blue-light);
+    color: var(--blue);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* ── Layout ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 9px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .col-span-2 { grid-column: span 2; }
+  .col-span-3 { grid-column: span 3; }
+
+  /* ── Cards ── */
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: var(--white);
+  }
+  .card-blue { border-left: 3px solid var(--blue-accent); }
+  .card-indigo { border-left: 3px solid var(--indigo); }
+  .card-green { border-left: 3px solid #10b981; }
+  .card-amber { border-left: 3px solid #f59e0b; }
+  .card-gray { border-left: 3px solid var(--gray); background: var(--gray-light); }
+
+  .card-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .card-title .icon { font-size: 12px; }
+
+  /* ── Sections within cards ── */
+  .section-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--gray);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 6px 0 3px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 2px;
+  }
+  .section-label:first-of-type { margin-top: 2px; }
+
+  /* ── Items / rows ── */
+  .item {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-bottom: 2.5px;
+    line-height: 1.45;
+  }
+  .item-icon {
+    font-size: 11px;
+    flex-shrink: 0;
+    width: 14px;
+    text-align: center;
+  }
+  .item-key {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--blue-mid);
+    flex-shrink: 0;
+    min-width: 60px;
+  }
+  .item-key.wide { min-width: 80px; }
+  .item-key.wider { min-width: 100px; }
+  .item-val {
+    font-size: 10px;
+    color: var(--gray-mid);
+  }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    font-size: 8.5px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 3px;
+  }
+  .badge-blue { background: var(--blue-light); color: var(--blue); }
+  .badge-indigo { background: #e0e7ff; color: var(--indigo); }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-amber { background: var(--amber-light); color: var(--amber); }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin: 4px 0;
+  }
+  .flow-step {
+    background: var(--blue-light);
+    border: 1px solid #93c5fd;
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-size: 9.5px;
+    font-weight: 500;
+    color: var(--blue);
+    white-space: nowrap;
+  }
+  .flow-step.alt { background: #e0e7ff; border-color: #a5b4fc; color: var(--indigo); }
+  .flow-step.action { background: #d1fae5; border-color: #6ee7b7; color: var(--green); }
+  .flow-arrow { color: var(--gray); font-size: 10px; }
+
+  /* ── Tip / note ── */
+  .tip {
+    font-size: 9.5px;
+    color: var(--gray);
+    font-style: italic;
+    margin-top: 3px;
+    padding-top: 3px;
+    border-top: 1px dashed var(--border);
+  }
+  .tip strong { color: var(--gray-mid); font-style: normal; }
+
+  /* ── Two-col list ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 8px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 9px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 9px;
+    color: var(--gray);
+  }
+  .footer .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    color: var(--blue);
+    font-size: 10px;
+  }
+
+  /* ── Keyboard shortcut ── */
+  kbd {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8.5px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    padding: 0 4px;
+    color: var(--gray-dark);
+  }
+
+  @media print {
+    body { margin: 0; padding: 0.45in 0.5in 0.4in; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>KUREAS-REPORT</h1>
+    <div class="subtitle">Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems — Report Generation Module</div>
+  </div>
+  <div class="header-right">
+    <span class="version">v1.0</span><br>
+    MIT License · Single-file, browser-based
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ ROW 1 -->
+<div class="grid" style="margin-bottom:9px">
+
+  <!-- OVERVIEW -->
+  <div class="card card-blue">
+    <div class="card-title"><span class="icon">📋</span> Overview</div>
+    <div class="item-val" style="margin-bottom:5px">
+      KUREAS-REPORT assembles multi-source PRA/reliability reports by dragging data elements from loaded KUREAS files into a Report Creation Area, then exporting to Word (.docx) or Markdown (.md).
+    </div>
+    <div class="section-label">Layout</div>
+    <div class="item"><span class="item-icon">◀</span><span class="item-val"><strong>Left pane</strong> — Report Elements library (Basic Elements, Insertable Elements, loaded files)</span></div>
+    <div class="item"><span class="item-icon">▶</span><span class="item-val"><strong>Right pane</strong> — Report Creation Area (ordered list of elements to include)</span></div>
+    <div class="item"><span class="item-icon">⟺</span><span class="item-val">Drag the <strong>divider</strong> to resize panes</span></div>
+    <div class="tip"><strong>Tip:</strong> Drop .KNOW_RPT, .KNOW_HA, .KNOW_FTL, or .ELEMENTS files directly onto the left pane to load them.</div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="card card-blue">
+    <div class="card-title"><span class="icon">🔧</span> Toolbar Buttons</div>
+    <div class="item"><span class="item-key">Open REPORT</span><span class="item-val">Load a saved .KNOW_REPORT project file</span></div>
+    <div class="item"><span class="item-key">Save REPORT</span><span class="item-val">Save current report to .KNOW_REPORT (dialog prompts for name; no "REPORT_" prefix added)</span></div>
+    <div class="item"><span class="item-key">Open KUREAS</span><span class="item-val">Load one or more source files (.KNOW_RPT / .KNOW_HA / .KNOW_FTL / .KNOW_3D)</span></div>
+    <div class="item"><span class="item-key">References</span><span class="item-val">Edit the citation library; cited refs auto-populate the References section</span></div>
+    <div class="item"><span class="item-key">Generate</span><span class="item-val">Open the Report Preview window with Save as Word / Save as Markdown buttons</span></div>
+    <div class="item"><span class="item-key">⚙</span><span class="item-val">App settings — font, page size, preview size, numeric precision</span></div>
+  </div>
+
+  <!-- FILE TYPES -->
+  <div class="card card-blue">
+    <div class="card-title"><span class="icon">📁</span> Supported File Types</div>
+    <div class="section-label">Input (Source Files)</div>
+    <div class="item"><span class="item-key">.KNOW_RPT</span><span class="item-val">KUREAS-SYS export — sections with text, tables, graphics, fault trees</span></div>
+    <div class="item"><span class="item-key">.KNOW_HA</span><span class="item-val">KUREAS-HA hazard analysis data</span></div>
+    <div class="item"><span class="item-key">.KNOW_FTL</span><span class="item-val">KUREAS-FTL fault tree logic &amp; diagrams</span></div>
+    <div class="item"><span class="item-key">.KNOW_3D</span><span class="item-val">KUREAS-3D 3D facility model snapshots</span></div>
+    <div class="item"><span class="item-key">.ELEMENTS</span><span class="item-val">Insertable rich-text element libraries</span></div>
+    <div class="section-label">Project</div>
+    <div class="item"><span class="item-key">.KNOW_REPORT</span><span class="item-val">Saved report project (all elements + sources)</span></div>
+    <div class="section-label">Output</div>
+    <div class="item"><span class="item-key">.docx</span><span class="item-val">Word document with headers, footers, numbered headings, captioned figures &amp; tables</span></div>
+    <div class="item"><span class="item-key">.md</span><span class="item-val">Markdown document</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ ROW 2 -->
+<div class="grid" style="margin-bottom:9px">
+
+  <!-- BASIC ELEMENTS -->
+  <div class="card card-amber">
+    <div class="card-title"><span class="icon">✨</span> Basic Elements</div>
+    <div class="tip" style="margin-bottom:5px;border-top:none;padding-top:0">Click any tile to add to the Report Creation Area.</div>
+    <div class="two-col">
+      <div>
+        <div class="item"><span class="item-icon">⚙️</span><span class="item-val"><strong>Formatting</strong> — page layout, margins, header/footer, page numbers, numbered section styles</span></div>
+        <div class="item"><span class="item-icon">📄</span><span class="item-val"><strong>Cover Page</strong> — title, subtitle, author, org, date (text), custom content</span></div>
+        <div class="item"><span class="item-icon">🔖</span><span class="item-val"><strong>Section Header</strong> — H1–H6 heading with optional body text</span></div>
+        <div class="item"><span class="item-icon">📋</span><span class="item-val"><strong>Table of Contents</strong> — Word auto-TOC (H1–H4); updates on open</span></div>
+        <div class="item"><span class="item-icon">🖼</span><span class="item-val"><strong>List of Figures</strong> — auto Figure list from SEQ fields</span></div>
+      </div>
+      <div>
+        <div class="item"><span class="item-icon">📊</span><span class="item-val"><strong>List of Tables</strong> — auto Table list from SEQ fields</span></div>
+        <div class="item"><span class="item-icon">🔤</span><span class="item-val"><strong>Acronyms</strong> — scans report text for <em>Expansion (ABBR)</em> patterns; click ↻ to refresh</span></div>
+        <div class="item"><span class="item-icon">📚</span><span class="item-val"><strong>References</strong> — cited references (only entries cited in the text are included)</span></div>
+        <div class="item"><span class="item-icon">📎</span><span class="item-val"><strong>File Insertion</strong> — placeholder for an external file path in the final document</span></div>
+      </div>
+    </div>
+    <div class="tip"><strong>Formatting</strong> stays locked at position #1. <strong>Acronyms</strong> re-scans all report text each time ↻ is clicked.</div>
+  </div>
+
+  <!-- KNOW_RPT ELEMENTS -->
+  <div class="card card-indigo">
+    <div class="card-title"><span class="icon">📦</span> .KNOW_RPT Sections</div>
+    <div class="item-val" style="margin-bottom:4px">When a .KNOW_RPT is loaded, its available sections appear in the left pane under the filename.</div>
+    <div class="section-label">Drag Options</div>
+    <div class="item"><span class="item-icon">📦</span><span class="item-val"><strong>"All Information in…"</strong> card (indigo, top of file) — drops a single collapsed <em>RPT group</em> containing all sections</span></div>
+    <div class="item"><span class="item-icon">📋</span><span class="item-val"><strong>Individual section</strong> — drag any section tile to add just that piece</span></div>
+    <div class="section-label">RPT Group in Report Area</div>
+    <div class="item"><span class="item-icon">▶</span><span class="item-val">Click the chevron to expand and see all contained sections</span></div>
+    <div class="item"><span class="item-icon">🔓</span><span class="item-val"><strong>Ungroup</strong> button — expands group into individual section rows in place</span></div>
+    <div class="item"><span class="item-icon">↕</span><span class="item-val">Move, view, or remove the group as a single unit</span></div>
+    <div class="section-label">Updating After Reload</div>
+    <div class="item-val">If a .KNOW_RPT file is reloaded and matching elements already exist in the report area, a dialog asks whether to <strong>Update Elements</strong> (refreshes data in place, preserving position) or <strong>Keep Existing</strong>.</div>
+  </div>
+
+  <!-- REPORT CREATION AREA -->
+  <div class="card card-green">
+    <div class="card-title"><span class="icon">🗂</span> Report Creation Area</div>
+    <div class="section-label">Adding Elements</div>
+    <div class="item"><span class="item-icon">🖱</span><span class="item-val">Drag elements from the left pane and drop onto the list or the <em>"Drop elements here"</em> zone at the bottom</span></div>
+    <div class="item"><span class="item-icon">➕</span><span class="item-val">Click Basic Element tiles to add directly</span></div>
+    <div class="section-label">Reordering</div>
+    <div class="item"><span class="item-icon">↕</span><span class="item-val">Drag any element card to a new position (blue indicator shows drop slot)</span></div>
+    <div class="item"><span class="item-icon">▲▼</span><span class="item-val">Use Up/Down arrow buttons as an alternative</span></div>
+    <div class="section-label">Element Actions</div>
+    <div class="item"><span class="item-icon">👁</span><span class="item-val">Eye — full preview of element content</span></div>
+    <div class="item"><span class="item-icon">✏</span><span class="item-val">Pencil / ↻ — edit (Cover Page, Section Header, Formatting, File Insertion) or refresh (Acronyms)</span></div>
+    <div class="item"><span class="item-icon">🗑</span><span class="item-val">Trash — remove from report</span></div>
+    <div class="tip"><strong>New elements</strong> are appended at the bottom; the area auto-scrolls to show them.</div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ ROW 3 -->
+<div class="grid-2" style="margin-bottom:9px">
+
+  <!-- FORMATTING ELEMENT -->
+  <div class="card card-gray">
+    <div class="card-title"><span class="icon">⚙️</span> Document Formatting Element</div>
+    <div class="two-col">
+      <div>
+        <div class="item"><span class="item-key wide">Page Layout</span><span class="item-val">Portrait or Landscape</span></div>
+        <div class="item"><span class="item-key wide">Page Numbers</span><span class="item-val">None · Top/Bottom × Left/Center/Right</span></div>
+        <div class="item"><span class="item-key wide">Margins</span><span class="item-val">Top / Bottom / Left / Right (inches)</span></div>
+      </div>
+      <div>
+        <div class="item"><span class="item-key wide">Header</span><span class="item-val">Text on every page header</span></div>
+        <div class="item"><span class="item-key wide">Footer</span><span class="item-val">Text on every page footer</span></div>
+        <div class="item"><span class="item-key wide">Numbered Styles</span><span class="item-val">Auto-numbers headings: 1. / 1.1. / 1.1.1. etc.</span></div>
+      </div>
+    </div>
+    <div class="tip">Formatting is always placed at position #1 and applies to the entire .docx output. It is invisible in the HTML preview.</div>
+  </div>
+
+  <!-- WORD EXPORT -->
+  <div class="card card-gray">
+    <div class="card-title"><span class="icon">📄</span> Word (.docx) Export Features</div>
+    <div class="two-col">
+      <div>
+        <div class="item"><span class="item-icon">📋</span><span class="item-val"><strong>Table captions</strong> appear <em>above</em> each table — "Table N. Description." using Word SEQ fields</span></div>
+        <div class="item"><span class="item-icon">🖼</span><span class="item-val"><strong>Figure captions</strong> appear <em>below</em> each image — "Figure N. Description." using Word SEQ fields</span></div>
+        <div class="item"><span class="item-icon">📐</span><span class="item-val"><strong>Image sizing</strong> — actual pixel dimensions read from PNG/JPEG headers; auto-scaled to fit page width</span></div>
+      </div>
+      <div>
+        <div class="item"><span class="item-icon">📑</span><span class="item-val"><strong>TOC / TOF / TOT</strong> use Word's native field mechanism; update with <kbd>Ctrl+A</kbd> → <kbd>F9</kbd> in Word</span></div>
+        <div class="item"><span class="item-icon">🔤</span><span class="item-val"><strong>Acronym table</strong> rendered as a two-column, alphabetically sorted table</span></div>
+        <div class="item"><span class="item-icon">📚</span><span class="item-val"><strong>References</strong> — only entries whose citation key appears in the document text are included</span></div>
+      </div>
+    </div>
+    <div class="tip">Caption numbers are SEQ fields — Word renumbers them automatically when fields are updated.</div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ ROW 4 -->
+<div class="grid" style="margin-bottom:8px">
+
+  <!-- INSERTABLE ELEMENTS -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📝</span> Insertable Elements</div>
+    <div class="item-val" style="margin-bottom:4px">Custom rich-text blocks created or imported externally.</div>
+    <div class="item"><span class="item-icon">📥</span><span class="item-val"><strong>Load</strong> button — import a .ELEMENTS file (duplicate detection with merge dialog)</span></div>
+    <div class="item"><span class="item-icon">✏</span><span class="item-val"><strong>Edit</strong> button — open the Insertable Elements editor to create, edit, or export</span></div>
+    <div class="item"><span class="item-icon">💾</span><span class="item-val"><strong>Save &amp; Export</strong> — saves the library as a .ELEMENTS file for sharing</span></div>
+    <div class="item"><span class="item-icon">🖱</span><span class="item-val">Drag any insertable element to the Report Creation Area or drop a .ELEMENTS file onto the left pane</span></div>
+  </div>
+
+  <!-- WORKFLOW -->
+  <div class="card">
+    <div class="card-title"><span class="icon">⚡</span> Typical Workflow</div>
+    <div class="flow" style="margin-bottom:5px">
+      <span class="flow-step">1. Open KUREAS file(s)</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step alt">2. Set Formatting</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step">3. Add Cover Page</span>
+    </div>
+    <div class="flow" style="margin-bottom:5px">
+      <span class="flow-step">4. Drag sections</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step alt">5. Add TOC / TOF / TOT</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step">6. Add Acronyms</span>
+    </div>
+    <div class="flow" style="margin-bottom:5px">
+      <span class="flow-step">7. Add References</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step action">8. Generate → Save .docx</span>
+    </div>
+    <div class="tip"><strong>Save REPORT</strong> at any time to preserve your layout as a .KNOW_REPORT for later editing.</div>
+  </div>
+
+  <!-- TIPS & NOTES -->
+  <div class="card">
+    <div class="card-title"><span class="icon">💡</span> Tips &amp; Notes</div>
+    <div class="item"><span class="item-icon">🔄</span><span class="item-val">Reload a .KNOW_RPT after re-exporting from KUREAS-SYS — a dialog offers to update existing report elements in place</span></div>
+    <div class="item"><span class="item-icon">🔤</span><span class="item-val">Click <strong>Acronyms ↻</strong> <em>after</em> the report is fully assembled to capture all acronyms across all sections</span></div>
+    <div class="item"><span class="item-icon">👁</span><span class="item-val">Use Settings → <em>Show Preview</em> to control inline previews (None / Small / Large) — improves performance on large reports</span></div>
+    <div class="item"><span class="item-icon">📐</span><span class="item-val">Set font, page size, and decimal precision in Settings; these apply to all output formats</span></div>
+    <div class="item"><span class="item-icon">📑</span><span class="item-val">In Word, press <kbd>Ctrl+A</kbd> then <kbd>F9</kbd> after opening the .docx to update all TOC, TOF, TOT, and SEQ fields</span></div>
+    <div class="item"><span class="item-icon">🖱</span><span class="item-val">The <strong>Ungroup</strong> button on an RPT group lets you reorder or remove individual sections after dropping the whole file</span></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ FOOTER -->
+<div class="footer">
+  <div>
+    <span class="logo">KUREAS</span>
+    — Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems
+  </div>
+  <div>KUREAS-REPORT v1.0 · MIT License </div>
+</div>
+
+</body>
+</html>
