@@ -2351,18 +2351,22 @@
         function SystemLogicEditor({ tokens, onChange, keywords, sscsInSystem, superComponents, boundaryConditions = [], fontSizeClass, backgroundStyle, onCursorChange }) {
             const textareaRef = useRef(null);
             const lineNumbersRef = useRef(null);
+            const backdropRef = useRef(null);
             
             // Convert tokens to text lines
             const tokensToText = (tokenArray) => {
                 const lines = [];
                 let currentLine = '';
-                
+                // Track COMBINE nesting to emit commas between arguments
+                let combineDepth = 0;
+                let combineArgCount = []; // stack: args emitted at each depth
+
                 for (let ti = 0; ti < tokenArray.length; ti++) {
                     const token = tokenArray[ti];
                     const nextToken = tokenArray[ti + 1];
+                    const prevToken = tokenArray[ti - 1];
                     if (token.type === 'eol') {
                         if (currentLine.trim()) {
-                            // Don't add semicolon to comment lines
                             const trimmedLine = currentLine.trim();
                             if (trimmedLine.startsWith('#')) {
                                 lines.push(trimmedLine);
@@ -2371,17 +2375,49 @@
                             }
                         }
                         currentLine = '';
+                        combineDepth = 0;
+                        combineArgCount = [];
                     } else if (token.type === 'comment') {
-                        // Comment token - add as-is
                         currentLine += token.value + ' ';
                     } else if (token.type === 'module_def') {
-                        // Module definition: [name] =
                         currentLine += '[' + token.value + '] = ';
                     } else if (token.type === 'module_ref') {
-                        // Module reference: [name]
                         currentLine += '[' + token.value + '] ';
+                    } else if (token.type === 'ssc_fm') {
+                        // SSC.FMname dot-notation — render with comma separation inside COMBINE
+                        if (combineDepth > 0) {
+                            const depth = combineArgCount.length - 1;
+                            if (combineArgCount[depth] > 0) currentLine += ', ';
+                            combineArgCount[depth]++;
+                            currentLine += token.value;
+                        } else {
+                            currentLine += token.value + ' ';
+                        }
                     } else {
-                        // Suppress space after COMBINE when immediately followed by '('
+                        // Entering COMBINE( ?
+                        if (token.value === '(' && prevToken && prevToken.value === 'COMBINE') {
+                            combineDepth++;
+                            combineArgCount.push(0);
+                            currentLine += '(';
+                            continue;
+                        }
+                        // Closing a COMBINE group?
+                        if (token.value === ')' && combineDepth > 0) {
+                            combineDepth--;
+                            combineArgCount.pop();
+                            currentLine += ')';
+                            if (nextToken && nextToken.value !== ')' && nextToken.type !== 'eol') currentLine += ' ';
+                            continue;
+                        }
+                        if (combineDepth > 0) {
+                            // Inside COMBINE: separate args with ", "
+                            const depth = combineArgCount.length - 1;
+                            if (combineArgCount[depth] > 0) currentLine += ', ';
+                            combineArgCount[depth]++;
+                            currentLine += token.value;
+                            continue;
+                        }
+                        // Normal token outside COMBINE
                         const noTrailingSpace = token.value === 'COMBINE' && nextToken && nextToken.value === '(';
                         currentLine += token.value + (noTrailingSpace ? '' : ' ');
                     }
@@ -2509,6 +2545,21 @@
                             else if (!isNaN(word) && word !== '') {
                                 newTokens.push({ type: 'number', value: word, deletable: true });
                             }
+                            // Check if it's an SSC.FMname dot-notation reference (e.g. PUMP-A.FM1)
+                            // Must be checked BEFORE plain SSC so PUMP-A.FM1 doesn't match PUMP-A
+                            else if (word.includes('.') && (() => {
+                                const dotIdx = word.indexOf('.');
+                                const sscPart = word.slice(0, dotIdx);
+                                const fmPart  = word.slice(dotIdx + 1);
+                                return fmPart.length > 0 && sscsInSystem.find(s => s.name.toUpperCase() === sscPart.toUpperCase());
+                            })()) {
+                                const dotIdx = word.indexOf('.');
+                                const sscPart = word.slice(0, dotIdx);
+                                const fmPart  = word.slice(dotIdx + 1);
+                                const matchingSSC = sscsInSystem.find(s => s.name.toUpperCase() === sscPart.toUpperCase());
+                                // value is the canonical display form; sscName/fmPart are for resolution
+                                newTokens.push({ type: 'ssc_fm', value: matchingSSC.name + '.' + fmPart, sscName: matchingSSC.name, fmPart: fmPart, deletable: true });
+                            }
                             // Check if it's an SSC
                             else if (sscsInSystem.find(ssc => ssc.name.toUpperCase() === wordUpper)) {
                                 const matchingSSC = sscsInSystem.find(ssc => ssc.name.toUpperCase() === wordUpper);
@@ -2576,6 +2627,10 @@
             const handleScroll = (e) => {
                 if (lineNumbersRef.current) {
                     lineNumbersRef.current.scrollTop = e.target.scrollTop;
+                }
+                if (backdropRef.current) {
+                    backdropRef.current.scrollTop = e.target.scrollTop;
+                    backdropRef.current.scrollLeft = e.target.scrollLeft;
                 }
             };
             
@@ -2681,25 +2736,65 @@
                         ))}
                     </div>
                     
-                    {/* Text editor */}
-                    <textarea
-                        ref={textareaRef}
-                        value={text}
-                        onChange={handleTextChange}
-                        onScroll={handleScroll}
-                        className={`flex-1 p-2 resize-none outline-none ${fontSizeClass}`}
-                        style={{
-                            backgroundColor: backgroundStyle.backgroundColor,
-                            color: backgroundStyle.color,
-                            lineHeight: lineHeight,
-                            fontFamily: 'monospace',
-                            whiteSpace: 'pre-wrap',
-                            wordWrap: 'break-word',
-                            overflowWrap: 'break-word'
-                        }}
-                        placeholder="Enter system logic expressions here..."
-                        spellCheck={false}
-                    />
+                    {/* Text editor with comment highlighting */}
+                    {/* Technique: backdrop div with identical metrics sits behind the textarea.
+                        The backdrop renders each line in its correct color (green for comments,
+                        normal text color for everything else). The textarea sits on top with
+                        color:transparent so only the backdrop text is visible; caretColor
+                        preserves the blinking cursor. Both layers scroll together. */}
+                    <div className="flex-1 relative overflow-hidden">
+                        <div
+                            ref={backdropRef}
+                            aria-hidden="true"
+                            className={`absolute inset-0 p-2 pointer-events-none select-none ${fontSizeClass}`}
+                            style={{
+                                fontFamily: 'monospace',
+                                lineHeight: lineHeight,
+                                whiteSpace: 'pre-wrap',
+                                wordWrap: 'break-word',
+                                overflowWrap: 'break-word',
+                                overflow: 'hidden',
+                                scrollbarWidth: 'none',
+                            }}
+                        >
+                            {(() => {
+                                const isDark = backgroundStyle.backgroundColor === '#1f2937';
+                                const commentColor = isDark ? '#4ade80' : '#15803d';
+                                const normalColor = backgroundStyle.color;
+                                return text.split('\n').map((line, i) => {
+                                    const isComment = line.trimStart().startsWith('#');
+                                    return (
+                                        <span key={i} style={{
+                                            display: 'block',
+                                            lineHeight: lineHeight,
+                                            color: isComment ? commentColor : normalColor,
+                                        }}>
+                                            {line || '\u200b'}
+                                        </span>
+                                    );
+                                });
+                            })()}
+                        </div>
+                        <textarea
+                            ref={textareaRef}
+                            value={text}
+                            onChange={handleTextChange}
+                            onScroll={handleScroll}
+                            className={`absolute inset-0 w-full h-full p-2 resize-none outline-none ${fontSizeClass}`}
+                            style={{
+                                backgroundColor: 'transparent',
+                                color: 'transparent',
+                                caretColor: backgroundStyle.color,
+                                lineHeight: lineHeight,
+                                fontFamily: 'monospace',
+                                whiteSpace: 'pre-wrap',
+                                wordWrap: 'break-word',
+                                overflowWrap: 'break-word',
+                            }}
+                            placeholder="Enter system logic expressions here..."
+                            spellCheck={false}
+                        />
+                    </div>
                 </div>
             );
         }
@@ -3197,7 +3292,7 @@
                 
                 const exportData = {
                     format: 'KUREAS-SYS-FMEA',
-                    version: '1.3',
+                    version: '1.4',
                     exportedAt: new Date().toISOString(),
                     systemName: systemName || '',
                     components: sscsToExport.map(ssc => ({
@@ -3248,6 +3343,11 @@
                     onClose();
                     return;
                 }
+                if (format === 'saphireFAS') {
+                    exportSAPHIREFAS();
+                    onClose();
+                    return;
+                }
                 if (format === 'knowRPT') {
                     await exportKNOWRPT();
                     onClose();
@@ -3258,6 +3358,115 @@
                 else if (format === 'fmeaDB') exportFmeaDB();
                 onClose();
             };
+
+            // ── SAPHIRE Post-Processing Rules (.fas) export ──────────────────────────
+            function exportSAPHIREFAS() {
+                if (!settings || settings.ccfModel !== 'beta') {
+                    alert('CCF model is not set to Beta Factor. Enable CCF in System Settings before exporting post-processing rules.');
+                    return;
+                }
+
+                const toFTLName = (label) => (label||'EVT').replace(/\s+/g,'_').toUpperCase().substring(0,48);
+                const projName = (systemName||'PROJECT').toUpperCase().substring(0,48);
+
+                // Build a flat list of all candidate events from allSSCs.
+                // Each entry: { eventName, componentType, failureMode, prob, dist }
+                // SSCs with multiple failure modes contribute one entry per FM.
+                const candidates = [];
+                for (const ssc of allSSCs) {
+                    const fms = (ssc.failureModes||[]).filter(fm => fm.applicable !== false && fm.probabilityType !== 'screened');
+                    if (fms.length === 0) continue;
+                    const componentType = ssc.label || '';
+                    const getProb = (fm) => {
+                        if (fm.probabilityType === 'qualitative') {
+                            const map = { low: parseFloat(settings?.qualitativeProbLow||'1E-5'), medium: parseFloat(settings?.qualitativeProbMedium||'1E-3'), high: parseFloat(settings?.qualitativeProbHigh||'1E-1') };
+                            return map[fm.qualitativeLevel||'medium'] ?? 1e-3;
+                        }
+                        if (fm.probabilityType === 'probability') {
+                            const model = fm.failureModel || '0';
+                            if (model === '1') { const dp=parseFloat(fm.demandProb); const dN=parseFloat(fm.demandN)||1; if(!isNaN(dp)&&dp>=0&&dN>=1) return 1-Math.pow(1-dp,dN); }
+                            if (model === '2') { const lam=parseFloat(fm.lambda)||0; const mt=parseFloat(fm.missionTime)||0; if(lam>0&&mt>0) return 1-Math.exp(-lam*mt); }
+                            if (model === '3') { const lam=parseFloat(fm.lambda)||0; const ii=parseFloat(fm.inspInterval)||0; if(lam>0&&ii>0){const li=lam*ii;return 1+(Math.exp(-li)-1)/li;} }
+                            if (model === '4') { const lam=parseFloat(fm.lambda)||0; const mt=parseFloat(fm.missionTime)||0; const tau=parseFloat(fm.tauRepair)||0; if(lam>0&&mt>0&&tau>0) return (lam*tau)*(1-Math.exp(-(lam+tau)*mt))/(1+lam*tau); }
+                            return parseFloat(fm.data?.mean||0)||0;
+                        }
+                        return parseFloat(fm.data?.mean||0)||0;
+                    };
+                    if (fms.length > 1) {
+                        fms.forEach((fm, i) => {
+                            const modeName = (fm.mode||`FM${i+1}`).replace(/\s+/g,'_');
+                            const eventName = `${ssc.name}__${modeName}`;
+                            const prob = getProb(fm);
+                            const dist = fm.data?.distribution_type || fm.data?.distributionType || 'CNI';
+                            candidates.push({ eventName, componentType, failureMode: modeName, prob, dist });
+                        });
+                    } else {
+                        const prob = getProb(fms[0]);
+                        const dist = fms[0].data?.distribution_type || fms[0].data?.distributionType || 'CNI';
+                        candidates.push({ eventName: ssc.name, componentType, failureMode: '', prob, dist });
+                    }
+                }
+
+                // Group candidates by CCF signature: componentType + failureMode + prob (1 sig fig) + dist
+                const sigGroups = {};
+                for (const c of candidates) {
+                    if (c.prob === null || c.prob === undefined || c.prob === 0) continue;
+                    const probKey = c.prob.toExponential(1);
+                    const sig = `${c.componentType}|${c.failureMode}|${probKey}|${c.dist}`;
+                    if (!sigGroups[sig]) sigGroups[sig] = [];
+                    sigGroups[sig].push(c);
+                }
+
+                // Build rules for any group with 2+ members
+                const rules = [];
+                for (const [sig, group] of Object.entries(sigGroups)) {
+                    if (group.length < 2) continue;
+                    const eventNames = group.map(c => c.eventName);
+                    // Derive CCF event name: common prefix + failureMode + _CCF
+                    const sscNames = group.map(c => c.eventName.includes('__') ? c.eventName.split('__')[0] : c.eventName);
+                    let pfx = sscNames[0];
+                    for (let i = 1; i < sscNames.length; i++) {
+                        while (!sscNames[i].startsWith(pfx) && pfx.length > 0) pfx = pfx.slice(0,-1);
+                    }
+                    pfx = pfx.replace(/[_\d]+$/, '');
+                    if (pfx.length < 1) pfx = group[0].componentType || 'CCF';
+                    const fm = group[0].failureMode;
+                    const ccfName = toFTLName(fm ? `${pfx}_${fm}_CCF` : `${pfx}_CCF`);
+                    rules.push({ group: eventNames.map(toFTLName), ccfName });
+                }
+
+                if (rules.length === 0) {
+                    alert('No CCF candidate groups found. Ensure multiple SSCs share the same component type, failure mode, probability, and distribution.');
+                    return;
+                }
+
+                const lines = [];
+                lines.push(`${projName} =`);
+                lines.push('');
+                lines.push('* SAPHIRE Fault Tree Post-Processing Rules');
+                lines.push('* Generated by KUREAS-SYS on ' + new Date().toISOString());
+                lines.push('* CCF substitution rules — one rule per group of SSCs meeting CCF criteria.');
+                lines.push('');
+                for (const { group, ccfName } of rules) {
+                    lines.push(`* CCF rule: ${ccfName} (replaces: ${group.join(', ')})`);
+                    lines.push(`if (${group.join(' * ')}) then`);
+                    lines.push('  CopyRoot;');
+                    group.forEach(n => lines.push(`  DeleteEvent = ${n};`));
+                    lines.push(`  AddEvent = ${ccfName};`);
+                    lines.push('endif');
+                    lines.push('');
+                }
+
+                const text = lines.join('\r\n');
+                const blob = new Blob([text], {type:'text/plain'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const safeName = (systemName||'project').replace(/[^a-zA-Z0-9_\-]/g,'_');
+                a.href = url;
+                a.download = `${safeName}.fas`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
 
             // ── KUREAS-FTL (.KNOW_FTL) export ─────────────────────────────────────
             function exportKUREASFTL() {
@@ -3355,6 +3564,18 @@
                 // Expand multi-mode SSCs into OR gates
                 const expandMultiMode = (node) => {
                     if (node.type === 'BASIC') {
+                        // SSC.FMname dot-notation: rewrite to SSC__FM key
+                        if (node.label.includes('.') && !node.label.includes('__')) {
+                            const dotIdx = node.label.indexOf('.');
+                            const sscPart = node.label.slice(0, dotIdx);
+                            const fmPart  = node.label.slice(dotIdx + 1).replace(/\s+/g, '_');
+                            node = { ...node, label: sscPart + '__' + fmPart };
+                        }
+                        if (node.label.includes('__')) {
+                            const fmData = basicEventData[node.label];
+                            if (fmData) node.probability = fmData.probability;
+                            return node;
+                        }
                         const ed = basicEventData[node.label];
                         if (ed?.hasMultipleModes) {
                             return { id: `or_${node.label}`, type: 'OR', label: `${node.label} fails`, children: ed.failureModeNames.map((n,i) => ({ id: `${node.label}_fm${i}`, type: 'BASIC', label: n, description: basicEventData[n]?.description||'' })) };
@@ -3367,7 +3588,7 @@
 
                 // Build label→FTL-name map so cut sets and descriptions use consistent names
                 // FTL EVENT names: spaces→underscore, truncated to 24 chars
-                const toFTLName = (label) => (label || 'EVT').replace(/\s+/g, '_').substring(0, 24);
+                const toFTLName = (label) => (label || 'EVT').replace(/\s+/g, '_').substring(0, 48);
 
                 // Convert SYS tree nodes → FTL-format nodes
                 // Preserve _origLabel on EVENT nodes so we can look up descriptions/probabilities
@@ -3445,7 +3666,11 @@
                             Calc_Prob: ccfData.probability,
                             Description: ccfData.description,
                             IsCCF: true,
-                            CCFGroup: ccfData.ccfGroup
+                            CCFGroup: ccfData.ccfGroup,
+                            FailureModel: '0',
+                            Distribution: (ccfData.distributionType || 'cni').toLowerCase(),
+                            DistEF: ccfData.errorFactor || ccfData.data?.distribution_shape_parameter || 3,
+                            ccfBeta: ccfData.ccfBeta
                         };
                         eventDescriptions[ftlName] = ccfData.description;
                     }
@@ -3492,7 +3717,7 @@
 
                 const projectData = {
                     format: 'KUREAS-FTL',
-                    version: '1.3',
+                    version: '1.4',
                     savedAt: new Date().toISOString(),
                     projectName: systemName || 'System',
                     projectDescription: `Fault tree exported from KUREAS-SYS for system: ${systemName||'System'}`,
@@ -3862,7 +4087,7 @@
                         format: 'KUREAS-REPORT',
                         version: '1.0',
                         sourceModule: 'KUREAS-SYS',
-                        appVersion: '1.3',
+                        appVersion: '1.4',
                         exportedAt
                     },
                     // ── Rendering contract ─────────────────────────────────────────
@@ -4134,6 +4359,11 @@
                     label: 'KUREAS-FTL Fault Tree (.KNOW_FTL)',
                     color: '#065f46',
                     desc: 'Native KUREAS-FTL project file (JSON). Includes the system fault tree structure, basic event probabilities and descriptions, and pre-computed minimal cut sets. Load directly in KUREAS-FTL.'
+                },
+                saphireFAS: {
+                    label: 'SAPHIRE Post-Processing Rules (.fas)',
+                    color: '#b91c1c',
+                    desc: 'SAPHIRE fault tree post-processing rules file. Generates CCF substitution rules derived from the current CCF expansion settings: for each CCF group found in the minimal cut sets, a rule is written that copies the cut set, deletes the independent events, and adds the CCF event.'
                 }
             };
 
@@ -4168,7 +4398,7 @@
                             </div>
 
                             {/* Component selection — not applicable for KNOW_FTL or KNOW_RPT */}
-                            {format !== 'knowFTL' && format !== 'knowRPT' ? (
+                            {format !== 'knowFTL' && format !== 'knowRPT' && format !== 'saphireFAS' ? (
                             <div>
                                 <div style={{fontSize:'11px',fontWeight:'700',color:'#6b7280',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'0.05em',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                                     <span>Components to Export</span>
@@ -4198,6 +4428,8 @@
                             <div style={{padding:'14px 16px',background: format==='knowRPT' ? '#fffbeb' : '#f0fdf4',border:`1px solid ${format==='knowRPT'?'#fde68a':'#bbf7d0'}`,borderRadius:'8px',fontSize:'12px',color: format==='knowRPT'?'#92400e':'#166534'}}>
                                 {format === 'knowRPT'
                                     ? <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-REPORT package captures all system data: SSC table, failure modes, FMEA diagrams, fault tree, cut sets, importance measures, and P&amp;ID.</>
+                                    : format === 'saphireFAS'
+                                    ? <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — Post-processing rules are generated from the full system fault tree and CCF expansion settings. The component selection above does not apply.</>
                                     : <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-FTL file is built from the complete system fault tree and includes all basic events derived from the SYSTEM WORKS expression. The component selection above does not apply.</>
                                 }
                             </div>
@@ -4208,7 +4440,7 @@
                         <div style={{borderTop:'1px solid #e5e7eb',padding:'12px 20px',display:'flex',justifyContent:'flex-end',gap:'8px',flexShrink:0}}>
                             <button onClick={onClose} style={{padding:'8px 18px',background:'#f3f4f6',border:'1px solid #d1d5db',borderRadius:'6px',cursor:'pointer',fontSize:'13px',fontWeight:'600',color:'#374151'}}>Cancel</button>
                             <button onClick={handleExport} style={{padding:'8px 20px',background: format==='knowRPT'?'#b45309':'#1e3a8a',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'13px',fontWeight:'700',color:'white'}}>
-                                &#x2193; Export {(format==='knowFTL'||format==='knowRPT') ? '' : selectedSSCs.size > 0 ? `(${selectedSSCs.size})` : ''}
+                                &#x2193; Export {(format==='knowFTL'||format==='knowRPT'||format==='saphireFAS') ? '' : selectedSSCs.size > 0 ? `(${selectedSSCs.size})` : ''}
                             </button>
                         </div>
                     </div>
@@ -4508,6 +4740,18 @@
                     // Transform basic events for SSCs with multiple failure modes into OR gates
                     const expandMultiModeSscs = (node) => {
                         if (node.type === 'BASIC') {
+                            // SSC.FMname dot-notation: rewrite to SSC__FM key
+                            if (node.label.includes('.') && !node.label.includes('__')) {
+                                const dotIdx = node.label.indexOf('.');
+                                const sscPart = node.label.slice(0, dotIdx);
+                                const fmPart  = node.label.slice(dotIdx + 1).replace(/\s+/g, '_');
+                                node = { ...node, label: sscPart + '__' + fmPart };
+                            }
+                            if (node.label.includes('__')) {
+                                const fmData = basicEventData[node.label];
+                                if (fmData) node.probability = fmData.probability;
+                                return node;
+                            }
                             const eventData = basicEventData[node.label];
                             if (eventData && eventData.hasMultipleModes && eventData.failureModeNames) {
                                 const ssc = sscsInSystem.find(s => s.name === node.label);
@@ -15323,7 +15567,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             const rect = container.getBoundingClientRect();
                             const relativeY = e.clientY - rect.top;
                             const percentage = (relativeY / rect.height) * 100;
-                            const constrainedPercentage = Math.max(30, Math.min(80, percentage));
+                            const constrainedPercentage = Math.max(15, Math.min(90, percentage));
                             setPaneCHeight(constrainedPercentage);
                         }
                     }
@@ -15680,7 +15924,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 const $SCHEMA = {
                     format: 'KUREAS-SYS',
                     version: '1.0',
-                    appVersion: '1.3',
+                    appVersion: '1.4',
                     savedAt: new Date().toISOString(),
                     generator: 'KUREAS-SYS',
                     description: 'System Knowledge Management / Reliability Analysis file for the KUREAS suite',
@@ -16141,7 +16385,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             const k = parseInt(nToken.value, 10);
                             const itemTokens = innerTokens.filter(t =>
                                 t !== nToken &&
-                                (t.type === 'ssc' || t.type === 'text' || t.type === 'identifier' ||
+                                (t.type === 'ssc' || t.type === 'ssc_fm' || t.type === 'text' || t.type === 'identifier' ||
                                  t.type === 'unknown' || t.type === 'gateRef' || t.type === 'supercomp' || t.type === 'boundary')
                             );
                             if (itemTokens.length === 0) {
@@ -16187,6 +16431,10 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         if (!definedModules.has(token.value.toUpperCase())) {
                             unknowns.add('[' + token.value + ']');
                         }
+                        return;
+                    }
+                    if (token.type === 'ssc_fm') {
+                        // SSC.FMname — validated during tokenization; always accepted
                         return;
                     }
                     if (token.type === 'identifier' || token.type === 'ssc' || token.type === 'unknown' || token.type === 'text') {
@@ -16608,6 +16856,18 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     // Expand multi-mode SSCs
                     const expandMultiModeSscs = (node) => {
                         if (node.type === 'BASIC') {
+                            // SSC.FMname dot-notation: rewrite to SSC__FM key
+                            if (node.label.includes('.') && !node.label.includes('__')) {
+                                const dotIdx = node.label.indexOf('.');
+                                const sscPart = node.label.slice(0, dotIdx);
+                                const fmPart  = node.label.slice(dotIdx + 1).replace(/\s+/g, '_');
+                                node = { ...node, label: sscPart + '__' + fmPart };
+                            }
+                            if (node.label.includes('__')) {
+                                const fmData = linkedBasicEventData[node.label];
+                                if (fmData) node.probability = fmData.probability;
+                                return node;
+                            }
                             const eventData = linkedBasicEventData[node.label];
                             if (eventData && eventData.hasMultipleModes && eventData.failureModeNames) {
                                 return {
@@ -18129,6 +18389,10 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     } else if ((token.type === 'identifier' || token.type === 'text' || token.type === 'unknown' || token.type === 'ssc') && 
                                moduleGates[token.value.toUpperCase()]) {
                         expandedTokens.push({ type: 'gateRef', value: moduleGates[token.value.toUpperCase()] });
+                    } else if (token.type === 'ssc_fm') {
+                        // SSC.FMname: resolve to the specific FM basic event key (SSC__FMname)
+                        const fmKey = token.sscName + '__' + token.fmPart.replace(/\s+/g, '_');
+                        expandedTokens.push({ type: 'text', value: fmKey });
                     } else {
                         expandedTokens.push(token);
                     }
@@ -18999,6 +19263,20 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         // This is the same transformation done in FailureAnalysisModal
                         const expandMultiModeSscs = (node) => {
                             if (node.type === 'BASIC') {
+                                // SSC.FMname dot-notation (e.g. 'SSCA.FM1'): rewrite label to SSC__FM1 key
+                                if (node.label.includes('.') && !node.label.includes('__')) {
+                                    const dotIdx = node.label.indexOf('.');
+                                    const sscPart = node.label.slice(0, dotIdx);
+                                    const fmPart  = node.label.slice(dotIdx + 1).replace(/\s+/g, '_');
+                                    const fmKey   = sscPart + '__' + fmPart;
+                                    node = { ...node, label: fmKey };
+                                }
+                                // SSC.FM dot-notation resolved to __: already a specific FM key — skip OR-expansion
+                                if (node.label.includes('__')) {
+                                    const fmData = basicEventData[node.label];
+                                    if (fmData) node.probability = fmData.probability;
+                                    return node;
+                                }
                                 const eventData = basicEventData[node.label];
                                 if (eventData && eventData.hasMultipleModes && eventData.failureModeNames) {
                                     // Replace this basic event with an OR gate of failure modes
@@ -19172,6 +19450,19 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         }
                         const expandMultiModeSscs = (node) => {
                             if (node.type === 'BASIC') {
+                                // SSC.FMname dot-notation (e.g. 'SSCA.FM1'): rewrite label to SSC__FM1 key
+                                if (node.label.includes('.') && !node.label.includes('__')) {
+                                    const dotIdx = node.label.indexOf('.');
+                                    const sscPart = node.label.slice(0, dotIdx);
+                                    const fmPart  = node.label.slice(dotIdx + 1).replace(/\s+/g, '_');
+                                    node = { ...node, label: sscPart + '__' + fmPart };
+                                }
+                                // SSC__FM key: already a specific FM — skip OR-expansion
+                                if (node.label.includes('__')) {
+                                    const fmData = basicEventData[node.label];
+                                    if (fmData) node.probability = fmData.probability;
+                                    return node;
+                                }
                                 const ed = basicEventData[node.label];
                                 if (ed && ed.hasMultipleModes && ed.failureModeNames) {
                                     const ssc = sscs.find(s => s.name === node.label);
@@ -20516,6 +20807,18 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                             // Transform basic events for SSCs with multiple failure modes into OR gates
                             const expandMultiModeSscs = (node) => {
                                 if (node.type === 'BASIC') {
+                                    // SSC.FMname dot-notation: rewrite to SSC__FM key
+                                    if (node.label.includes('.') && !node.label.includes('__')) {
+                                        const dotIdx = node.label.indexOf('.');
+                                        const sscPart = node.label.slice(0, dotIdx);
+                                        const fmPart  = node.label.slice(dotIdx + 1).replace(/\s+/g, '_');
+                                        node = { ...node, label: sscPart + '__' + fmPart };
+                                    }
+                                    if (node.label.includes('__')) {
+                                        const fmData = basicEventData[node.label];
+                                        if (fmData) node.probability = fmData.probability;
+                                        return node;
+                                    }
                                     const eventData = basicEventData[node.label];
                                     if (eventData && eventData.hasMultipleModes && eventData.failureModeNames) {
                                         // Replace this basic event with an OR gate of failure modes
@@ -20696,7 +20999,23 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                         ccfEvents: ccfBasicEvents
                     };
                 }, [failureLogicTree, basicEventData, sscsInSystem, settings]);
-                
+
+                // Importance measures — memoized, only rebuilt when cut sets/probabilities change
+                const importanceMeasures = React.useMemo(() => {
+                    if (!mcubValue || cutSets.length === 0) return [];
+                    const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
+                    if (validCutSets.length === 0) return [];
+                    const combinedEventData = { ...basicEventData, ...ccfEvents };
+                    const engine = buildImportanceEngine(validCutSets, combinedEventData, mcubValue, settings);
+                    const allEvents = new Set();
+                    validCutSets.forEach(cs => cs.events.forEach(e => allEvents.add(e)));
+                    return Array.from(allEvents).map(eventName => {
+                        const r = engine(eventName);
+                        if (!r) return null;
+                        return { ...r, event: r.name };
+                    }).filter(m => m !== null);
+                }, [cutSets, mcubValue, basicEventData, ccfEvents, settings]);
+
                 const toggleNode = (nodeId) => {
                     setExpandedNodes(prev => {
                         const newSet = new Set(prev);
@@ -21251,9 +21570,9 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                             />
                                         ) : (
                                             <div>
-                                                {/* Calculate importance measures */}
+                                                {/* Importance measures from useMemo — not recalculated on each render */}
                                                 {(() => {
-                                                    if (!mcubValue || cutSets.length === 0) {
+                                                    if (!mcubValue || cutSets.length === 0 || importanceMeasures.length === 0) {
                                                         return (
                                                             <div className="text-center p-8 text-gray-500">
                                                                 <p>No importance measures available</p>
@@ -21261,22 +21580,6 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                                             </div>
                                                         );
                                                     }
-                                                    
-                                                    // Create combined event data including CCF events
-                                                    const combinedEventData = { ...basicEventData, ...ccfEvents };
-
-                                                    // Build importance engine once — BDD tree built once / MCUB products precomputed
-                                                    const impEngine = buildImportanceEngine(cutSets, combinedEventData, mcubValue, settings);
-                                                    const allEvents = new Set();
-                                                    cutSets.forEach(cs => cs.events.forEach(e => allEvents.add(e)));
-
-                                                    // Calculate RIR, RRR, PC, SWIM for each event
-                                                    const importanceMeasures = Array.from(allEvents).map(eventName => {
-                                                        const r = impEngine(eventName);
-                                                        if (!r) return null;
-                                                        // FailureAnalysisModal uses 'event' key for the name field
-                                                        return { ...r, event: r.name };
-                                                    }).filter(m => m !== null);
                                                     
                                                     // Get axis labels and data based on selection
                                                     const getAxisLabel = (axis) => {
@@ -21299,31 +21602,22 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                                         }
                                                     };
                                                     
-                                                    // Find max values for scaling - round to next half-decade
+                                                    // Find max values — use rawMax * 1.1 for tight, data-driven axes
                                                     const rawMaxX = Math.max(...importanceMeasures.map(m => getAxisValue(m, plotXAxis)));
                                                     const rawMaxY = Math.max(...importanceMeasures.map(m => getAxisValue(m, plotYAxis)));
-                                                    
-                                                    // Function to get next half-decade value (1, 5, 10, 50, 100, 500, 1000, etc.)
-                                                    const getNextDecade = (value) => {
-                                                        if (value <= 1) return 1;
-                                                        if (value <= 5) return 5;
-                                                        if (value <= 10) return 10;
-                                                        if (value <= 50) return 50;
-                                                        if (value <= 100) return 100;
-                                                        if (value <= 500) return 500;
-                                                        if (value <= 1000) return 1000;
-                                                        if (value <= 5000) return 5000;
-                                                        if (value <= 10000) return 10000;
-                                                        // For larger values, round to next 5*10^n
-                                                        const log = Math.log10(value);
-                                                        const exp = Math.floor(log);
-                                                        const mantissa = value / Math.pow(10, exp);
-                                                        if (mantissa <= 5) return 5 * Math.pow(10, exp);
-                                                        return Math.pow(10, exp + 1);
+
+                                                    // Scale each axis to data * 1.1 so points fill the plot area
+                                                    const scaleAxis = (rawMax, axis) => {
+                                                        if (!isFinite(rawMax) || rawMax <= 0) {
+                                                            return (axis === 'pc' || axis === 'swim') ? 1 : 10;
+                                                        }
+                                                        const padded = rawMax * 1.1;
+                                                        if (axis === 'pc') return Math.min(padded, 1.1); // PC is bounded 0–1
+                                                        return padded;
                                                     };
-                                                    
-                                                    const maxX = getNextDecade(rawMaxX);
-                                                    const maxY = getNextDecade(rawMaxY);
+
+                                                    const maxX = scaleAxis(rawMaxX, plotXAxis);
+                                                    const maxY = scaleAxis(rawMaxY, plotYAxis);
                                                     
                                                     const plotHeight = 400;
                                                     const margin = { top: 50, right: 20, bottom: 60, left: 60 }; // Increased top margin
@@ -21626,9 +21920,77 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                 );
             }
             
+            // ── Boolean filter parser for cut sets ──────────────────────────────────────
+            function parseCutSetFilterExpr(exprStr) {
+                const raw = exprStr.trim();
+                if (!raw) return null;
+                const tokens = [];
+                let i = 0;
+                while (i < raw.length) {
+                    if (/\s/.test(raw[i])) { i++; continue; }
+                    if (raw[i] === '(') { tokens.push({ type: 'LPAREN' }); i++; continue; }
+                    if (raw[i] === ')') { tokens.push({ type: 'RPAREN' }); i++; continue; }
+                    let j = i;
+                    while (j < raw.length && !/[\s()]/.test(raw[j])) j++;
+                    const word = raw.slice(i, j);
+                    const up = word.toUpperCase();
+                    if (up === 'OR')       tokens.push({ type: 'OR' });
+                    else if (up === 'AND') tokens.push({ type: 'AND' });
+                    else if (up === 'NOT') tokens.push({ type: 'NOT' });
+                    else                   tokens.push({ type: 'TOKEN', value: word });
+                    i = j;
+                }
+                let pos = 0;
+                const peek    = () => tokens[pos];
+                const consume = () => tokens[pos++];
+                const parseExpr = () => parseOr();
+                const parseOr = () => {
+                    let left = parseAnd();
+                    while (peek() && peek().type === 'OR') { consume(); const right = parseAnd(); const L=left,R=right; left=(s)=>L(s)||R(s); }
+                    return left;
+                };
+                const parseAnd = () => {
+                    let left = parseNot();
+                    while (peek() && peek().type === 'AND') { consume(); const right = parseNot(); const L=left,R=right; left=(s)=>L(s)&&R(s); }
+                    return left;
+                };
+                const parseNot = () => {
+                    if (peek() && peek().type === 'NOT') { consume(); const inner = parseNot(); return (s)=>!inner(s); }
+                    return parseAtom();
+                };
+                const parseAtom = () => {
+                    const t = peek();
+                    if (!t) throw new Error('Unexpected end of expression');
+                    if (t.type === 'LPAREN') {
+                        consume();
+                        const inner = parseExpr();
+                        if (!peek() || peek().type !== 'RPAREN') throw new Error('Missing closing parenthesis');
+                        consume();
+                        return inner;
+                    }
+                    if (t.type === 'TOKEN') {
+                        consume();
+                        const pattern = t.value.toLowerCase();
+                        return (s) => { for (const e of s) { if (e.includes(pattern)) return true; } return false; };
+                    }
+                    throw new Error(`Unexpected token: ${t.type}`);
+                };
+                try {
+                    const predicate = parseExpr();
+                    if (pos < tokens.length) throw new Error('Unexpected token after expression');
+                    return { predicate, error: null };
+                } catch(err) {
+                    return { predicate: null, error: err.message };
+                }
+            }
+
             // Cut Set Viewer Component (Reusable)
             function CutSetViewer({ cutSets, fontSizeClass, backgroundStyle, settings, mcubValue, quantMethod = 'mcub', ccfEvents = {}, basicEventData = {}, highlightedEvent, setHighlightedEvent }) {
                 const [sortBy, setSortBy] = useState('probability'); // 'probability' | 'order'
+                const [filterExpr, setFilterExpr] = useState('');
+                const [filterMode, setFilterMode] = useState('show'); // 'show' | 'hide'
+                const [activeFilter, setActiveFilter] = useState(null);
+                const [filterError, setFilterError] = useState(null);
                 
                 const sortedCutSets = [...cutSets].sort((a, b) => {
                     if (sortBy === 'probability') {
@@ -21648,25 +22010,54 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                 }, 0);
                 
                 const probDisplayMode = settings?.showProbability || '1';
-                
+
+                // Filter apply/clear handlers
+                const applyFilter = () => {
+                    if (!filterExpr.trim()) { setActiveFilter(null); setFilterError(null); return; }
+                    const result = parseCutSetFilterExpr(filterExpr);
+                    if (result.error) { setFilterError(result.error); return; }
+                    setFilterError(null);
+                    setActiveFilter({ predicate: result.predicate, expr: filterExpr, mode: filterMode });
+                };
+                const clearFilter = () => {
+                    setFilterExpr('');
+                    setActiveFilter(null);
+                    setFilterError(null);
+                };
+
+                // Apply active filter to the sorted list
+                const visibleCutSets = activeFilter
+                    ? sortedCutSets.filter(cs => {
+                        const eventSet = new Set(cs.events.map(e => e.toLowerCase()));
+                        const matched = activeFilter.predicate(eventSet);
+                        return activeFilter.mode === 'show' ? matched : !matched;
+                    })
+                    : sortedCutSets;
+
+                const filterMatchCount = activeFilter
+                    ? sortedCutSets.filter(cs => {
+                        const eventSet = new Set(cs.events.map(e => e.toLowerCase()));
+                        return activeFilter.predicate(eventSet);
+                    }).length
+                    : null;
+
                 return (
                     <div>
                         {/* Header with controls */}
-                        <div className="mb-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className={`${fontSizeClass} font-semibold`}>
-                                        Total Cut Sets: {cutSets.length}
-                                        {Object.keys(ccfEvents || {}).length > 0 && (
-                                            <span className="ml-2 text-pink-600 text-xs font-normal">
-                                                ({cutSets.filter(cs => cs.hasCCF).length} with CCF)
-                                            </span>
-                                        )}
-                                    </div>
+                        <div className="mb-3 space-y-2">
+                            {/* Row 1: cut set count + CCF info inline + sort selector */}
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                                <div className={`${fontSizeClass} font-semibold flex items-center flex-wrap gap-x-2`}>
+                                    <span>Total Cut Sets: {cutSets.length.toLocaleString()}</span>
+                                    {Object.keys(ccfEvents || {}).length > 0 && (
+                                        <span className="text-pink-600 text-xs font-normal">
+                                            ({cutSets.filter(cs => cs.hasCCF).length} with CCF)
+                                        </span>
+                                    )}
                                     {settings?.ccfModel === 'beta' && (
-                                        <div className="text-xs text-pink-600 mt-1">
-                                            CCF Model: Beta Factor (&#946; = {settings.ccfBetaFactor || '0.02'})
-                                        </div>
+                                        <span className="text-pink-600 text-xs font-normal">
+                                            &mdash; CCF Model: Beta Factor (&#946;&thinsp;=&thinsp;{settings.ccfBetaFactor || '0.02'})
+                                        </span>
                                     )}
                                 </div>
                                 <select
@@ -21682,62 +22073,160 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                     <option value="order">Sort by Order</option>
                                 </select>
                             </div>
-                            
-                            {/* System Failure Probability Display */}
+
+                            {/* Green box: primary probability + comparison rows */}
                             {mcubValue !== null && (
-                                <div className="p-3 border-2 border-green-500 rounded bg-green-50" style={{
+                                <div className="p-3 border-2 rounded" style={{
                                     borderColor: '#22c55e',
                                     backgroundColor: settings?.background === 'dark' ? '#064e3b' : '#f0fdf4'
                                 }}>
-                                    <div className={`${fontSizeClass} font-bold text-green-800 flex items-baseline gap-3`} style={{
-                                        color: settings?.background === 'dark' ? '#86efac' : '#166534'
-                                    }}>
-                                        <span>
-                                            System Failure Probability 
-                                            {quantMethod === 'rare' && ' (Rare Event)'} 
-                                            {quantMethod === 'mcub' && ' (MCUB)'} 
-                                            {(quantMethod === 'bdd' || quantMethod === 'BDD' || quantMethod === 'Inclusion-Exclusion') && ' (BDD Exact)'}
-                                        </span>
-                                        <span className="font-mono text-lg" style={{
-                                            color: settings?.background === 'dark' ? '#6ee7b7' : '#15803d'
-                                        }}>
-                                            {formatProbability(mcubValue, probDisplayMode)}
-                                        </span>
+                                    <div className="flex items-start gap-4 flex-wrap">
+                                        {/* Primary result — left */}
+                                        <div>
+                                            <div className={`${fontSizeClass} font-bold flex items-baseline gap-2`} style={{
+                                                color: settings?.background === 'dark' ? '#86efac' : '#166534'
+                                            }}>
+                                                <span>
+                                                    System Failure Probability
+                                                    {quantMethod === 'rare' && ' (Rare Event)'}
+                                                    {quantMethod === 'mcub' && ' (MCUB)'}
+                                                    {(quantMethod === 'bdd' || quantMethod === 'BDD' || quantMethod === 'Inclusion-Exclusion') && ' (BDD Exact)'}
+                                                </span>
+                                                <span className="font-mono text-lg" style={{
+                                                    color: settings?.background === 'dark' ? '#6ee7b7' : '#15803d'
+                                                }}>
+                                                    {formatProbability(mcubValue, probDisplayMode)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {/* Alternative method results — right */}
+                                        {cutSets.some(cs => cs.probability !== null) && (
+                                            <div className="flex items-center gap-4 flex-wrap text-xs" style={{
+                                                color: settings?.background === 'dark' ? '#6ee7b7' : '#166534',
+                                                borderLeft: `1px solid ${settings?.background === 'dark' ? '#16a34a' : '#86efac'}`,
+                                                paddingLeft: '12px'
+                                            }}>
+                                                {quantMethod !== 'rare' && (
+                                                    <div>
+                                                        <div className="opacity-70">Rare Event</div>
+                                                        <div className="font-mono font-semibold">{formatProbability(rareEventApprox, probDisplayMode)}</div>
+                                                    </div>
+                                                )}
+                                                {quantMethod !== 'mcub' && (
+                                                    <div>
+                                                        <div className="opacity-70">MCUB</div>
+                                                        <div className="font-mono font-semibold">{formatProbability(
+                                                            (() => {
+                                                                const probs = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null).map(cs => cs.probability);
+                                                                return calculateMCUB(probs);
+                                                            })(),
+                                                            probDisplayMode
+                                                        )}</div>
+                                                    </div>
+                                                )}
+                                                {quantMethod !== 'bdd' && quantMethod !== 'BDD' && quantMethod !== 'Inclusion-Exclusion' && (
+                                                    <div>
+                                                        <div className="opacity-70">BDD Exact</div>
+                                                        <div className="font-mono font-semibold">{formatProbability(
+                                                            (() => {
+                                                                const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
+                                                                const cutSetEvents = validCutSets.map(cs => cs.events);
+                                                                const combinedData = { ...basicEventData, ...ccfEvents };
+                                                                const bddResult = calculateBDD(cutSetEvents, combinedData, ccfEvents);
+                                                                return bddResult.probability;
+                                                            })(),
+                                                            probDisplayMode
+                                                        )}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
-                            
-                            {/* Comparison with other methods */}
-                            {cutSets.length > 0 && cutSets.some(cs => cs.probability !== null) && (
-                                <div className={`${fontSizeClass} text-gray-600 text-xs space-y-1`}>
-                                    {quantMethod !== 'rare' && (
-                                        <div>Rare Event Approximation: {formatProbability(rareEventApprox, probDisplayMode)}</div>
-                                    )}
-                                    {quantMethod !== 'mcub' && (
-                                        <div>Minimal Cut Set Upperbound: {formatProbability(
-                                            (() => {
-                                                const probs = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null).map(cs => cs.probability);
-                                                return calculateMCUB(probs);
-                                            })(),
-                                            probDisplayMode
-                                        )}</div>
-                                    )}
-                                    {quantMethod !== 'bdd' && quantMethod !== 'BDD' && quantMethod !== 'Inclusion-Exclusion' && (
-                                        <div>BDD (Exact): {formatProbability(
-                                            (() => {
-                                                const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
-                                                const cutSetEvents = validCutSets.map(cs => cs.events);
-                                                const combinedData = { ...basicEventData, ...ccfEvents };
-                                                const bddResult = calculateBDD(cutSetEvents, combinedData, ccfEvents);
-                                                return bddResult.probability;
-                                            })(),
-                                            probDisplayMode
-                                        )}</div>
+
+                            {/* Boolean Filter Bar */}
+                            <div className="p-2 border rounded text-xs" style={{
+                                backgroundColor: settings?.background === 'dark' ? '#1e3a5f' : '#eff6ff',
+                                borderColor: settings?.background === 'dark' ? '#3b82f6' : '#93c5fd'
+                            }}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-semibold" style={{ color: settings?.background === 'dark' ? '#93c5fd' : '#1d4ed8', whiteSpace: 'nowrap' }}>
+                                        Filter BEs:
+                                    </span>
+                                    <input
+                                        type="text"
+                                        value={filterExpr}
+                                        onChange={e => { setFilterExpr(e.target.value); setFilterError(null); }}
+                                        onKeyDown={e => { if (e.key === 'Enter') applyFilter(); if (e.key === 'Escape') clearFilter(); }}
+                                        placeholder="e.g.  PMP  OR  (VLV AND NOT CCF)"
+                                        className="flex-1 px-2 py-1 border rounded font-mono"
+                                        style={{
+                                            minWidth: '180px',
+                                            backgroundColor: settings?.background === 'dark' ? '#1f2937' : '#fff',
+                                            borderColor: filterError ? '#ef4444' : (activeFilter ? '#22c55e' : '#d1d5db'),
+                                            color: backgroundStyle.color,
+                                            outline: 'none'
+                                        }}
+                                    />
+                                    <div className="flex items-center border rounded overflow-hidden" style={{ borderColor: '#d1d5db' }}>
+                                        <button
+                                            onClick={() => setFilterMode('show')}
+                                            className="px-2 py-1 font-semibold"
+                                            style={{
+                                                backgroundColor: filterMode === 'show' ? '#2563eb' : (settings?.background === 'dark' ? '#374151' : '#f3f4f6'),
+                                                color: filterMode === 'show' ? '#fff' : backgroundStyle.color
+                                            }}
+                                            title="Show only cut sets matching the filter"
+                                        >Show</button>
+                                        <button
+                                            onClick={() => setFilterMode('hide')}
+                                            className="px-2 py-1 font-semibold"
+                                            style={{
+                                                backgroundColor: filterMode === 'hide' ? '#dc2626' : (settings?.background === 'dark' ? '#374151' : '#f3f4f6'),
+                                                color: filterMode === 'hide' ? '#fff' : backgroundStyle.color
+                                            }}
+                                            title="Hide cut sets matching the filter"
+                                        >Hide</button>
+                                    </div>
+                                    <button
+                                        onClick={applyFilter}
+                                        className="px-2 py-1 rounded font-semibold"
+                                        style={{ backgroundColor: '#2563eb', color: '#fff' }}
+                                        title="Apply filter (Enter)"
+                                    >Apply</button>
+                                    {activeFilter && (
+                                        <button
+                                            onClick={clearFilter}
+                                            className="px-2 py-1 rounded"
+                                            style={{ backgroundColor: '#6b7280', color: '#fff' }}
+                                            title="Clear filter (Esc)"
+                                        >Clear</button>
                                     )}
                                 </div>
-                            )}
+                                {filterError && (
+                                    <div className="mt-1 text-red-500 font-mono">{filterError}</div>
+                                )}
+                                {activeFilter && filterMatchCount !== null && (
+                                    <div className="mt-1 flex items-center gap-2 flex-wrap" style={{ color: settings?.background === 'dark' ? '#86efac' : '#166534' }}>
+                                        <span className="font-semibold">
+                                            {activeFilter.mode === 'show'
+                                                ? `Showing ${visibleCutSets.length} of ${sortedCutSets.length} cut sets matching:`
+                                                : `Hiding ${filterMatchCount} \u2014 showing ${visibleCutSets.length} of ${sortedCutSets.length}:`}
+                                        </span>
+                                        <code className="px-1 rounded" style={{ backgroundColor: settings?.background === 'dark' ? '#064e3b' : '#dcfce7' }}>
+                                            {activeFilter.expr}
+                                        </code>
+                                    </div>
+                                )}
+                                {!activeFilter && (
+                                    <div className="mt-1 opacity-60">
+                                        Operators: <code>AND</code>&nbsp; <code>OR</code>&nbsp; <code>NOT</code>&nbsp; <code>(&#8202;)</code> \u2014 substring match \u2014 Enter to apply, Esc to clear
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        
+
                         {/* Cut Sets List - Compact View */}
                         {cutSets.length > 0 ? (
                             <div className="border rounded" style={{
@@ -21754,9 +22243,9 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                     <div style={{ flex: 1 }}>Cut Set</div>
                                     <div style={{ flex: 1 }}>Description</div>
                                 </div>
-                                
+
                                 {/* Cut Set Rows */}
-                                {sortedCutSets.map((cutSet, idx) => (
+                                {visibleCutSets.map((cutSet, idx) => (
                                     <div 
                                         key={cutSet.id}
                                         className="flex items-center p-2 border-b text-xs hover:bg-gray-50"
@@ -21861,7 +22350,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <h1 className="text-lg font-bold"><a href="https://github.com/curtlsmith/KUREAS/tree/main/SYS" target="_blank" rel="noopener noreferrer" style={{color:'white',textDecoration:'underline',textDecorationStyle:'dotted',textUnderlineOffset:'3px'}}>KUREAS-SYS</a></h1>
                         </div>
-                        <span className="text-sm opacity-90 flex-1 text-center">v1.3 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>System Evaluation Module</strong></span>
+                        <span className="text-sm opacity-90 flex-1 text-center">v1.4 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>System Evaluation Module</strong></span>
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <button
                                 onClick={loadSystemDefinition}
@@ -22137,8 +22626,8 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                         backgroundColor: backgroundStyle.paneBackground,
                                         borderColor: backgroundStyle.borderColor,
                                         height: `${paneCHeight}%`,
-                                        minHeight: '30%',
-                                        maxHeight: '80%'
+                                        minHeight: '15%',
+                                        maxHeight: '90%'
                                     }}>
                                         <div className="p-2 border-b flex items-center justify-between" style={{
                                             borderColor: backgroundStyle.borderColor,
@@ -22481,11 +22970,11 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                             <Tooltip key={keyword} text={keywordTooltips[keyword] || keyword}>
                                                 <button
                                                     onClick={() => handleTokenInsert(keyword)}
-                                                    className={`px-2 py-1 rounded text-xs hover:bg-blue-200 ${
+                                                    className={`px-2 py-0.5 rounded hover:bg-blue-200 ${
                                                         keyword === ';' || keyword === '(' || keyword === ')' 
                                                             ? 'bg-gray-100 text-gray-600' 
                                                             : 'bg-blue-100 text-blue-800'
-                                                    }`}
+                                                    }`} style={{ fontSize: '11px' }}
                                                 >
                                                     {keyword}
                                                 </button>
@@ -22521,7 +23010,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                     <Tooltip key={varName} text={expression.trim() || 'Variable definition'}>
                                                         <button
                                                             onClick={() => handleTokenInsert(varName)}
-                                                            className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs hover:bg-red-200"
+                                                            className="px-2 py-0.5 bg-red-100 text-red-800 rounded hover:bg-red-200" style={{ fontSize: '11px' }}
                                                         >
                                                             {varName}
                                                         </button>
@@ -22547,11 +23036,11 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                 <Tooltip key={ssc.id} text={tooltipText}>
                                                     <button
                                                         onClick={() => handleTokenInsert(ssc.name)}
-                                                        className={`px-2 py-1 rounded text-xs ${
+                                                        className={`px-2 py-0.5 rounded ${
                                                             hasLinkedFailureMode 
                                                                 ? 'bg-amber-200 text-amber-900 hover:bg-amber-300 ring-1 ring-amber-400'
                                                                 : 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                        }`}
+                                                        }`} style={{ fontSize: '11px' }}
                                                     >
                                                         {ssc.name}
                                                         {hasLinkedFailureMode && ' 🔗'}
@@ -22565,7 +23054,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                             <Tooltip key={sc.id} text={sc.description || `Supercomponent: ${sc.sscs.map(s => s.name).join(', ')}`}>
                                                 <button
                                                     onClick={() => handleTokenInsert(sc.name)}
-                                                    className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs hover:bg-yellow-200"
+                                                    className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200" style={{ fontSize: '11px' }}
                                                 >
                                                     {sc.name}
                                                 </button>
@@ -22774,7 +23263,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                                                             return (
                                                                 <div style={{ flex: '0 0 25%' }}>
                                                                     <label className="block font-bold mb-1 text-xs">Probability:</label>
-                                                                    <div className="w-full px-2 py-1 border rounded text-xs" style={{ backgroundColor: settings.background === 'dark' ? '#374151' : '#f3f4f6', color: settings.background === 'dark' ? '#f3f4f6' : '#111827', borderColor: backgroundStyle.borderColor, display: 'flex', alignItems: 'center', minHeight: '30px' }}>
+                                                                    <div className="w-full px-2 py-1 border rounded font-mono font-semibold" style={{ fontSize: '13px', backgroundColor: settings.background === 'dark' ? '#374151' : '#f3f4f6', color: settings.background === 'dark' ? '#f3f4f6' : '#111827', borderColor: backgroundStyle.borderColor, display: 'flex', alignItems: 'center', minHeight: '30px' }}>
                                                                         {displayValue}
                                                                     </div>
                                                                 </div>
