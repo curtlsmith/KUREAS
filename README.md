@@ -50,7 +50,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | Module | File | Version | Purpose |
 |--------|------|---------|---------|
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.1 | Hazard analysis, initiating event frequency quantification, and screening |
-| **KUREAS-FTL** | `KUREAS-FTL.html` | v1.2 | Fault tree logic editing, visualization, and analysis |
+| **KUREAS-FTL** | `KUREAS-FTL.html` | v1.3 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.3 | System modeling, P&ID, FMEA, failure analysis, CCF, importance measures, and comparison function |
 | **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | v1.0 | Process Operational Logic (POL) diagrams and event tree generation |
@@ -98,7 +98,7 @@ Full fault tree authoring, visualization, and analysis environment with SAPHIRE 
 - **Cut set analysis** — load cut sets from `.FTC` files; floating, draggable results window sorted by probability contribution with fault tree top event probability
 - **Basic Event List** — floating, draggable/resizable window listing all basic events with inline editing and drag-to-canvas functionality
 - **Change tracking** — append-only change log with timestamps (View Changes button); undo support (Ctrl+Z, up to 50 levels); unsaved changes warning on close
-- **Export** — SAPHIRE MAR-D (.FTL), KUREAS native (.KNOW_FTL), and OpenPSA Model Exchange Format (.xml) with per-tree selection
+- **Export** — SAPHIRE MAR-D (.FTL, .BEI), KUREAS native (.KNOW_FTL), and OpenPSA Model Exchange Format (.xml) with per-tree selection
 - **Report generation** — Word (.doc) and Markdown with selectable trees, cut set limits, configurable headers, progress indicator, and saved preferences; in-browser preview with print
 - **Settings** — font size, node size, color mode (full color / grayscale / single custom color), font family, connection lines (arrows / no arrows / dotted), line style (curved down / curved up / straight), line thickness, background (light / dark / blue grid / engineering green), probability display, default zoom level
 - **Persistence** — projects stored in IndexedDB for browser-session persistence; save to `.KNOW_FTL` files for portable backup
