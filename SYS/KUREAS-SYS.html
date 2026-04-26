@@ -196,7 +196,7 @@
     <div id="root"></div>
 
     <script type="text/babel" data-presets="custom">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useEffect, useLayoutEffect, useRef, useCallback } = React;
 
         // Initialize Mermaid
         mermaid.initialize({
@@ -544,17 +544,26 @@
                     setError('Unique SSC Name is required');
                     return;
                 }
-                
+                if (/[\[\]]/.test(trimmedName)) {
+                    setError('SSC names cannot contain brackets [ or ] \u2014 these are reserved for script variables and modules.');
+                    return;
+                }
+                if (/\./.test(trimmedName)) {
+                    setError('SSC names cannot contain a period (.) \u2014 this character is reserved for failure mode dot-notation (e.g. PUMP-A.FM1).');
+                    return;
+                }
+                if (/\s/.test(trimmedName)) {
+                    setError('SSC names cannot contain spaces. Use hyphens or underscores instead (e.g. PUMP-A or PUMP_A).');
+                    return;
+                }
                 // Check if name already exists
                 const nameExists = existingSSCs.some(ssc => 
                     ssc.name.toLowerCase() === trimmedName.toLowerCase()
                 );
-                
                 if (nameExists) {
                     setError('An SSC with this name already exists in the system');
                     return;
                 }
-                
                 onSave({ name: trimmedName, description: description.trim() });
             };
 
@@ -949,7 +958,11 @@
                     setError('Please select a KUREAS-SYS file to link'); return;
                 }
                 if (mode === 'ssc') {
-                    const nameExists = existingSSCs.some(ssc => ssc.name.toLowerCase() === name.trim().toLowerCase());
+                    const trimmedSSCName = name.trim();
+                    if (/[\[\]]/.test(trimmedSSCName)) { setError('SSC names cannot contain brackets [ or ] \u2014 these are reserved for script variables and modules.'); return; }
+                    if (/\./.test(trimmedSSCName)) { setError('SSC names cannot contain a period (.) \u2014 this character is reserved for failure mode dot-notation (e.g. PUMP-A.FM1).'); return; }
+                    if (/\s/.test(trimmedSSCName)) { setError('SSC names cannot contain spaces. Use hyphens or underscores instead (e.g. PUMP-A or PUMP_A).'); return; }
+                    const nameExists = existingSSCs.some(ssc => ssc.name.toLowerCase() === trimmedSSCName.toLowerCase());
                     if (nameExists) { setError('An SSC with this name already exists in the system'); return; }
                 }
 
@@ -2026,6 +2039,29 @@
                                         </div>
                                     </div>
 
+                                    {/* Cut Set Truncation */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Cut Set Truncation</label>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {['none', '1E-4', '1E-5', '1E-6', '1E-7', '1E-8', '1E-9', '1E-10', '1E-12'].map(option => (
+                                                <button
+                                                    key={option}
+                                                    onClick={() => handleChange('cutSetTruncation', option)}
+                                                    className={`px-3 py-1.5 rounded text-sm ${
+                                                        (localSettings.cutSetTruncation || 'none') === option
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {option === 'none' ? 'None' : option}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-2">
+                                            Cut sets with a calculated probability below this threshold will be removed from results. Requires probability data on all events in a cut set to apply. Set to <strong>None</strong> to retain all cut sets.
+                                        </div>
+                                    </div>
+
                                     {/* Qualitative Probability Settings */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2352,6 +2388,8 @@
             const textareaRef = useRef(null);
             const lineNumbersRef = useRef(null);
             const backdropRef = useRef(null);
+            const lineSpanRefs = useRef([]);
+            const [lineHeights, setLineHeights] = useState([]);
             
             // Convert tokens to text lines
             const tokensToText = (tokenArray) => {
@@ -2607,6 +2645,9 @@
             const [lineCount, setLineCount] = useState(1);
             const isInternalUpdate = useRef(false);
             
+            // lineCount derived synchronously so lineNumbers always matches the current text
+            const currentLineCount = Math.max(text.split('\n').length, 1);
+            
             // Update text when tokens change externally (not from our own edits)
             useEffect(() => {
                 if (isInternalUpdate.current) {
@@ -2617,11 +2658,22 @@
                 setText(newText);
             }, [tokens]);
             
-            // Update line count when text changes
+            // Update line count when text changes (kept for any external consumers)
             useEffect(() => {
-                const lines = text.split('\n');
-                setLineCount(Math.max(lines.length, 1));
-            }, [text]);
+                setLineCount(currentLineCount);
+            }, [currentLineCount]);
+
+            // Measure actual rendered height of each backdrop line span after render
+            useLayoutEffect(() => {
+                const spans = lineSpanRefs.current;
+                if (!spans || spans.length === 0) return;
+                const defaultH = parseInt(getLineHeight(), 10);
+                const heights = spans.map(span => span ? span.offsetHeight : defaultH);
+                setLineHeights(prev => {
+                    if (prev.length === heights.length && heights.every((h, i) => h === prev[i])) return prev;
+                    return heights;
+                });
+            });
             
             // Sync scroll between line numbers and textarea
             const handleScroll = (e) => {
@@ -2689,13 +2741,12 @@
                 }
             }, [insertAtCursor, onCursorChange]);
             
-            // Generate line numbers
+            // Generate line numbers — use currentLineCount (synchronous) so it always matches spans
             const lineNumbers = [];
-            for (let i = 1; i <= Math.max(lineCount, 10); i++) {
+            for (let i = 1; i <= Math.max(currentLineCount, 10); i++) {
                 lineNumbers.push(i);
             }
             
-            // Calculate line height based on font size class
             const getLineHeight = () => {
                 switch (fontSizeClass) {
                     case 'text-xs': return '16px';
@@ -2725,12 +2776,19 @@
                             borderRight: `1px solid ${backgroundStyle.borderColor}`,
                             color: backgroundStyle.backgroundColor === '#1f2937' ? '#6b7280' : '#9ca3af',
                             minWidth: '40px',
-                            lineHeight: lineHeight,
                             fontFamily: 'monospace'
                         }}
                     >
-                        {lineNumbers.map(num => (
-                            <div key={num} className={fontSizeClass} style={{ lineHeight: lineHeight }}>
+                        {lineNumbers.map((num, idx) => (
+                            <div key={num} className={fontSizeClass} style={{
+                                height: lineHeights[idx] ? `${lineHeights[idx]}px` : lineHeight,
+                                lineHeight: lineHeights[idx] ? `${lineHeights[idx]}px` : lineHeight,
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                justifyContent: 'flex-end',
+                                paddingTop: lineHeights[idx] && lineHeights[idx] > parseInt(lineHeight, 10)
+                                    ? `${Math.floor((parseInt(lineHeight, 10)) / 4)}px` : '0'
+                            }}>
                                 {num}
                             </div>
                         ))}
@@ -2761,10 +2819,11 @@
                                 const isDark = backgroundStyle.backgroundColor === '#1f2937';
                                 const commentColor = isDark ? '#4ade80' : '#15803d';
                                 const normalColor = backgroundStyle.color;
+                                lineSpanRefs.current = [];
                                 return text.split('\n').map((line, i) => {
                                     const isComment = line.trimStart().startsWith('#');
                                     return (
-                                        <span key={i} style={{
+                                        <span key={i} ref={el => { lineSpanRefs.current[i] = el; }} style={{
                                             display: 'block',
                                             lineHeight: lineHeight,
                                             color: isComment ? commentColor : normalColor,
@@ -15401,7 +15460,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             const [dropTarget, setDropTarget] = useState(null);
             const [keywords] = useState([
                 'SYSTEM WORKS =', 'RELIES ON', 'WORKS', 'FAILS', 'UNLESS', 'WHEN', 'IF', 'THEN', 'IS',
-                'AND', 'OR', 'NOT', 'COMBINE', 'ARE IN', 'ARE NOT IN', '=', '<', '>', '<=', '>=', 'TRUE', 'FALSE', '(', ')', ';'
+                'AND', 'OR', 'NOT', 'COMBINE', 'ARE IN', 'ARE NOT IN', '=', 'TRUE', 'FALSE', '[', ']', '(', ')', ';'
             ]);
             
             const keywordTooltips = {
@@ -15421,10 +15480,12 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 'ARE IN': 'Implies a condition that will be met if the elements to the right of [ARE IN] exist. Example: Your system has four pumps and the system functions when two pumps are working as long as two pumps are in the group P1:P2:P3. This condition would be depicted as: [PUMPS=][P1][P2][P3][P4][;][MY_GROUP=][P1][P2][P3][;] [SYSTEM WORKS =][2][PUMPS=][ARE IN][MY_GROUP][;]',
                 'ARE NOT IN': 'Implies a condition that will be met if the element to the right of [ARE NOT IN] do not exist. Example: Your system has four pumps and the system functions when two pumps are working as long as two pumps are not in the group P1:P2. This condition would be depicted as: [PUMPS=][P1][P2][P3][P4][;][MY_GROUP=][P1][P2][;] [SYSTEM WORKS =][2][PUMPS=][ARE NOT IN][MY_GROUP][;]',
                 '=': 'Equality comparison operator. Used with boundary conditions to test if a value equals another. Example: [BOUNDARY_CONDITION][=][TRUE]',
-                '<': 'Less than comparison operator. Used with boundary conditions to test if a value is less than another. Example: [TEMPERATURE][<][100]',
-                '>': 'Greater than comparison operator. Used with boundary conditions to test if a value is greater than another. Example: [PRESSURE][>][50]',
-                '<=': 'Less than or equal comparison operator. Used with boundary conditions. Example: [LEVEL][<=][MAX_LEVEL]',
-                '>=': 'Greater than or equal comparison operator. Used with boundary conditions. Example: [FLOW_RATE][>=][MIN_FLOW]',
+                '<': undefined,
+                '>': undefined,
+                '<=': undefined,
+                '>=': undefined,
+                '[': 'Opening bracket — begins a module or variable name. Modules are named expressions that can be reused or referenced in RELIES ON statements. Example: [PUMP] = PUMP_A OR PUMP_B; then reference [PUMP] elsewhere.',
+                ']': 'Closing bracket — ends a module or variable name. Together [ ] delimit a named expression. Example: [PUMP] RELIES ON [POWER];',
                 'TRUE': 'House event set to TRUE: probability 1.0, always occurs/present. Used after IS: [Variable_X][IS][TRUE]. Typically set via an IF-THEN conditional rule.',
                 'FALSE': 'House event set to FALSE: probability 0.0, never occurs/present. Used after IS: [Variable_X][IS][FALSE]. Typically set via an IF-THEN conditional rule.',
                 '(': 'Left parenthesis for grouping expressions. Used to control precedence of operations.',
@@ -15918,7 +15979,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     ccfBetaDistBeta: settings.ccfBetaDistBeta,
                     ccfBetaDistLow: settings.ccfBetaDistLow,
                     ccfBetaDistHigh: settings.ccfBetaDistHigh,
-                    ccfBetaSource: settings.ccfBetaSource
+                    ccfBetaSource: settings.ccfBetaSource,
+                    cutSetTruncation: settings.cutSetTruncation
                 };
                 
                 const $SCHEMA = {
@@ -16061,6 +16123,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                     if (data.projectSettings.ccfBetaDistLow !== undefined) newSettings.ccfBetaDistLow = data.projectSettings.ccfBetaDistLow;
                                     if (data.projectSettings.ccfBetaDistHigh !== undefined) newSettings.ccfBetaDistHigh = data.projectSettings.ccfBetaDistHigh;
                                     if (data.projectSettings.ccfBetaSource !== undefined) newSettings.ccfBetaSource = data.projectSettings.ccfBetaSource;
+                                    if (data.projectSettings.cutSetTruncation !== undefined) newSettings.cutSetTruncation = data.projectSettings.cutSetTruncation;
                                     setSettings(newSettings);
                                     SettingsManager.save(newSettings);
                                 }
@@ -16428,8 +16491,16 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     if (token.type === 'comment') return;
                     if (token.type === 'module_def') return;
                     if (token.type === 'module_ref') {
-                        if (!definedModules.has(token.value.toUpperCase())) {
-                            unknowns.add('[' + token.value + ']');
+                        const refVal = token.value.toUpperCase();
+                        // A bracketed name could be a defined module, variable, SSC, supercomp, or BC
+                        if (!definedModules.has(refVal) &&
+                            !definedVariables.has(refVal) &&
+                            !definedVariables.has(refVal + '=') &&
+                            !knownSSCs.has(refVal) &&
+                            !knownSupercomps.has(refVal) &&
+                            !knownBCs.has(refVal)) {
+                            // Add without brackets so it can be created as a valid SSC name
+                            unknowns.add(token.value);
                         }
                         return;
                     }
@@ -18294,6 +18365,71 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     }
                 }
 
+                // ── Apply standalone RELIES ON lines ────────────────────────────────────
+                // Syntax: <module_ref|ssc> RELIES ON <dependency>
+                // Semantics: subject fails if its own logic fails OR if the dependency fails.
+                {
+                    let ri = 0;
+                    while (ri < tokens.length) {
+                        if (tokens[ri].value === 'RELIES ON') {
+                            // Find start of this line (after previous eol or beginning)
+                            let lineStart = ri - 1;
+                            while (lineStart > 0 && tokens[lineStart - 1].type !== 'eol') lineStart--;
+                            const subjectTokens = tokens.slice(lineStart, ri);
+                            // Dependency: tokens after RELIES ON until eol
+                            let lineEnd = ri + 1;
+                            while (lineEnd < tokens.length && tokens[lineEnd].type !== 'eol') lineEnd++;
+                            const depTokens = tokens.slice(ri + 1, lineEnd);
+
+                            const subjectNameToken = subjectTokens.find(t =>
+                                t.type === 'module_ref' || t.type === 'ssc' || t.type === 'identifier' || t.type === 'text' || t.type === 'unknown'
+                            );
+                            if (subjectNameToken) {
+                                const subjectKey = subjectNameToken.value.toUpperCase();
+                                const existingGateName = moduleGates[subjectKey];
+                                if (existingGateName) {
+                                    const depResult = translateWorksToFailure(depTokens, variables, gateCounter, gates, modules, moduleGates, supercompMap, houseEvents, ifThenRules);
+                                    gateCounter = depResult.nextGateId;
+                                    const depChildren = [];
+                                    if (depResult.isGate) depChildren.push(depResult.gateName);
+                                    else if (depResult.items) depChildren.push(...depResult.items);
+                                    if (depChildren.length > 0) {
+                                        const existingGate = gates.find(g => g.label === existingGateName);
+                                        if (existingGate) {
+                                            const innerGateName = `${existingGateName}-SELF`;
+                                            const wrappedGateName = `${existingGateName}-RELY`;
+                                            existingGate.label = innerGateName;
+                                            existingGate.id = innerGateName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                                            moduleGates[subjectKey] = wrappedGateName;
+                                            gates.push({
+                                                id: wrappedGateName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+                                                label: wrappedGateName,
+                                                type: 'OR',
+                                                children: [innerGateName, ...depChildren]
+                                            });
+                                        }
+                                    }
+                                } else {
+                                    const subResult = translateWorksToFailure(subjectTokens, variables, gateCounter, gates, modules, moduleGates, supercompMap, houseEvents, ifThenRules);
+                                    gateCounter = subResult.nextGateId;
+                                    const depResult = translateWorksToFailure(depTokens, variables, gateCounter, gates, modules, moduleGates, supercompMap, houseEvents, ifThenRules);
+                                    gateCounter = depResult.nextGateId;
+                                    const children = [];
+                                    if (subResult.isGate) children.push(subResult.gateName);
+                                    else if (subResult.items) children.push(...subResult.items);
+                                    if (depResult.isGate) children.push(depResult.gateName);
+                                    else if (depResult.items) children.push(...depResult.items);
+                                    if (children.length > 1) {
+                                        const gn = `GATE-${gateCounter++}`;
+                                        gates.push({ id: gn.toLowerCase(), label: gn, type: 'OR', children });
+                                        moduleGates[subjectKey] = gn;
+                                    }
+                                }
+                            }
+                        }
+                        ri++;
+                    }
+                }
                 // STEP 1: Create top gate
                 let topNode;
                 if (systemWorksExpressions.length > 1) {
@@ -22001,6 +22137,15 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                     }
                     return a.id - b.id;
                 });
+
+                // Apply cut set truncation — remove cut sets whose probability is known and below threshold
+                const truncThreshold = settings?.cutSetTruncation && settings.cutSetTruncation !== 'none'
+                    ? parseFloat(settings.cutSetTruncation)
+                    : null;
+                const truncatedCutSets = truncThreshold !== null
+                    ? sortedCutSets.filter(cs => cs.probability === null || cs.probability >= truncThreshold)
+                    : sortedCutSets;
+                const truncatedCount = sortedCutSets.length - truncatedCutSets.length;
                 
                 const rareEventApprox = cutSets.reduce((sum, cs) => {
                     if (cs.probability !== null) {
@@ -22025,17 +22170,17 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                     setFilterError(null);
                 };
 
-                // Apply active filter to the sorted list
+                // Apply active filter to the truncated list
                 const visibleCutSets = activeFilter
-                    ? sortedCutSets.filter(cs => {
+                    ? truncatedCutSets.filter(cs => {
                         const eventSet = new Set(cs.events.map(e => e.toLowerCase()));
                         const matched = activeFilter.predicate(eventSet);
                         return activeFilter.mode === 'show' ? matched : !matched;
                     })
-                    : sortedCutSets;
+                    : truncatedCutSets;
 
                 const filterMatchCount = activeFilter
-                    ? sortedCutSets.filter(cs => {
+                    ? truncatedCutSets.filter(cs => {
                         const eventSet = new Set(cs.events.map(e => e.toLowerCase()));
                         return activeFilter.predicate(eventSet);
                     }).length
@@ -22211,17 +22356,22 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                     <div className="mt-1 flex items-center gap-2 flex-wrap" style={{ color: settings?.background === 'dark' ? '#86efac' : '#166534' }}>
                                         <span className="font-semibold">
                                             {activeFilter.mode === 'show'
-                                                ? `Showing ${visibleCutSets.length} of ${sortedCutSets.length} cut sets matching:`
-                                                : `Hiding ${filterMatchCount} \u2014 showing ${visibleCutSets.length} of ${sortedCutSets.length}:`}
+                                                ? `Showing ${visibleCutSets.length} of ${truncatedCutSets.length} cut sets matching:`
+                                                : `Hiding ${filterMatchCount} \u2014 showing ${visibleCutSets.length} of ${truncatedCutSets.length}:`}
                                         </span>
                                         <code className="px-1 rounded" style={{ backgroundColor: settings?.background === 'dark' ? '#064e3b' : '#dcfce7' }}>
                                             {activeFilter.expr}
                                         </code>
                                     </div>
                                 )}
+                                {truncatedCount > 0 && (
+                                    <div className="mt-1 text-xs" style={{ color: settings?.background === 'dark' ? '#fbbf24' : '#92400e' }}>
+                                        {truncatedCount} cut set{truncatedCount !== 1 ? 's' : ''} removed by truncation threshold ({settings.cutSetTruncation})
+                                    </div>
+                                )}
                                 {!activeFilter && (
                                     <div className="mt-1 opacity-60">
-                                        Operators: <code>AND</code>&nbsp; <code>OR</code>&nbsp; <code>NOT</code>&nbsp; <code>(&#8202;)</code> \u2014 substring match \u2014 Enter to apply, Esc to clear
+                                        Operators: <code>AND</code>&nbsp; <code>OR</code>&nbsp; <code>NOT</code>&nbsp; <code>(&#8202;)</code> &mdash; substring match &mdash; Enter to apply, Esc to clear
                                     </div>
                                 )}
                             </div>
