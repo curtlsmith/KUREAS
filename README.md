@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/server-none_required-orange.svg" alt="No Server Required"/>
 </p>
 
-KUREAS is a suite of open-source browser-based modules for complex system or facility reliability analysis and probabilistic risk assessment (PRA). Each module is a standalone HTML file — no server, no build step, no installation. Open in any modern browser and start working.
+KUREAS (pronounced as 'curious') is a suite of open-source browser-based modules for complex system or facility reliability analysis and probabilistic risk assessment (PRA). Each module is a standalone HTML file — no server, no build step, no installation. Open in any modern browser and start working.
 
 Designed for reliability, risk, safety, and system engineers performing what-if performance analysis, KUREAS provides professional-grade functionality for small and large technical projects.
 
@@ -53,9 +53,9 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.3 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.4 | System modeling, P&ID, FMEA, failure analysis, CCF, importance measures, and comparison function |
-| **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | v1.0 | Process Operational Logic (POL) diagrams and event tree generation |
+| **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | vX.0 | Process Operational Logic (POL) diagrams and event tree generation |
 | **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
-| **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | v1.0 | General-purpose `.KNOW` file viewer and editor |
+| **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | vX.0 | General-purpose `.KNOW` file viewer and editor |
 
 ---
 
