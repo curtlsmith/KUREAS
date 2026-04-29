@@ -27,6 +27,140 @@
     SOFTWARE.
     
     https://opensource.org/license/mit
+
+    ─────────────────────────────────────────────────────────────────────────
+    Change log
+    ─────────────────────────────────────────────────────────────────────────
+
+    v1.5 — Cut-set generation, quantification, and importance-measure
+           performance + memory optimizations.
+
+      • Truncation is now applied during cut-set generation, not just at display
+        time. The project-level "Cut Set Truncation" threshold is threaded through
+        generateMinimalCutSets / generateCutSets / expandAndGate / expandVotingGate
+        so that partial paths whose probability product has already dropped below
+        threshold are discarded before they enter the BFS queue. This is the main
+        lever against the OOM seen on complicated models — sub-threshold cut sets
+        never occupy memory in the first place.
+
+      • CCF expansion (applyCCFExpansion) runs a final truncation pass on the
+        merged independent + CCF cut-set set, so the 2^N expansion of N CCF
+        groups can no longer multiply already-tiny cut sets into millions of
+        below-threshold entries.
+
+      • minimizeCutSets rewritten with size-bucketed Set-based subsumption
+        checks. The old O(n²) Array.includes-based implementation became the
+        bottleneck once cut-set counts climbed into the tens of thousands.
+
+      • buildImportanceEngine MCUB / rare-event path is now O(|affected|) per
+        event instead of O(n) per event. We precompute per-cut-set products and
+        a running log-product over (1 - P_i); for each event we only patch the
+        cut sets that actually contain it. No per-event array allocation. For a
+        system with 10k cut sets and 1k events this drops the inner loop from
+        ~10^7 includes() probes per event to a handful of array reads.
+        Side note: the new algorithm also fixes a latent bug in the old
+        patchedProbs() that returned overrideVal directly (instead of the
+        recomputed cut-set product) when origProb was 0 — only reachable in
+        unusual configurations but technically incorrect.
+
+      • buildBDDTree gained a Number-bitmask fast path for ≤31 events with a
+        BigInt fallback above that. Cache keys use sorted-deduped numeric
+        strings instead of repeated map+sort+join over BigInts.
+
+      • calculateBDDMemoized now delegates to buildBDDTree / evaluateBDDTree so
+        we don't maintain two parallel BDD code paths.
+
+      • Linked subsystem evaluation (evaluateLinkedSystemFile) honours the
+        truncation threshold from the linked file's own settings so deeply-
+        nested subsystems can't blow memory on their way to producing a
+        single-number result.
+
+      • The display-time truncation pass in CutSetTable still runs as a safety
+        net, but in normal use it now finds nothing to drop because pre-
+        filtering has already happened upstream.
+
+      • All seven internal callers of generateMinimalCutSets pass the
+        truncation threshold. ExportModal and ReportModal inline the parsing
+        because they receive generateMinimalCutSets via props and don't have
+        direct access to the parseTruncationThreshold helper.
+
+      • Progress dialog UX fix: the "Analyzing System Failures" overlay no
+        longer disappears before the results modal has rendered. Previously,
+        runFailureAnalysisWithProgress dismissed the overlay then mounted the
+        modal, and the modal's synchronous useMemo work (cut set generation,
+        CCF expansion, BDD build, importance engine) would freeze the JS
+        thread for several seconds with no UI feedback. Now the overlay stays
+        up across the modal mount and is dismissed by the modal itself via a
+        new onAnalysisReady prop that fires from a useEffect after first
+        paint. Because the work is synchronous, the last-painted frame (the
+        progress dialog at "Importance Measures") stays on screen for the
+        whole freeze, and the dialog only disappears when the results modal
+        is actually visible.
+
+      • CCF + truncation correctness fix: BFS pruning now uses a CCF-aware
+        upper bound on each partial path's post-CCF probability, so we get
+        the memory benefit of BFS pruning AND correctly preserve cut sets
+        that CCF expansion will lift above threshold.
+
+        Concrete example: for SYSTEM WORKS = COMBINE(3, A, B, C, D, E) with
+        each event at 1E-4, truncation 1E-10, beta 0.02 — the independent
+        cut set {A,B,C} has probability 1E-12 (sub-threshold), but if A/B/C
+        share a CCF signature, CCF expansion produces a CCF event at
+        beta * 1E-4 = 2E-6 (above threshold). The old plain-product bound
+        would have pruned {A,B,C} during BFS, silently losing the CCF cut
+        set. The new bound recognises the CCF lift and keeps the path.
+
+        How the bound works: for a partial path, group its basic events by
+        CCF signature. Singletons contribute P. Groups of ≥2 contribute
+        max(productOf(group), beta * P) — exactly what CCF expansion will
+        produce as alternatives. Non-CCF events (no signature, complement
+        events, house events) contribute their plain probability. The bound
+        is provably non-increasing as the path grows, so prune-below-
+        threshold remains safe. Tested with end-to-end equivalence vs. a
+        no-pruning baseline on multiple scenarios including the exact
+        Curtis bug-report case (10 CCF cut sets correctly preserved).
+
+        Implementation: new helpers buildCCFContext(basicEventData,
+        sscsInSystem, settings) and pathPostCCFUpperBound(path, eventData,
+        ccfContext). The ccfContext threads through generateMinimalCutSets,
+        generateCutSets, expandAndGate, expandVotingGate as a 4th optional
+        parameter. ExportModal and ReportModal receive buildCCFContext as
+        a new prop because they live outside the parent component scope.
+        Linked-subsystem evaluation passes null (no CCF stage there).
+
+        Supersedes the v1.5-interim earlyTruncationThreshold() helper,
+        which disabled BFS pruning entirely when CCF was on (correct but
+        gave back the OOM benefit on CCF-heavy models). The helper itself
+        is kept around for callers that prefer the simpler "off-when-CCF"
+        semantics, but the main paths use the bound.
+
+      • Lazy importance measures + responsive cancel: in the "How the
+        System Fails" results modal, importance measures are no longer
+        computed at modal mount time. The cut sets and system probability
+        appear immediately, and importance calculation is deferred until
+        the user actually clicks the Importance tab. The previous behaviour
+        ran buildImportanceEngine over every basic event synchronously
+        during the first useMemo pass, which on complicated models took
+        long enough (tens of seconds) that the AnalysisProgressModal's
+        Cancel button was painted but unresponsive — clicks couldn't be
+        processed because the JS thread was fully occupied.
+
+        The new flow: when the user opens the Importance tab and we're in
+        the 'idle' state, an async compute function runs that builds the
+        importance engine, then loops through all events in batches of 50
+        with a microtask yield between batches. The yield lets React paint
+        a progress bar (events processed of total) and lets the Cancel
+        button's click handler actually fire. Inputs-changed invalidation
+        bumps a token that the compute function checks at every yield, so
+        in-flight runs abort cleanly when settings or cut sets change.
+
+        Side effect: the AnalysisProgressModal that shows during the
+        initial open of the results modal is now a 3-stage dialog (Logic
+        Creation, Cut Set Generation, Cut Set Quantification) instead of
+        4 — the importance stage moved to the results modal itself. The
+        Compare flow still uses 4 stages because it computes both sides'
+        importance eagerly. The progress modal now takes a `stages` prop
+        so each runner can pass its own list.
 -->
 <html lang="en">
 <head>
@@ -3287,10 +3421,11 @@
         }
         
         // ==================== EXPORT MODAL ====================
-        function ExportModal({ onClose, sscsInSystem, systemName, systemDescription, systemLogic, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion }) {
+        function ExportModal({ onClose, sscsInSystem, systemName, systemDescription, systemLogic, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext }) {
             const allSSCs = sscsInSystem || [];
             const [selectedSSCs, setSelectedSSCs] = React.useState(() => new Set(allSSCs.map((_, i) => i)));
             const [format, setFormat] = React.useState('knowRPT');
+            const [cutSetExportMode, setCutSetExportMode] = React.useState('all');
 
             const toggleSSC = (idx) => {
                 setSelectedSSCs(prev => {
@@ -3398,7 +3533,7 @@
 
             const handleExport = async () => {
                 if (format === 'knowFTL') {
-                    exportKUREASFTL();
+                    exportKUREASFTL(cutSetExportMode);
                     onClose();
                     return;
                 }
@@ -3528,7 +3663,7 @@
             }
 
             // ── KUREAS-FTL (.KNOW_FTL) export ─────────────────────────────────────
-            function exportKUREASFTL() {
+            function exportKUREASFTL(cutSetExportMode) {
                 if (!systemLogic || systemLogic.length <= 1) {
                     alert('No system logic (SYSTEM WORKS = ...) defined. Please enter fault tree logic before exporting.');
                     return;
@@ -3705,7 +3840,19 @@
                 // then map each plain-string label to FTL-format { name, complement } objects
                 let cutSetsData = {};
                 try {
-                    const minCS = generateMinimalCutSets(failureTree, basicEventData);
+                    // Parse the truncation value inline (parent helper not in scope here).
+                    // We pass the full threshold along with a CCF context built via the
+                    // injected buildCCFContext prop, so the BFS pruning is CCF-aware:
+                    // sub-threshold paths get pruned during generation but the bound
+                    // accounts for CCF expansion's ability to lift small cut sets back
+                    // above threshold (e.g. {A,B,C} at 1E-12 → CCF event at beta*P).
+                    const _trunc = (settings?.cutSetTruncation && settings.cutSetTruncation !== 'none')
+                        ? (parseFloat(settings.cutSetTruncation) || null)
+                        : null;
+                    const _ccfCtx = (typeof buildCCFContext === 'function')
+                        ? buildCCFContext(basicEventData, sscsInSystem, settings)
+                        : null;
+                    const minCS = generateMinimalCutSets(failureTree, basicEventData, _trunc, _ccfCtx);
                     
                     // Apply CCF expansion if enabled
                     const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(
@@ -3750,15 +3897,28 @@
                         return { cs, probability: p };
                     });
                     csWithProb.sort((a, b) => (b.probability || 0) - (a.probability || 0));
-                    const probs = csWithProb.map(c => c.probability).filter(p => p !== null);
+                    
+                    // Apply truncation filter if requested
+                    let filteredCsWithProb = csWithProb;
+                    if (cutSetExportMode === 'aboveTruncation') {
+                        const truncThreshold = settings?.cutSetTruncation && settings.cutSetTruncation !== 'none'
+                            ? parseFloat(settings.cutSetTruncation)
+                            : null;
+                        if (truncThreshold !== null) {
+                            filteredCsWithProb = csWithProb.filter(c =>
+                                c.probability === null || c.probability >= truncThreshold
+                            );
+                        }
+                    }
+                    const probs = filteredCsWithProb.map(c => c.probability).filter(p => p !== null);
                     let mcub = null;
                     if (probs.length > 0) {
                         let prod = 1; for (const p of probs) prod *= (1 - p);
                         mcub = 1 - prod;
                     }
                     cutSetsData[systemName || 'System'] = {
-                        cutSets: csWithProb.map(c => c.cs),
-                        probabilities: csWithProb.map(c => c.probability),
+                        cutSets: filteredCsWithProb.map(c => c.cs),
+                        probabilities: filteredCsWithProb.map(c => c.probability),
                         mcub,
                         ccfModel: settings?.ccfModel || 'none',
                         ccfBetaFactor: settings?.ccfBetaFactor
@@ -3895,7 +4055,20 @@
                             enrich(failureLogicTree);
 
                             if (failureLogicTree.children && failureLogicTree.children.length > 0) {
-                                const minCS = generateMinimalCutSets(failureLogicTree, basicEventData);
+                                // Parse the truncation value inline (parent helper not in
+                                // scope). Pass the full threshold along with a CCF context
+                                // built via the injected buildCCFContext prop, so BFS
+                                // pruning is CCF-aware: sub-threshold paths get pruned
+                                // during generation but the bound accounts for CCF
+                                // expansion's ability to lift small cut sets back above
+                                // threshold.
+                                const _trunc = (settings?.cutSetTruncation && settings.cutSetTruncation !== 'none')
+                                    ? (parseFloat(settings.cutSetTruncation) || null)
+                                    : null;
+                                const _ccfCtx = (typeof buildCCFContext === 'function')
+                                    ? buildCCFContext(basicEventData, allSSCs, settings)
+                                    : null;
+                                const minCS = generateMinimalCutSets(failureLogicTree, basicEventData, _trunc, _ccfCtx);
                                 const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(minCS, basicEventData, allSSCs, settings);
                                 ccfEvents = ccfBasicEvents;
                                 const combinedEventData = { ...basicEventData, ...ccfBasicEvents };
@@ -4146,7 +4319,7 @@
                         format: 'KUREAS-REPORT',
                         version: '1.0',
                         sourceModule: 'KUREAS-SYS',
-                        appVersion: '1.4',
+                        appVersion: '1.5',
                         exportedAt
                     },
                     // ── Rendering contract ─────────────────────────────────────────
@@ -4404,6 +4577,11 @@
                     color: '#b45309',
                     desc: 'Report package for KUREAS-REPORT. Contains all section data (text, tables, graphics) needed to compose a multi-module report: SSC info, FMEA diagrams, fault tree, cut sets, importance measures, P&ID, and more.'
                 },
+                knowFTL: {
+                    label: 'KUREAS-FTL Fault Tree (.KNOW_FTL)',
+                    color: '#065f46',
+                    desc: 'Native KUREAS-FTL project file (JSON). Includes the system fault tree structure, basic event probabilities and descriptions, and pre-computed minimal cut sets. Load directly in KUREAS-FTL.'
+                },
                 relDB: {
                     label: 'Reliability Database (.relDB)',
                     color: '#1d4ed8',
@@ -4413,11 +4591,6 @@
                     label: 'FMEA Database (.fmeaDB)',
                     color: '#7c3aed',
                     desc: 'JSON-format FMEA database. Contains all component information including failure modes, FMEA data (severity, detection, mitigation, notes), and probability data. Full round-trip compatible with KUREAS-SYS Load Database.'
-                },
-                knowFTL: {
-                    label: 'KUREAS-FTL Fault Tree (.KNOW_FTL)',
-                    color: '#065f46',
-                    desc: 'Native KUREAS-FTL project file (JSON). Includes the system fault tree structure, basic event probabilities and descriptions, and pre-computed minimal cut sets. Load directly in KUREAS-FTL.'
                 },
                 saphireFAS: {
                     label: 'SAPHIRE Post-Processing Rules (.fas)',
@@ -4491,6 +4664,33 @@
                                     ? <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — Post-processing rules are generated from the full system fault tree and CCF expansion settings. The component selection above does not apply.</>
                                     : <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-FTL file is built from the complete system fault tree and includes all basic events derived from the SYSTEM WORKS expression. The component selection above does not apply.</>
                                 }
+                                {format === 'knowFTL' && (
+                                    <div style={{marginTop:'12px',paddingTop:'10px',borderTop:'1px solid #a7f3d0'}}>
+                                        <div style={{fontSize:'11px',fontWeight:'700',color:'#065f46',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.05em'}}>Cut Set Export Scope</div>
+                                        <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
+                                            <label style={{display:'flex',alignItems:'flex-start',gap:'8px',cursor:'pointer'}}>
+                                                <input type="radio" name="csExportMode" value="all" checked={cutSetExportMode==='all'} onChange={() => setCutSetExportMode('all')} style={{marginTop:'2px',accentColor:'#065f46'}}/>
+                                                <div>
+                                                    <div style={{fontSize:'12px',fontWeight:'600',color:'#064e3b'}}>All cut sets</div>
+                                                    <div style={{fontSize:'11px',color:'#6b7280',lineHeight:'1.4'}}>Export every minimal cut set regardless of probability.</div>
+                                                </div>
+                                            </label>
+                                            <label style={{display:'flex',alignItems:'flex-start',gap:'8px',cursor:'pointer'}}>
+                                                <input type="radio" name="csExportMode" value="aboveTruncation" checked={cutSetExportMode==='aboveTruncation'} onChange={() => setCutSetExportMode('aboveTruncation')} style={{marginTop:'2px',accentColor:'#065f46'}}/>
+                                                <div>
+                                                    <div style={{fontSize:'12px',fontWeight:'600',color:'#064e3b'}}>
+                                                        Above truncation threshold
+                                                        {settings?.cutSetTruncation && settings.cutSetTruncation !== 'none'
+                                                            ? <span style={{marginLeft:'6px',fontSize:'11px',fontWeight:'400',color:'#047857'}}>({settings.cutSetTruncation})</span>
+                                                            : <span style={{marginLeft:'6px',fontSize:'11px',fontWeight:'400',color:'#9ca3af'}}>(no threshold set &mdash; same as All)</span>
+                                                        }
+                                                    </div>
+                                                    <div style={{fontSize:'11px',color:'#6b7280',lineHeight:'1.4'}}>Export only cut sets at or above the project truncation probability.</div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             )}
                         </div>
@@ -4507,7 +4707,7 @@
             );
         }
 
-        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion }) {
+        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext }) {
             const [fileFormat, setFileFormat] = useState(() => {
                 return localStorage.getItem('KUREAS_SYS_reportFormat') || 'word';
             });
@@ -4871,17 +5071,31 @@
                 if (!failureLogicTree || !failureLogicTree.children || failureLogicTree.children.length === 0) {
                     return { cutSets: [], mcubValue: null, quantMethod: 'mcub', ccfEvents: {} };
                 }
-                
-                const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData);
-                
-                // Apply CCF expansion if enabled
+
+                // Pass the full truncation threshold to generateMinimalCutSets along with
+                // a CCF context. The context lets the BFS use a CCF-aware upper bound on
+                // post-CCF probability — so we can prune sub-threshold paths during
+                // generation even with CCF enabled, recovering the memory benefit.
+                // Example: {A,B,C} at 1E-4 each, beta=0.02, threshold=1E-10. The CCF-aware
+                // bound for partial path {A} is P=1E-4 (singleton, no CCF yet); for {A,B}
+                // it's max(P^2, beta*P) = max(1E-8, 2E-6) = 2E-6 (still above threshold,
+                // keep). Eventually CCF expansion produces the {ABC_CCF} cut set at 2E-6.
+                // For paths with no CCF-eligible events, the bound collapses to the plain
+                // product, so non-CCF systems get the same pruning as before.
+                const truncThreshold = parseTruncationThreshold(settings);
+                const ccfContext = buildCCFContext(basicEventData, sscsInSystem, settings);
+
+                const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData, truncThreshold, ccfContext);
+
+                // Apply CCF expansion if enabled (also internally truncates with the full
+                // threshold from settings)
                 const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(
-                    minimalCutSets, 
-                    basicEventData, 
-                    sscsInSystem, 
+                    minimalCutSets,
+                    basicEventData,
+                    sscsInSystem,
                     settings
                 );
-                
+
                 // Merge CCF basic events into a combined event data for probability calculations
                 const combinedEventData = { ...basicEventData, ...ccfBasicEvents };
                 
@@ -15521,6 +15735,15 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             const [showAnalysisProgress, setShowAnalysisProgress] = useState(false);
             const [analysisProgressStage, setAnalysisProgressStage] = useState(0);
             const [analysisProgressMsg, setAnalysisProgressMsg] = useState('');
+            // Stage list for the progress modal — different runners use different lists.
+            // Defaults to the full 4-stage list for the Compare flow; the FailureAnalysis
+            // runner overrides it to a 3-stage list (importance is now deferred).
+            const [analysisProgressStages, setAnalysisProgressStages] = useState([
+                { label: 'Logic Creation' },
+                { label: 'Cut Set Generation' },
+                { label: 'Cut Set Quantification' },
+                { label: 'Importance Measures' },
+            ]);
             const analysisCancelledRef = useRef(false);
             const [showLinkedFilesPrompt, setShowLinkedFilesPrompt] = useState(false);
             const [linkedFilesPromptData, setLinkedFilesPromptData] = useState(null);
@@ -15986,7 +16209,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 const $SCHEMA = {
                     format: 'KUREAS-SYS',
                     version: '1.0',
-                    appVersion: '1.4',
+                    appVersion: '1.5',
                     savedAt: new Date().toISOString(),
                     generator: 'KUREAS-SYS',
                     description: 'System Knowledge Management / Reliability Analysis file for the KUREAS suite',
@@ -16959,9 +17182,13 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     };
                     
                     const linkedTree = expandMultiModeSscs(linkedParsed);
-                    
-                    // Generate cut sets
-                    const linkedCutSets = generateMinimalCutSets(linkedTree, linkedBasicEventData);
+
+                    // Generate cut sets — apply project-wide truncation here too so a deeply-
+                    // nested linked subsystem can't blow memory while computing its own MCUB.
+                    // Note: unlike the main system path, the linked-subsystem evaluation has
+                    // no CCF expansion stage, so it's safe to use the full truncation
+                    // threshold during generation (no CCF-can-lift-it-back consideration).
+                    const linkedCutSets = generateMinimalCutSets(linkedTree, linkedBasicEventData, parseTruncationThreshold(linkedSettings));
                     
                     // Calculate probabilities
                     const cutSetProbs = linkedCutSets.map(cs => {
@@ -17014,16 +17241,38 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 analysisCancelledRef.current = false;
                 setAnalysisProgressStage(0);
                 setAnalysisProgressMsg('');
+                // Tell the progress modal to show only 3 stages — importance is deferred
+                // and now happens on demand in the results modal's Importance tab.
+                setAnalysisProgressStages([
+                    { label: 'Logic Creation' },
+                    { label: 'Cut Set Generation' },
+                    { label: 'Cut Set Quantification' },
+                ]);
                 setShowAnalysisProgress(true);
                 await yieldToBrowser();
 
+                // Note: "Importance Measures" used to be a stage here but is now
+                // deferred until the user clicks the Importance tab in the results
+                // modal. Importance calculation can take tens of seconds on large
+                // systems and is the place where the Cancel button used to become
+                // unresponsive (synchronous work blocked the JS thread). Deferring
+                // it lets the results window appear as soon as cut sets are ready.
                 const stages = [
                     'Building failure logic tree\u2026',
                     'Generating minimal cut sets\u2026',
                     'Quantifying cut set probabilities\u2026',
-                    'Calculating importance measures\u2026',
                 ];
 
+                // Tick through stages with their visible delays so the user has feedback
+                // that work is starting. The actual computation happens on modal mount; we
+                // intentionally DO NOT dismiss the progress dialog before mounting because
+                // the modal's useMemo work runs synchronously (cut set generation, CCF
+                // expansion, BDD build) and freezes the JS thread for potentially several
+                // seconds on complicated systems. While the thread is frozen, no new frame
+                // can paint — so whatever was on screen last (the progress dialog at the
+                // last stage) stays there until React commits the modal render. The modal
+                // then signals "ready" via the onAnalysisReady prop, and we dismiss the
+                // dialog at that point.
                 for (let i = 0; i < stages.length; i++) {
                     if (analysisCancelledRef.current) {
                         setShowAnalysisProgress(false);
@@ -17031,11 +17280,10 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     }
                     setAnalysisProgressStage(i + 1);
                     setAnalysisProgressMsg(stages[i]);
-                    // Yield so the modal re-renders with the new stage before the CPU work
+                    // Yield so the modal re-renders with the new stage before the next tick
                     await yieldToBrowser();
                     await yieldToBrowser();
-                    // Simulate stage timing (actual work happens in useMemo on modal mount)
-                    // Small async gap so the UI is visibly responsive
+                    // Visible pause so each stage is actually perceptible to the user.
                     await new Promise(resolve => setTimeout(resolve, 80));
                     if (analysisCancelledRef.current) {
                         setShowAnalysisProgress(false);
@@ -17043,8 +17291,9 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     }
                 }
 
-                setShowAnalysisProgress(false);
-                await yieldToBrowser();
+                // Don't dismiss the dialog here. Mount the modal; let it dismiss the dialog
+                // itself after its first paint via the onAnalysisReady callback we wire up
+                // in the modal-mount JSX.
                 if (!analysisCancelledRef.current) {
                     onReadyToOpen();
                 }
@@ -17085,6 +17334,14 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 analysisCancelledRef.current = false;
                 setAnalysisProgressStage(0);
                 setAnalysisProgressMsg('');
+                // Compare uses the full 4-stage list — it computes importance synchronously
+                // because the comparison view needs both sides' importance data eagerly.
+                setAnalysisProgressStages([
+                    { label: 'Logic Creation' },
+                    { label: 'Cut Set Generation' },
+                    { label: 'Cut Set Quantification' },
+                    { label: 'Importance Measures' },
+                ]);
                 setShowAnalysisProgress(true);
                 await yieldToBrowser();
 
@@ -17144,38 +17401,321 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             // Parse and translate system works expression to failure logic
             // ==================== CUT SET GENERATION AND QUANTIFICATION ====================
             // Based on KUREAS-FTA fault tree solver
-            
+
+            /**
+             * Parse the cut-set truncation setting into a numeric threshold.
+             * Returns null if truncation is disabled or unparseable.
+             * Threshold is the minimum probability a cut set must have to be retained.
+             */
+            function parseTruncationThreshold(settings) {
+                if (!settings) return null;
+                const raw = settings.cutSetTruncation;
+                if (!raw || raw === 'none') return null;
+                const v = parseFloat(raw);
+                if (isNaN(v) || v <= 0) return null;
+                return v;
+            }
+
+            /**
+             * The threshold that's safe to apply *during* cut-set generation (i.e. before
+             * CCF expansion has had a chance to run). When CCF is enabled, this returns
+             * null even if the user has set a truncation value, because CCF expansion can
+             * lift a cut set back above the threshold.
+             *
+             * Concrete example: a cut set {A, B, C} with each event at 1E-4 has probability
+             * 1E-12, well below a 1E-10 truncation threshold. But if A, B, C share a CCF
+             * component type / failure mode / probability, CCF expansion produces a CCF
+             * event whose probability is `beta * 1E-4 = 2E-6` (with beta = 0.02), which is
+             * far above 1E-10. Pruning the original cut set during generation would silently
+             * lose that CCF cut set.
+             *
+             * The full-strength truncation value still gets applied AFTER CCF expansion via
+             * applyCCFExpansion's internal truncation pass and the display-time filter.
+             *
+             * NOTE: This helper is now mostly superseded by buildCCFContext + the CCF-aware
+             * bound used in generateCutSets — when CCF is on, callers should pass a CCF
+             * context so the BFS can prune using a correct (CCF-aware) bound rather than
+             * skipping pruning entirely. We keep this around for callers that don't need
+             * memory-efficient generation under CCF (e.g. the export/report paths).
+             */
+            function earlyTruncationThreshold(settings) {
+                if (settings && settings.ccfModel === 'beta') return null;
+                return parseTruncationThreshold(settings);
+            }
+
+            /**
+             * Build a CCF context object that lets generateCutSets compute a CCF-aware
+             * upper bound on a partial path's post-CCF probability. The bound lets us
+             * prune sub-threshold paths during BFS even when CCF is enabled, recovering
+             * the memory benefit that earlyTruncationThreshold(settings) sacrifices.
+             *
+             * Returns null when CCF is disabled or settings are missing — callers should
+             * fall back to the plain probability bound in that case.
+             *
+             * The context exposes:
+             *   getSignature(eventName) → string|null
+             *       Same signature function as applyCCFExpansion uses, so events that
+             *       will form a CCF group post-expansion are identified consistently.
+             *   betaFactor: number
+             *       The CCF beta factor; used to compute beta * P for a group.
+             */
+            function buildCCFContext(basicEventData, sscsInSystem, settings) {
+                if (!settings || settings.ccfModel !== 'beta') return null;
+
+                const parsedBeta = parseFloat(settings.ccfBetaFactor);
+                const betaFactor = (!isNaN(parsedBeta) && settings.ccfBetaFactor !== '' && settings.ccfBetaFactor !== undefined)
+                    ? parsedBeta : 0.02;
+
+                // Replicate applyCCFExpansion's component-type lookup and signature logic
+                // exactly so the bound is consistent with the actual CCF expansion.
+                const sscComponentTypes = {};
+                if (Array.isArray(sscsInSystem)) {
+                    for (const ssc of sscsInSystem) {
+                        sscComponentTypes[ssc.name] = ssc.label;
+                        if (ssc.failureModes) {
+                            ssc.failureModes.forEach((fm, idx) => {
+                                const modeName = (fm.mode || `FM${idx + 1}`).replace(/\s+/g, '_');
+                                sscComponentTypes[`${ssc.name}__${modeName}`] = ssc.label;
+                            });
+                        }
+                    }
+                }
+
+                const parseEventName = (eventName) => {
+                    if (eventName.includes('__')) {
+                        const parts = eventName.split('__');
+                        return { sscName: parts[0], failureMode: parts[1] };
+                    }
+                    return { sscName: eventName, failureMode: '' };
+                };
+
+                const getSignature = (eventName) => {
+                    const data = basicEventData[eventName];
+                    if (!data || data.probability === null || data.probability === undefined) return null;
+                    if (data.isHouseEvent) return null;
+                    const { sscName, failureMode } = parseEventName(eventName);
+                    const componentType = sscComponentTypes[eventName] || sscComponentTypes[sscName] || '';
+                    const dist = data.distributionType || data.data?.distribution_type || 'CNI';
+                    const probRounded = data.probability.toExponential(1);
+                    return `${failureMode}|${probRounded}|${dist}|${componentType}`;
+                };
+
+                return { getSignature, betaFactor };
+            }
+
+            /**
+             * Compute a CCF-aware upper bound on the post-CCF probability of any cut set
+             * that descends from the given partial path. This is used as a pruning bound
+             * during BFS: if even the best-case post-CCF probability is below threshold,
+             * the path can be safely discarded.
+             *
+             * The bound is monotonically non-increasing as the path grows (proof sketch:
+             * adding an event either creates a new singleton group multiplying by P<1, or
+             * joins an existing group, where the new contribution is at most the old one).
+             *
+             * For each CCF signature group within the partial path:
+             *   - If the group has 1 event: contribution is P (no CCF possible yet, but
+             *     could become a group later as path extends — bound stays correct).
+             *   - If the group has ≥2 events: contribution is max(productOf(group), beta*P).
+             *     This is exactly what CCF expansion produces — independent product OR
+             *     CCF replacement, whichever the cut-set list will contain.
+             *
+             * Events without a CCF signature (no matching component-type lookup, house
+             * events, etc.) contribute their plain probability.
+             *
+             * Returns Infinity if any event has missing/unresolved probability data — in
+             * which case the bound is unusable and the path must not be pruned.
+             */
+            function pathPostCCFUpperBound(path, basicEventData, ccfContext) {
+                if (!ccfContext) {
+                    // Fall back to plain product
+                    let prob = 1.0;
+                    for (let i = 0; i < path.length; i++) {
+                        const node = path[i];
+                        if (node && (node.type === 'BASIC' || node.type === 'BASIC_NOT')) {
+                            const ed = basicEventData[node.label];
+                            if (!ed) return Infinity;
+                            if (ed.isLinked && !ed.linkedResolved) return Infinity;
+                            if (ed.probability === null || ed.probability === undefined) return Infinity;
+                            const p = node.type === 'BASIC_NOT' ? (1.0 - ed.probability) : ed.probability;
+                            prob *= p;
+                            if (prob === 0) return 0;
+                        }
+                    }
+                    return prob;
+                }
+
+                // Group events by signature. Singletons (sig === null or no other member)
+                // get their own bucket. Use a Map keyed by signature with array values.
+                // We also accumulate non-CCF (signature===null, or BASIC_NOT) events as
+                // independent contributors.
+                const groups = new Map();             // sig → { prob, count, productSoFar }
+                let independentProduct = 1.0;         // for events without a usable signature
+
+                for (let i = 0; i < path.length; i++) {
+                    const node = path[i];
+                    if (!node || (node.type !== 'BASIC' && node.type !== 'BASIC_NOT')) continue;
+                    const ed = basicEventData[node.label];
+                    if (!ed) return Infinity;
+                    if (ed.isLinked && !ed.linkedResolved) return Infinity;
+                    if (ed.probability === null || ed.probability === undefined) return Infinity;
+
+                    // Complement events (BASIC_NOT) can't participate in CCF — treat as independent
+                    if (node.type === 'BASIC_NOT') {
+                        independentProduct *= (1.0 - ed.probability);
+                        if (independentProduct === 0) return 0;
+                        continue;
+                    }
+
+                    const sig = ccfContext.getSignature(node.label);
+                    if (sig === null) {
+                        independentProduct *= ed.probability;
+                        if (independentProduct === 0) return 0;
+                        continue;
+                    }
+
+                    let g = groups.get(sig);
+                    if (!g) {
+                        g = { prob: ed.probability, count: 0, productSoFar: 1.0 };
+                        groups.set(sig, g);
+                    }
+                    g.count += 1;
+                    g.productSoFar *= ed.probability;
+                    if (g.productSoFar === 0) return 0;
+                }
+
+                // Aggregate group contributions
+                let bound = independentProduct;
+                for (const g of groups.values()) {
+                    let contribution;
+                    if (g.count === 1) {
+                        // Singleton — no CCF yet. Bound stays at P.
+                        contribution = g.productSoFar;
+                    } else {
+                        // ≥2 members — CCF expansion produces both alternatives;
+                        // upper bound is the larger.
+                        contribution = Math.max(g.productSoFar, ccfContext.betaFactor * g.prob);
+                    }
+                    bound *= contribution;
+                    if (bound === 0) return 0;
+                }
+                return bound;
+            }
+
+            /**
+             * Compute the probability of a cut set for the purpose of *truncation*.
+             * Differs from calculateCutSetProbability in two ways:
+             *  - returns Infinity for cut sets containing events with no probability data
+             *    (those must NEVER be truncated — we don't know their probability),
+             *  - skips the linked-event branch since it's caller-owned and may not be
+             *    resolved yet at generation time.
+             * Used internally by truncation passes; the canonical probability for
+             * reporting still comes from calculateCutSetProbability.
+             */
+            function _truncationProb(cutSet, basicEventData) {
+                let prob = 1.0;
+                for (let i = 0; i < cutSet.length; i++) {
+                    const eventName = cutSet[i];
+                    const isComplement = typeof eventName === 'string' && eventName.startsWith('NOT-');
+                    const baseName = isComplement ? eventName.slice(4) : eventName;
+                    const ed = basicEventData[baseName] || basicEventData[eventName];
+                    if (!ed) return Infinity; // unknown event — don't truncate
+                    if (ed.isLinked && !ed.linkedResolved) return Infinity; // unresolved link — don't truncate
+                    if (ed.probability === null || ed.probability === undefined) return Infinity;
+                    const p = isComplement ? (1.0 - ed.probability) : ed.probability;
+                    prob *= p;
+                    if (prob === 0) return 0; // can short-circuit; 0 is below any positive threshold
+                }
+                return prob;
+            }
+
+            /**
+             * Filter a cut-set list by truncation threshold. Cut sets whose probability
+             * is unknown (missing data) are KEPT — we never silently drop something we
+             * can't quantify. Returns { kept, droppedCount }.
+             */
+            function applyTruncation(cutSets, basicEventData, threshold) {
+                if (threshold === null || threshold === undefined) {
+                    return { kept: cutSets, droppedCount: 0 };
+                }
+                const kept = [];
+                let dropped = 0;
+                for (let i = 0; i < cutSets.length; i++) {
+                    const p = _truncationProb(cutSets[i], basicEventData);
+                    if (p === Infinity || p >= threshold) {
+                        kept.push(cutSets[i]);
+                    } else {
+                        dropped++;
+                    }
+                }
+                return { kept, droppedCount: dropped };
+            }
+
             /**
              * Generate minimal cut sets from fault tree structure
              * @param {Object} tree - Fault tree root node
              * @param {Object} basicEventData - Map of basic event names to probability data
+             * @param {number|null} truncThreshold - Optional probability threshold below which
+             *        cut sets are discarded during/after generation. Pass null for no truncation.
+             * @param {Object|null} ccfContext - Optional CCF context from buildCCFContext.
+             *        When provided, the BFS bound becomes a CCF-aware *upper bound* on the
+             *        post-CCF probability (so CCF expansion can lift small cut sets back
+             *        above threshold and we still prune correctly). When null, the bound is
+             *        the plain product (only safe when CCF is disabled).
              * @returns {Array} Array of minimal cut sets (each cut set is an array of event names)
              */
-            function generateMinimalCutSets(tree, basicEventData = {}) {
+            function generateMinimalCutSets(tree, basicEventData = {}, truncThreshold = null, ccfContext = null) {
                 if (!tree) return [];
-                
-                // Generate all cut sets using BFS
-                const allCutSets = generateCutSets(tree, basicEventData);
-                
+
+                // Generate all cut sets using BFS, with truncation pruning if a threshold is set.
+                const allCutSets = generateCutSets(tree, basicEventData, truncThreshold, ccfContext);
+
                 // Minimize the cut sets
                 const minimalCutSets = minimizeCutSets(allCutSets);
-                
+
+                // Final truncation pass after minimization. With a CCF context, we don't
+                // run this — the cut-set probabilities here are pre-CCF and may be below
+                // threshold even though their CCF-expanded form will be above. The post-CCF
+                // truncation in applyCCFExpansion handles the final filter. Without a CCF
+                // context (CCF off), the plain product is the final probability and we
+                // can safely apply the threshold here.
+                if (truncThreshold !== null && !ccfContext) {
+                    return applyTruncation(minimalCutSets, basicEventData, truncThreshold).kept;
+                }
                 return minimalCutSets;
             }
-            
+
             /**
-             * Generate all cut sets from fault tree using BFS
+             * Generate all cut sets from fault tree using BFS.
+             * If truncThreshold is supplied, partial paths whose (CCF-aware if ccfContext
+             * is provided, else plain) probability bound has dropped below the threshold
+             * are pruned. The bound is an upper bound on the post-CCF probability of any
+             * descendant cut set, so it's safe to prune below threshold.
              */
-            function generateCutSets(tree, basicEventData = {}) {
+            function generateCutSets(tree, basicEventData = {}, truncThreshold = null, ccfContext = null) {
                 const cutSets = [];
                 const queue = [[tree]];
-                
+
+                // Helper: upper bound on post-CCF probability of any cut set descended
+                // from this partial path. With ccfContext this accounts for CCF lifting;
+                // without, it's the plain probability product. Returns Infinity when any
+                // event has missing/unresolved data (caller treats as "do not prune").
+                const pathProb = (path) => pathPostCCFUpperBound(path, basicEventData, ccfContext);
+
                 while (queue.length > 0) {
                     const path = queue.shift();
                     const lastNode = path[path.length - 1];
-                    
+
                     if (!lastNode) continue;
-                    
+
+                    // Early truncation: if we know enough probabilities to bound this partial
+                    // path's product and it's already below threshold, prune. Adding more events
+                    // can only reduce the product further, so this is sound.
+                    if (truncThreshold !== null) {
+                        const pp = pathProb(path);
+                        if (pp !== Infinity && pp < truncThreshold) continue;
+                    }
+
                     if (lastNode.type === 'BASIC' || lastNode.type === 'BASIC_NOT') {
                         // Check for house events: prob=0 eliminates this path; prob=1 it's always present
                         const eventData = basicEventData[lastNode.label];
@@ -17228,10 +17768,10 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         }
                     } else if (lastNode.type === 'AND') {
                         // AND gate: all children must fail (expand combinatorially)
-                        expandAndGate(path, lastNode.children, queue, basicEventData);
+                        expandAndGate(path, lastNode.children, queue, basicEventData, truncThreshold, ccfContext);
                     } else if (lastNode.type && lastNode.type.includes('/')) {
                         // Voting gate (e.g., "2/3" means 2 out of 3 must fail)
-                        expandVotingGate(path, lastNode.children, lastNode.type, queue, basicEventData);
+                        expandVotingGate(path, lastNode.children, lastNode.type, queue, basicEventData, truncThreshold, ccfContext);
                     }
                 }
                 
@@ -17239,26 +17779,39 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             }
             
             /**
-             * Expand AND gate - all children must fail
+             * Expand AND gate - all children must fail.
+             * If truncThreshold is supplied, recursive child cut-set generation receives it
+             * and pre-pruned products carry through to here. After cartesian-product expansion
+             * we re-check each new path's bound and skip those already below threshold, so
+             * the queue never grows with cut sets we'll only delete later.
+             *
+             * When ccfContext is supplied, the bound is the CCF-aware upper bound on the
+             * post-CCF probability of any descendant — safe to prune below threshold even
+             * with CCF enabled.
              */
-            function expandAndGate(path, children, queue, basicEventData = {}) {
+            function expandAndGate(path, children, queue, basicEventData = {}, truncThreshold = null, ccfContext = null) {
                 // Generate all combinations where all children fail
                 const childrenToProcess = children.map(child => {
                     if (child.type === 'BASIC' || child.type === 'BASIC_NOT') {
                         return [[child]];
                     } else {
                         // Recursively generate cut sets for this child
-                        return generateCutSets(child, basicEventData);
+                        return generateCutSets(child, basicEventData, truncThreshold, ccfContext);
                     }
                 });
-                
+
+                // Empty product means at least one branch had no surviving cut sets — discard.
+                for (let i = 0; i < childrenToProcess.length; i++) {
+                    if (childrenToProcess[i].length === 0) return;
+                }
+
                 // Cartesian product of all child cut sets
                 const combinations = cartesianProduct(childrenToProcess);
-                
+
                 for (const combo of combinations) {
                     const newPath = path.slice(0, -1); // Remove AND gate
                     const flatCombo = combo.flat();
-                    
+
                     // Add all basic events from the combination
                     for (const item of flatCombo) {
                         if (typeof item === 'object' && (item.type === 'BASIC' || item.type === 'BASIC_NOT')) {
@@ -17267,40 +17820,53 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             newPath.push({ type: 'BASIC', label: item });
                         }
                     }
-                    
+
+                    // Pre-prune at enqueue time using the same bound the BFS loop uses.
+                    if (truncThreshold !== null) {
+                        const bound = pathPostCCFUpperBound(newPath, basicEventData, ccfContext);
+                        if (bound !== Infinity && bound < truncThreshold) continue;
+                    }
+
                     queue.push(newPath);
                 }
             }
-            
+
             /**
              * Expand voting gate (k/n gate)
              */
-            function expandVotingGate(path, children, gateType, queue, basicEventData = {}) {
+            function expandVotingGate(path, children, gateType, queue, basicEventData = {}, truncThreshold = null, ccfContext = null) {
                 const match = gateType.match(/(\d+)\/(\d+)/);
                 if (!match) return;
-                
+
                 const k = parseInt(match[1]); // Number that must fail
                 const n = parseInt(match[2]); // Total number
-                
+
                 // Generate all combinations of k failures from n children
                 const combinations = generateCombinations(children, k);
-                
+
                 for (const combo of combinations) {
                     const childrenToProcess = combo.map(child => {
                         if (child.type === 'BASIC' || child.type === 'BASIC_NOT') {
                             return [[child]];
                         } else {
-                            return generateCutSets(child, basicEventData);
+                            return generateCutSets(child, basicEventData, truncThreshold, ccfContext);
                         }
                     });
-                    
+
+                    // Skip combinations where any branch has no surviving cut sets.
+                    let anyEmpty = false;
+                    for (let i = 0; i < childrenToProcess.length; i++) {
+                        if (childrenToProcess[i].length === 0) { anyEmpty = true; break; }
+                    }
+                    if (anyEmpty) continue;
+
                     // Cartesian product of selected children
                     const products = cartesianProduct(childrenToProcess);
-                    
+
                     for (const prod of products) {
                         const newPath = path.slice(0, -1); // Remove voting gate
                         const flatProd = prod.flat();
-                        
+
                         for (const item of flatProd) {
                             if (typeof item === 'object' && (item.type === 'BASIC' || item.type === 'BASIC_NOT')) {
                                 newPath.push(item);
@@ -17308,7 +17874,13 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                 newPath.push({ type: 'BASIC', label: item });
                             }
                         }
-                        
+
+                        // Pre-prune at enqueue time using the same bound the BFS loop uses.
+                        if (truncThreshold !== null) {
+                            const bound = pathPostCCFUpperBound(newPath, basicEventData, ccfContext);
+                            if (bound !== Infinity && bound < truncThreshold) continue;
+                        }
+
                         queue.push(newPath);
                     }
                 }
@@ -17361,54 +17933,98 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             }
             
             /**
-             * Minimize cut sets by removing non-minimal sets
+             * Minimize cut sets by removing non-minimal sets.
+             *
+             * Performance notes:
+             *  - Buckets the kept (already-minimal) cut sets by their smallest event so that
+             *    when we test a candidate, we only check buckets whose pivot event the
+             *    candidate actually contains. This avoids O(n) scans against the full kept list.
+             *  - Subset check uses Set.has() (O(1) per element) instead of Array.includes().
+             *  - Smaller cut sets are processed first, so any candidate that is non-minimal
+             *    is guaranteed to be subsumed by something already in the kept list.
              */
             function minimizeCutSets(cutSets) {
                 if (cutSets.length === 0) return [];
-                
-                // Convert to unique sets and sort by size
+
+                // Deduplicate: stable canonical form is sorted-by-name and joined.
                 const uniqueSets = [];
                 const seenSets = new Set();
-                
+
                 for (const cutSet of cutSets) {
                     const sortedSet = cutSet.slice().sort();
-                    const key = sortedSet.join(',');
+                    const key = sortedSet.join('\u0001'); // SOH separator — won't appear in event names
                     if (!seenSets.has(key)) {
                         seenSets.add(key);
                         uniqueSets.push(sortedSet);
                     }
                 }
-                
-                // Sort by size (smaller first)
+
+                // Sort by size ascending: any non-minimal cut set must be a strict superset of
+                // a smaller (already-kept) cut set, so we only need to look at smaller ones.
                 uniqueSets.sort((a, b) => a.length - b.length);
-                
-                // Remove non-minimal sets
+
+                // Build event-keyed buckets of kept cut sets. For each kept cut set we put it
+                // under its first (lexicographically smallest) event, plus we keep a flat
+                // "kept" array for lookups. A candidate C can only be subsumed by a kept K if
+                // K's first event ∈ C. So when testing C, we only need to walk buckets whose
+                // pivot event is in C — a tiny subset of the full kept list in practice.
                 const minimal = [];
+                const buckets = new Map(); // pivot event -> array of {set: Array, setObj: Set}
+
                 for (let i = 0; i < uniqueSets.length; i++) {
+                    const candidate = uniqueSets[i];
+                    const candidateLen = candidate.length;
+                    const candidateSet = new Set(candidate);
+
                     let isMinimal = true;
-                    
-                    for (let j = 0; j < i; j++) {
-                        if (uniqueSets[j].length > uniqueSets[i].length) break;
-                        if (isSubset(uniqueSets[j], uniqueSets[i])) {
-                            isMinimal = false;
-                            break;
+
+                    // For each event in the candidate, look up its bucket. If any kept cut set
+                    // in that bucket is fully contained in the candidate, candidate is subsumed.
+                    // We try the candidate's events in order, but every kept set has its pivot
+                    // somewhere in the candidate (since pivot ∈ candidate is the precondition).
+                    for (let p = 0; p < candidate.length && isMinimal; p++) {
+                        const bucket = buckets.get(candidate[p]);
+                        if (!bucket) continue;
+                        for (let b = 0; b < bucket.length; b++) {
+                            const kept = bucket[b];
+                            // Length pruning: a kept set strictly larger than candidate can't subsume it.
+                            // (Same length means not a strict superset; but identical sets were dedup'd.)
+                            if (kept.set.length > candidateLen) continue;
+                            // Subset check: every element of kept must be in candidateSet.
+                            let isSub = true;
+                            const kArr = kept.set;
+                            for (let q = 0; q < kArr.length; q++) {
+                                if (!candidateSet.has(kArr[q])) { isSub = false; break; }
+                            }
+                            if (isSub) { isMinimal = false; break; }
                         }
                     }
-                    
+
                     if (isMinimal) {
-                        minimal.push(uniqueSets[i]);
+                        minimal.push(candidate);
+                        // Place into bucket keyed by its first event (sorted, so it's the smallest).
+                        const pivot = candidate[0];
+                        let bucket = buckets.get(pivot);
+                        if (!bucket) { bucket = []; buckets.set(pivot, bucket); }
+                        bucket.push({ set: candidate });
                     }
                 }
-                
+
                 return minimal;
             }
-            
+
             /**
-             * Check if subset is a subset of superset
+             * Check if subset is a subset of superset.
+             * Note: the hot path in minimizeCutSets uses an inlined Set check; this remains
+             * for any external callers that pass arrays.
              */
             function isSubset(subset, superset) {
                 if (subset.length > superset.length) return false;
-                return subset.every(elem => superset.includes(elem));
+                const sup = new Set(superset);
+                for (let i = 0; i < subset.length; i++) {
+                    if (!sup.has(subset[i])) return false;
+                }
+                return true;
             }
             
             /**
@@ -17627,22 +18243,31 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     generateCCFCombinations(0, cutSet, new Set());
                 }
                 
-                // Remove duplicate cut sets and minimize
+                // Remove duplicate cut sets and minimize.
+                // Use a sentinel separator that can't appear in event names.
                 const uniqueExpanded = [];
                 const seenKeys = new Set();
-                
+
                 for (const cs of expandedCutSets) {
                     const sorted = [...cs].sort();
-                    const key = sorted.join('|');
+                    const key = sorted.join('\u0001');
                     if (!seenKeys.has(key)) {
                         seenKeys.add(key);
                         uniqueExpanded.push(sorted);
                     }
                 }
-                
+
                 // Re-minimize (CCF cut sets might subsume original cut sets or vice versa)
-                const minimized = minimizeCutSets(uniqueExpanded);
-                
+                let minimized = minimizeCutSets(uniqueExpanded);
+
+                // Apply truncation if requested. CCF events need to be visible in the lookup
+                // for _truncationProb to evaluate cut sets that include them.
+                const truncThreshold = parseTruncationThreshold(settings);
+                if (truncThreshold !== null) {
+                    const combined = { ...basicEventData, ...ccfBasicEvents };
+                    minimized = applyTruncation(minimized, combined, truncThreshold).kept;
+                }
+
                 return { expandedCutSets: minimized, ccfBasicEvents };
             }
             
@@ -17876,95 +18501,28 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             }
             
             /**
-             * BDD-based memoized calculation for larger problems
-             * Uses Shannon decomposition: P(f) = P(x) * P(f|x=1) + P(~x) * P(f|x=0)
+             * BDD-based memoized calculation for larger problems.
+             * Uses Shannon decomposition: P(f) = P(x) * P(f|x=1) + P(~x) * P(f|x=0).
+             *
+             * Implementation note: this delegates to the same buildBDDTree/evaluateBDDTree
+             * pair used by buildImportanceEngine, so we don't maintain two BDD code paths.
+             * That gives us the Number-mask fast path (≤53 events), the optimized cache key,
+             * and lets one-shot quantification share the structural build with importance
+             * measures if a caller wants to (currently they don't, but the cost is the same).
              */
             function calculateBDDMemoized(cutSets, eventData, allEvents) {
-                // Get probability for an event
-                const getEventProb = (eventName) => {
-                    const data = eventData[eventName];
-                    return data?.probability || 0;
-                };
-                
-                // Convert events to ordered array for consistent variable ordering
-                const eventList = Array.from(allEvents).sort();
-                const eventIndex = new Map();
-                eventList.forEach((e, i) => eventIndex.set(e, i));
-                
-                // Convert cut sets to bitmasks for efficient operations
-                const cutSetMasks = cutSets.map(cs => {
-                    let mask = 0n;
-                    for (const event of cs) {
-                        const idx = eventIndex.get(event);
-                        mask |= (1n << BigInt(idx));
-                    }
-                    return mask;
-                });
-                
-                // Memoization cache
-                const cache = new Map();
-                
-                // Recursive BDD evaluation with Shannon decomposition
-                // varIdx: current variable index being considered
-                // remainingMasks: cut set masks that haven't been satisfied yet
-                const evaluate = (varIdx, remainingMasks) => {
-                    // Base cases
-                    if (remainingMasks.length === 0) {
-                        return 0; // No cut sets to satisfy = probability 0
-                    }
-                    
-                    // Check if any cut set is already satisfied (empty after removing assigned vars)
-                    for (const mask of remainingMasks) {
-                        if (mask === 0n) {
-                            return 1; // At least one cut set is satisfied = probability 1
-                        }
-                    }
-                    
-                    if (varIdx >= eventList.length) {
-                        return 0; // No more variables to assign
-                    }
-                    
-                    // Create cache key
-                    const cacheKey = `${varIdx}:${remainingMasks.map(m => m.toString(16)).sort().join(',')}`;
-                    if (cache.has(cacheKey)) {
-                        return cache.get(cacheKey);
-                    }
-                    
-                    const eventName = eventList[varIdx];
-                    const eventProb = getEventProb(eventName);
-                    const varBit = 1n << BigInt(varIdx);
-                    
-                    // Shannon decomposition: P(f) = p * P(f|x=1) + (1-p) * P(f|x=0)
-                    
-                    // Case x=1 (event fails): remove this event from all cut sets that contain it
-                    const masksIfTrue = remainingMasks.map(mask => {
-                        if (mask & varBit) {
-                            return mask & ~varBit; // Remove this variable from the cut set
-                        }
-                        return mask;
-                    });
-                    const probIfTrue = evaluate(varIdx + 1, masksIfTrue);
-                    
-                    // Case x=0 (event works): remove cut sets that require this event
-                    const masksIfFalse = remainingMasks.filter(mask => !(mask & varBit));
-                    const probIfFalse = evaluate(varIdx + 1, masksIfFalse);
-                    
-                    // Combine
-                    const result = eventProb * probIfTrue + (1 - eventProb) * probIfFalse;
-                    
-                    cache.set(cacheKey, result);
-                    return result;
-                };
-                
-                const probability = evaluate(0, cutSetMasks);
-                
+                const tree = buildBDDTree(cutSets, allEvents);
+                if (!tree) {
+                    return { probability: 0, method: 'BDD', details: { numCutSets: 0, numEvents: 0 } };
+                }
+                // evaluateBDDTree handles both the {name: {probability}} object form and Maps.
+                const probability = evaluateBDDTree(tree, eventData);
                 return {
-                    probability: Math.max(0, Math.min(1, probability)),
+                    probability,
                     method: 'BDD',
                     details: {
                         numCutSets: cutSets.length,
-                        numEvents: eventList.length,
-                        cacheSize: cache.size
+                        numEvents: tree.eventList.length
                     }
                 };
             }
@@ -17975,6 +18533,12 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
              * metadata needed for fast requantification.
              * Call this ONCE per cut-set collection, then call evaluateBDDTree
              * repeatedly with different probability maps.
+             *
+             * Performance: when there are ≤31 unique events we use plain Number bitmasks,
+             * which are dramatically faster than BigInt for the bit ops and (crucially)
+             * for the cache-key string construction. Above 31 events we fall back to BigInt.
+             * The 31-event ceiling is the safe range for JavaScript's 32-bit-signed bitwise
+             * operators; bit 31 of a Number is the sign bit, so 1 << 31 goes negative.
              */
             function buildBDDTree(cutSets, allEventsSet) {
                 if (!cutSets || cutSets.length === 0) return null;
@@ -17983,6 +18547,73 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 const eventIndex = new Map();
                 eventList.forEach((e, i) => eventIndex.set(e, i));
 
+                // useNumber: cap at 31 unique events so all bitwise ops (`<<`, `&`, `~`, `|`)
+                // operate within JavaScript's signed 32-bit int range and produce exact
+                // results. We use 31 (not 32) because 1 << 31 produces a negative number
+                // due to two's-complement, which would break sort-as-number cache keys.
+                const useNumber = eventList.length <= 31;
+
+                if (useNumber) {
+                    // ── Number bitmask path (≤31 events) ──────────────────────
+                    const cutSetMasks = cutSets.map(cs => {
+                        let mask = 0;
+                        for (const event of cs) {
+                            const idx = eventIndex.get(event);
+                            if (idx !== undefined) mask |= (1 << idx);
+                        }
+                        return mask;
+                    });
+
+                    const nodeCache = new Map();
+
+                    const buildNode = (varIdx, remainingMasks) => {
+                        if (remainingMasks.length === 0) return null;
+                        for (let i = 0; i < remainingMasks.length; i++) {
+                            if (remainingMasks[i] === 0) return 'ONE';
+                        }
+                        if (varIdx >= eventList.length) return null;
+
+                        // Cache key: sorted unique masks joined. Numbers sort numerically
+                        // once per call. Dedupe with a Set first — collapsed subtrees
+                        // commonly produce duplicates.
+                        const uniq = Array.from(new Set(remainingMasks)).sort((a, b) => a - b);
+                        const cacheKey = varIdx + ':' + uniq.join(',');
+                        const cached = nodeCache.get(cacheKey);
+                        if (cached !== undefined) return cached;
+
+                        const varBit = 1 << varIdx;
+                        const eventName = eventList[varIdx];
+
+                        // high branch: event = 1 (fails) — clear bit in cut sets that have it
+                        const masksHigh = new Array(remainingMasks.length);
+                        for (let i = 0; i < remainingMasks.length; i++) {
+                            const m = remainingMasks[i];
+                            masksHigh[i] = (m & varBit) ? (m & ~varBit) : m;
+                        }
+                        const high = buildNode(varIdx + 1, masksHigh);
+
+                        // low branch: event = 0 — drop cut sets requiring this event
+                        const masksLow = [];
+                        for (let i = 0; i < remainingMasks.length; i++) {
+                            if (!(remainingMasks[i] & varBit)) masksLow.push(remainingMasks[i]);
+                        }
+                        const low = buildNode(varIdx + 1, masksLow);
+
+                        if (high === low) {
+                            nodeCache.set(cacheKey, high);
+                            return high;
+                        }
+
+                        const node = { varIdx, eventName, high, low };
+                        nodeCache.set(cacheKey, node);
+                        return node;
+                    };
+
+                    const root = buildNode(0, cutSetMasks);
+                    return { root, eventList, eventIndex };
+                }
+
+                // ── BigInt fallback for >53 events ────────────────────────────
                 const cutSetMasks = cutSets.map(cs => {
                     let mask = 0n;
                     for (const event of cs) {
@@ -17992,34 +18623,39 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     return mask;
                 });
 
-                // Build structural tree nodes (no probabilities stored)
-                // Node: null = terminal-0, 'ONE' = terminal-1, or { varIdx, eventName, high, low }
                 const nodeCache = new Map();
 
                 const buildNode = (varIdx, remainingMasks) => {
-                    if (remainingMasks.length === 0) return null; // terminal 0
-                    for (const mask of remainingMasks) {
-                        if (mask === 0n) return 'ONE'; // terminal 1
+                    if (remainingMasks.length === 0) return null;
+                    for (let i = 0; i < remainingMasks.length; i++) {
+                        if (remainingMasks[i] === 0n) return 'ONE';
                     }
-                    if (varIdx >= eventList.length) return null; // terminal 0
+                    if (varIdx >= eventList.length) return null;
 
-                    const cacheKey = `${varIdx}:${[...remainingMasks].map(m => m.toString(16)).sort().join(',')}`;
-                    if (nodeCache.has(cacheKey)) return nodeCache.get(cacheKey);
+                    // Dedupe and sort to canonicalise the cache key.
+                    const uniqSet = new Set();
+                    for (let i = 0; i < remainingMasks.length; i++) uniqSet.add(remainingMasks[i].toString(16));
+                    const uniq = Array.from(uniqSet).sort();
+                    const cacheKey = varIdx + ':' + uniq.join(',');
+                    const cached = nodeCache.get(cacheKey);
+                    if (cached !== undefined) return cached;
 
                     const varBit = 1n << BigInt(varIdx);
                     const eventName = eventList[varIdx];
 
-                    // high branch: event = 1 (fails)
-                    const masksHigh = remainingMasks.map(mask =>
-                        (mask & varBit) ? (mask & ~varBit) : mask
-                    );
+                    const masksHigh = new Array(remainingMasks.length);
+                    for (let i = 0; i < remainingMasks.length; i++) {
+                        const m = remainingMasks[i];
+                        masksHigh[i] = (m & varBit) ? (m & ~varBit) : m;
+                    }
                     const high = buildNode(varIdx + 1, masksHigh);
 
-                    // low branch: event = 0 (works)
-                    const masksLow = remainingMasks.filter(mask => !(mask & varBit));
+                    const masksLow = [];
+                    for (let i = 0; i < remainingMasks.length; i++) {
+                        if (!(remainingMasks[i] & varBit)) masksLow.push(remainingMasks[i]);
+                    }
                     const low = buildNode(varIdx + 1, masksLow);
 
-                    // Reduction: if both branches are identical, skip this node
                     if (high === low) {
                         nodeCache.set(cacheKey, high);
                         return high;
@@ -18072,7 +18708,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
              * Returns a function: computeImportance(eventName, eventProb, baseProb, settings)
              * that calculates RIR/RRR/PC/SWIM for one event very quickly.
              *
-             * For MCUB: precomputes all cut-set log-products; only patches affected cut sets.
+             * For MCUB: precomputes per-cut-set products plus, for each event, the indices
+             *           of cut sets it appears in. Per-event work is O(|affected|), not O(n).
              * For BDD:  builds the BDD tree once; requantifies by swapping one probability.
              *
              * Call buildImportanceEngine ONCE, then loop over events calling the returned fn.
@@ -18087,20 +18724,18 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     validCutSets.forEach(cs => cs.events.forEach(e => allEventsSet.add(e)));
                     const bddTree = buildBDDTree(cutSetEvents, allEventsSet);
 
-                    // Base probability map (plain object, fast lookup)
-                    const baseMap = {};
+                    // Reusable Map to avoid per-call allocations during BDD evaluation.
+                    // We construct it once here, and mutate one entry per calcProb call.
+                    const probMap = new Map();
                     for (const name of allEventsSet) {
-                        baseMap[name] = combinedEventData[name]?.probability ?? 0;
+                        probMap.set(name, combinedEventData[name]?.probability ?? 0);
                     }
 
                     const calcProb = (overrideName, overrideVal) => {
-                        // Swap just one entry — no full object copy needed
-                        const orig = baseMap[overrideName];
-                        baseMap[overrideName] = overrideVal;
-                        const p = evaluateBDDTree(bddTree, {
-                            get: (n) => n === overrideName ? overrideVal : (combinedEventData[n]?.probability ?? 0)
-                        });
-                        baseMap[overrideName] = orig;
+                        const orig = probMap.get(overrideName);
+                        probMap.set(overrideName, overrideVal);
+                        const p = evaluateBDDTree(bddTree, probMap);
+                        probMap.set(overrideName, orig);
                         return p;
                     };
 
@@ -18114,48 +18749,135 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     };
 
                 } else {
-                    // ── MCUB / rare-event path: precompute cut-set products ──────
-                    // csProbs[i] = product of all event probs in cut set i
-                    const csProbs = validCutSets.map(cs =>
-                        cs.events.reduce((prod, ev) => prod * (combinedEventData[ev]?.probability ?? 0), 1.0)
-                    );
+                    // ── MCUB / rare-event path: O(|affected|) per event ──────────
+                    //
+                    // Precompute the per-cut-set product P_i = ∏ p_e for e in cs_i.
+                    // For RIR/RRR we need the system probability when one event's prob is
+                    // overridden to 1 or 0. Only cut sets that contain the event are affected.
+                    //
+                    // MCUB:    sysProb = 1 - ∏ (1 - P_i)
+                    //          We maintain a running log-product over all cut sets, and for
+                    //          each event we know which cut sets are affected. To recompute
+                    //          for an override, we subtract the affected cut sets' log(1-P_i)
+                    //          contribution and add the new ones — all O(|affected|).
+                    //
+                    // Rare:    sysProb = min(1, sum P_i)
+                    //          Equivalent — subtract old, add new for affected cut sets.
+                    //
+                    // We use Number sums of log(1-P_i) rather than running products to avoid
+                    // catastrophic floating-point underflow with thousands of cut sets, then
+                    // exponentiate at the end.
 
-                    // For each event, which cut sets contain it?
-                    const eventToCutSets = new Map();
-                    validCutSets.forEach((cs, i) => {
-                        cs.events.forEach(ev => {
-                            if (!eventToCutSets.has(ev)) eventToCutSets.set(ev, []);
-                            eventToCutSets.get(ev).push(i);
-                        });
-                    });
+                    const n = validCutSets.length;
 
-                    const calcSystemProbFromPriors = (probs) => {
-                        if (method === 'rare') {
-                            return Math.min(1.0, probs.reduce((s, p) => s + p, 0));
+                    // Per-cut-set probability product
+                    const csProbs = new Array(n);
+                    // log(1 - P_i) per cut set, used by MCUB path
+                    const csLogComp = new Array(n);
+                    let totalLogComp = 0;
+                    let totalSum = 0;
+
+                    for (let i = 0; i < n; i++) {
+                        const events = validCutSets[i].events;
+                        let prod = 1.0;
+                        for (let j = 0; j < events.length; j++) {
+                            prod *= (combinedEventData[events[j]]?.probability ?? 0);
                         }
-                        return 1 - probs.reduce((prod, p) => prod * (1 - p), 1.0); // MCUB
+                        csProbs[i] = prod;
+                        // Clamp 1 - P_i to a strictly positive number; log(0) is -Infinity.
+                        // For P_i = 1 exactly we lose precision but those are degenerate anyway.
+                        const lc = Math.log(Math.max(1e-300, 1 - prod));
+                        csLogComp[i] = lc;
+                        totalLogComp += lc;
+                        totalSum += prod;
+                    }
+
+                    // Map: event name → array of cut-set indices that contain it.
+                    // Stored as plain arrays (numerically-indexed access is hot).
+                    const eventToCutSets = new Map();
+                    for (let i = 0; i < n; i++) {
+                        const events = validCutSets[i].events;
+                        for (let j = 0; j < events.length; j++) {
+                            const ev = events[j];
+                            let arr = eventToCutSets.get(ev);
+                            if (!arr) { arr = []; eventToCutSets.set(ev, arr); }
+                            arr.push(i);
+                        }
+                    }
+
+                    // Compute the new system probability when one event is overridden.
+                    // affected: indices of cut sets containing the event
+                    // origProb: the event's current probability (so we can scale)
+                    // overrideVal: 0 or 1
+                    const calcSysProb = (affected, origProb, overrideVal) => {
+                        if (affected.length === 0) {
+                            // Event isn't in any cut set — system prob unchanged
+                            return systemProb;
+                        }
+
+                        if (method === 'rare') {
+                            // Rare-event sum: subtract old contributions, add new
+                            let newSum = totalSum;
+                            for (let k = 0; k < affected.length; k++) {
+                                const i = affected[k];
+                                const oldP = csProbs[i];
+                                let newP;
+                                if (origProb > 0) {
+                                    newP = oldP * (overrideVal / origProb);
+                                } else {
+                                    // Original product was 0 because origProb was 0; can't
+                                    // recover the rest of the product analytically. Fall back
+                                    // to recomputing the cut set product with override.
+                                    newP = overrideVal === 0 ? 0 : recomputeCSProd(i, eventName_, overrideVal);
+                                }
+                                newSum += (newP - oldP);
+                            }
+                            return Math.max(0, Math.min(1, newSum));
+                        }
+
+                        // MCUB: 1 - exp(sum log(1 - P_i))
+                        // Subtract affected cut sets' old contribution, add new.
+                        let newLogComp = totalLogComp;
+                        for (let k = 0; k < affected.length; k++) {
+                            const i = affected[k];
+                            const oldP = csProbs[i];
+                            let newP;
+                            if (origProb > 0) {
+                                newP = oldP * (overrideVal / origProb);
+                            } else {
+                                newP = overrideVal === 0 ? 0 : recomputeCSProd(i, eventName_, overrideVal);
+                            }
+                            const newLc = Math.log(Math.max(1e-300, 1 - newP));
+                            newLogComp += (newLc - csLogComp[i]);
+                        }
+                        return Math.max(0, Math.min(1, 1 - Math.exp(newLogComp)));
                     };
 
-                    // Return per-event calculator
+                    // Fallback path used only when origProb is 0 and we need the cut-set
+                    // product with one event swapped to a different value. Stays correct
+                    // (matches the original implementation) at the cost of O(|cs|) work.
+                    let eventName_ = null; // closed over; set inside the returned fn
+                    const recomputeCSProd = (csIdx, evName, overrideVal) => {
+                        const events = validCutSets[csIdx].events;
+                        let prod = 1.0;
+                        for (let j = 0; j < events.length; j++) {
+                            const e = events[j];
+                            if (e === evName) prod *= overrideVal;
+                            else prod *= (combinedEventData[e]?.probability ?? 0);
+                        }
+                        return prod;
+                    };
+
                     return (eventName) => {
                         const ed = combinedEventData[eventName];
                         if (!ed || ed.probability === null || ed.probability === undefined || ed.isLinked) return null;
 
+                        eventName_ = eventName;
                         const origProb = ed.probability;
-                        const affectedIndices = eventToCutSets.get(eventName) || [];
+                        const affected = eventToCutSets.get(eventName) || [];
 
-                        // Patch only affected cut-set products
-                        const patchedProbs = (overrideVal) => {
-                            const ratio = origProb > 0 ? overrideVal / origProb : overrideVal;
-                            return csProbs.map((p, i) => {
-                                if (!affectedIndices.includes(i)) return p;
-                                // Replace origProb with overrideVal in the product
-                                return origProb > 0 ? p * ratio : overrideVal; // if origProb=0, cs product was 0 anyway
-                            });
-                        };
-
-                        const prob1 = calcSystemProbFromPriors(patchedProbs(1.0));
-                        const prob0 = calcSystemProbFromPriors(patchedProbs(0.0));
+                        const prob1 = calcSysProb(affected, origProb, 1.0);
+                        const prob0 = calcSysProb(affected, origProb, 0.0);
                         return _calcMeasures(origProb, prob1, prob0, systemProb, ed, eventName);
                     };
                 }
@@ -19444,11 +20166,19 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         };
                         
                         failureLogicTree = expandMultiModeSscs(failureLogicTree);
-                        
-                        // Generate minimal cut sets
-                        const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData);
-                        
-                        // Apply CCF expansion
+
+                        // Generate minimal cut sets with CCF-aware BFS pruning. The CCF
+                        // context lets us safely prune sub-threshold paths during BFS even
+                        // with CCF enabled, because the bound accounts for CCF expansion's
+                        // ability to lift small cut sets back above threshold.
+                        const minimalCutSets = generateMinimalCutSets(
+                            failureLogicTree,
+                            basicEventData,
+                            parseTruncationThreshold(settings),
+                            buildCCFContext(basicEventData, sscsInSystem, settings)
+                        );
+
+                        // Apply CCF expansion (also runs full-threshold truncation post-expansion)
                         const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(
                             minimalCutSets, 
                             basicEventData, 
@@ -19626,7 +20356,15 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     let combinedEventData = basicEventData;
                     let cutSetsWithProb = [];
                     try {
-                        const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData);
+                        // CCF-aware BFS pruning: pass the full threshold + a CCF context so
+                        // sub-threshold paths get pruned during generation while still
+                        // accounting for CCF lifting (see pathPostCCFUpperBound docs).
+                        const minimalCutSets = generateMinimalCutSets(
+                            failureLogicTree,
+                            basicEventData,
+                            parseTruncationThreshold(settings),
+                            buildCCFContext(basicEventData, sscs, settings)
+                        );
                         const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(minimalCutSets, basicEventData, sscs, settings);
                         combinedEventData = { ...basicEventData, ...ccfBasicEvents };
                         cutSetsWithProb = expandedCutSets.map((cutSet, index) => {
@@ -20496,12 +21234,16 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
 
 
             // ── Analysis Progress Modal ──────────────────────────────────────────
-            function AnalysisProgressModal({ stage, message, onCancel }) {
-                const stages = [
-                    { label: 'Logic Creation',           icon: '\u{1F9EE}' },
-                    { label: 'Cut Set Generation',       icon: '\u2702\uFE0F'  },
-                    { label: 'Cut Set Quantification',   icon: '\u{1F4CA}' },
-                    { label: 'Importance Measures',      icon: '\u{1F3AF}' },
+            // The `stages` prop lets each runner control how many steps appear in the
+            // dialog. The "How the System Fails" runner uses 3 stages because importance
+            // measures are now deferred until the user opens the Importance tab; the
+            // Compare runner uses 4 because it computes importance eagerly for both sides.
+            function AnalysisProgressModal({ stage, message, onCancel, stages }) {
+                const stageList = stages && stages.length > 0 ? stages : [
+                    { label: 'Logic Creation' },
+                    { label: 'Cut Set Generation' },
+                    { label: 'Cut Set Quantification' },
+                    { label: 'Importance Measures' },
                 ];
                 return (
                     <div className="fixed inset-0 flex items-center justify-center z-[9999]"
@@ -20521,7 +21263,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                             </div>
 
                             <div className="space-y-2 mb-5">
-                                {stages.map((s, i) => {
+                                {stageList.map((s, i) => {
                                     const idx = i + 1;
                                     const done    = stage > idx;
                                     const active  = stage === idx;
@@ -20556,7 +21298,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                             {/* Overall progress bar */}
                             <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
                                 <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-                                     style={{ width: `${Math.min(100, (stage / stages.length) * 100)}%` }}/>
+                                     style={{ width: `${Math.min(100, (stage / stageList.length) * 100)}%` }}/>
                             </div>
 
                             <div className="flex justify-end">
@@ -20639,7 +21381,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
             }
 
             // Failure Analysis Modal Component
-            function FailureAnalysisModal({ onClose, settings, backgroundStyle, fontSizeClass, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, linkedSystemProbabilities = {} }) {
+            function FailureAnalysisModal({ onClose, settings, backgroundStyle, fontSizeClass, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, linkedSystemProbabilities = {}, onAnalysisReady }) {
                 const [activeLeftTab, setActiveLeftTab] = useState('text');
                 const [activeRightTab, setActiveRightTab] = useState('cutsets');
                 const [leftPaneWidth, setLeftPaneWidth] = useState(50); // percentage
@@ -21038,10 +21780,15 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                     if (!failureLogicTree || !failureLogicTree.children || failureLogicTree.children.length === 0) {
                         return { cutSets: [], mcubValue: null, quantMethod: 'mcub', quantDetails: null, ccfEvents: {} };
                     }
-                    
-                    // Generate minimal cut sets
-                    const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData);
-                    
+
+                    // Full truncation threshold + a CCF context — the BFS uses a CCF-aware
+                    // upper bound on post-CCF probability so we can prune sub-threshold
+                    // paths during generation even with CCF enabled. See the helper docs
+                    // on pathPostCCFUpperBound for the bound's monotonicity proof.
+                    const truncThreshold = parseTruncationThreshold(settings);
+                    const ccfContext = buildCCFContext(basicEventData, sscsInSystem, settings);
+                    const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData, truncThreshold, ccfContext);
+
                     // Apply CCF expansion if enabled
                     const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(
                         minimalCutSets, 
@@ -21136,21 +21883,164 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                     };
                 }, [failureLogicTree, basicEventData, sscsInSystem, settings]);
 
-                // Importance measures — memoized, only rebuilt when cut sets/probabilities change
-                const importanceMeasures = React.useMemo(() => {
-                    if (!mcubValue || cutSets.length === 0) return [];
-                    const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
-                    if (validCutSets.length === 0) return [];
-                    const combinedEventData = { ...basicEventData, ...ccfEvents };
-                    const engine = buildImportanceEngine(validCutSets, combinedEventData, mcubValue, settings);
-                    const allEvents = new Set();
-                    validCutSets.forEach(cs => cs.events.forEach(e => allEvents.add(e)));
-                    return Array.from(allEvents).map(eventName => {
-                        const r = engine(eventName);
-                        if (!r) return null;
-                        return { ...r, event: r.name };
-                    }).filter(m => m !== null);
+                // Importance measures — computed LAZILY, on demand. The synchronous
+                // useMemo approach used to freeze the UI for tens of seconds on large
+                // systems with thousands of basic events: each event requires a full
+                // BDD re-evaluation (or an MCUB patch over all cut sets), so the work
+                // scales as O(events × cutSets). On a complicated model this kept the JS
+                // thread busy long enough that the AnalysisProgressModal's Cancel button
+                // couldn't be processed, even though it was painted on screen.
+                //
+                // The new approach defers the calculation until the user actually clicks
+                // the Importance tab. The compute function below runs asynchronously, in
+                // chunks of ~50 events with a microtask yield between batches, so the UI
+                // can paint progress and the Cancel button stays responsive throughout.
+                //
+                // States:
+                //   'idle'      — not yet started (or invalidated because inputs changed)
+                //   'computing' — running; UI shows progress with cancel button
+                //   'done'      — results ready in importanceMeasures
+                //   'cancelled' — user clicked cancel; partial results discarded
+                //   'error'     — exception during computation
+                const [importanceMeasures, setImportanceMeasures] = React.useState([]);
+                const [importanceState, setImportanceState] = React.useState('idle');
+                const [importanceProgress, setImportanceProgress] = React.useState({ current: 0, total: 0 });
+                const [importanceError, setImportanceError] = React.useState(null);
+                const importanceCancelRef = React.useRef(false);
+                // Token used to invalidate in-flight computations whose inputs are now stale.
+                // Each compute run captures the token at start and checks it at every yield;
+                // if the input-changing useEffect below has bumped it, the run aborts.
+                const importanceComputeTokenRef = React.useRef(0);
+
+                // Whenever the inputs that feed importance measures change, invalidate
+                // any in-flight or completed result and reset to 'idle'. The lazy trigger
+                // useEffect below will restart computation if the user is currently on
+                // the Importance tab; otherwise we wait until they switch to it.
+                React.useEffect(() => {
+                    importanceCancelRef.current = true;
+                    importanceComputeTokenRef.current += 1;
+                    setImportanceMeasures([]);
+                    setImportanceState('idle');
+                    setImportanceProgress({ current: 0, total: 0 });
+                    setImportanceError(null);
                 }, [cutSets, mcubValue, basicEventData, ccfEvents, settings]);
+
+                // The compute function. Defined inline rather than as a callback so it
+                // closes over the current cutSets/basicEventData/etc. — we don't want
+                // stale captures across re-renders.
+                const computeImportanceMeasures = async () => {
+                    if (!mcubValue || cutSets.length === 0) {
+                        setImportanceMeasures([]);
+                        setImportanceState('done');
+                        return;
+                    }
+                    const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
+                    if (validCutSets.length === 0) {
+                        setImportanceMeasures([]);
+                        setImportanceState('done');
+                        return;
+                    }
+
+                    const myToken = importanceComputeTokenRef.current;
+                    importanceCancelRef.current = false;
+                    setImportanceState('computing');
+                    setImportanceError(null);
+
+                    try {
+                        const combinedEventData = { ...basicEventData, ...ccfEvents };
+
+                        // Engine build is the up-front cost (BDD tree construction or
+                        // MCUB cut-set product precompute). Wrap it in a yield so the
+                        // 'computing' UI paints with stage info before the build runs.
+                        setImportanceProgress({ current: 0, total: 0, phase: 'Preparing\u2026' });
+                        await new Promise(r => setTimeout(r, 0));
+                        if (importanceCancelRef.current || importanceComputeTokenRef.current !== myToken) {
+                            setImportanceState('cancelled');
+                            return;
+                        }
+
+                        const engine = buildImportanceEngine(validCutSets, combinedEventData, mcubValue, settings);
+
+                        const allEvents = [];
+                        const seen = new Set();
+                        for (const cs of validCutSets) {
+                            for (const ev of cs.events) {
+                                if (!seen.has(ev)) { seen.add(ev); allEvents.push(ev); }
+                            }
+                        }
+                        const total = allEvents.length;
+                        setImportanceProgress({ current: 0, total, phase: 'Calculating\u2026' });
+                        await new Promise(r => setTimeout(r, 0));
+
+                        // Process events in batches with a yield between batches so
+                        // the UI can paint progress and the cancel button stays clickable.
+                        const BATCH = 50;
+                        const results = [];
+                        for (let i = 0; i < total; i += BATCH) {
+                            if (importanceCancelRef.current || importanceComputeTokenRef.current !== myToken) {
+                                setImportanceState('cancelled');
+                                return;
+                            }
+                            const end = Math.min(i + BATCH, total);
+                            for (let j = i; j < end; j++) {
+                                const r = engine(allEvents[j]);
+                                if (r) results.push({ ...r, event: r.name });
+                            }
+                            setImportanceProgress({ current: end, total, phase: 'Calculating\u2026' });
+                            // Yield to event loop so React paints and click handlers fire
+                            await new Promise(r => setTimeout(r, 0));
+                        }
+
+                        if (importanceCancelRef.current || importanceComputeTokenRef.current !== myToken) {
+                            setImportanceState('cancelled');
+                            return;
+                        }
+
+                        setImportanceMeasures(results);
+                        setImportanceState('done');
+                    } catch (err) {
+                        console.error('Importance measure computation failed:', err);
+                        setImportanceError(err.message || String(err));
+                        setImportanceState('error');
+                    }
+                };
+
+                // Lazy trigger: when the user switches to the Importance tab and we're
+                // idle (haven't computed yet, or inputs changed), start the calculation.
+                // This is the heart of the deferred-compute behaviour — the modal
+                // mounts and shows cut sets immediately; importance work only begins
+                // when the user actually asks for it.
+                React.useEffect(() => {
+                    if (activeRightTab === 'importance' && importanceState === 'idle') {
+                        computeImportanceMeasures();
+                    }
+                    // computeImportanceMeasures is intentionally not in deps — it captures
+                    // current state by reference and gets re-created each render; we only
+                    // want to retrigger on tab/state changes.
+                    // eslint-disable-next-line react-hooks/exhaustive-deps
+                }, [activeRightTab, importanceState]);
+
+                const cancelImportanceComputation = () => {
+                    importanceCancelRef.current = true;
+                };
+
+                // Signal the parent (which is showing the AnalysisProgressModal overlay)
+                // that analysis is complete and the modal is rendered. We do this in a
+                // useEffect that depends on the heavy computed values, so it fires after
+                // the first commit — i.e., after both useMemos above have finished running
+                // and the modal's DOM has been painted. The parent then dismisses the
+                // progress overlay. Without this, the overlay was being dismissed before
+                // the modal mounted, leaving a visible "frozen UI with no feedback" gap
+                // between the dialog disappearing and the results window appearing.
+                React.useEffect(() => {
+                    if (typeof onAnalysisReady === 'function') {
+                        onAnalysisReady();
+                    }
+                    // Intentionally only fires once — after the first render. Subsequent
+                    // recomputes (e.g. user toggles a setting) don't need to re-signal
+                    // because the progress dialog isn't shown for those.
+                    // eslint-disable-next-line react-hooks/exhaustive-deps
+                }, []);
 
                 const toggleNode = (nodeId) => {
                     setExpandedNodes(prev => {
@@ -21706,8 +22596,81 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                             />
                                         ) : (
                                             <div>
-                                                {/* Importance measures from useMemo — not recalculated on each render */}
+                                                {/* Importance measures are computed lazily — only when this tab
+                                                    is opened. While computing, show progress with a cancel
+                                                    button. The cancel works because the compute function yields
+                                                    every 50 events, so click handlers actually run. See the
+                                                    importanceMeasures state machine declared above. */}
                                                 {(() => {
+                                                    // Computing state — show progress + cancel
+                                                    if (importanceState === 'computing') {
+                                                        const { current, total, phase } = importanceProgress;
+                                                        const pct = total > 0 ? Math.min(100, (current / total) * 100) : 0;
+                                                        return (
+                                                            <div className="p-8">
+                                                                <div className="max-w-md mx-auto">
+                                                                    <div className="flex items-center gap-3 mb-4">
+                                                                        <svg className="w-5 h-5 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                                                        </svg>
+                                                                        <div>
+                                                                            <div className="font-semibold text-gray-800">Calculating importance measures</div>
+                                                                            <div className="text-xs text-gray-500 mt-0.5">{phase || 'Working\u2026'}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                    {total > 0 && (
+                                                                        <>
+                                                                            <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
+                                                                                <div className="bg-blue-500 h-2 rounded-full transition-all duration-150"
+                                                                                     style={{ width: `${pct}%` }}/>
+                                                                            </div>
+                                                                            <div className="text-xs text-gray-500 text-center mb-4">
+                                                                                {current} of {total} events ({pct.toFixed(0)}%)
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                    <div className="flex justify-center">
+                                                                        <button onClick={cancelImportanceComputation}
+                                                                                className="px-4 py-1.5 text-sm bg-gray-100 text-gray-600 rounded hover:bg-gray-200 border border-gray-300">
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // Cancelled — let the user retry
+                                                    if (importanceState === 'cancelled') {
+                                                        return (
+                                                            <div className="text-center p-8 text-gray-500">
+                                                                <p>Importance measure calculation was cancelled.</p>
+                                                                <button
+                                                                    onClick={() => { setImportanceState('idle'); }}
+                                                                    className="mt-3 px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                                                                    Calculate Now
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // Error — show message and retry
+                                                    if (importanceState === 'error') {
+                                                        return (
+                                                            <div className="text-center p-8 text-red-600">
+                                                                <p className="font-semibold">Importance measure calculation failed</p>
+                                                                <p className="text-xs mt-2 text-gray-600">{importanceError}</p>
+                                                                <button
+                                                                    onClick={() => { setImportanceState('idle'); }}
+                                                                    className="mt-3 px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                                                                    Try Again
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // Idle and no data, or done with empty results
                                                     if (!mcubValue || cutSets.length === 0 || importanceMeasures.length === 0) {
                                                         return (
                                                             <div className="text-center p-8 text-gray-500">
@@ -22138,7 +23101,10 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                     return a.id - b.id;
                 });
 
-                // Apply cut set truncation — remove cut sets whose probability is known and below threshold
+                // Display-time truncation pass. Note: cut-set generation now applies the
+                // same threshold *during* generation so that sub-threshold sets never reach
+                // memory in the first place; this filter is the safety net that catches any
+                // sets that came in via a path that didn't truncate (e.g. legacy callers).
                 const truncThreshold = settings?.cutSetTruncation && settings.cutSetTruncation !== 'none'
                     ? parseFloat(settings.cutSetTruncation)
                     : null;
@@ -22500,7 +23466,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <h1 className="text-lg font-bold"><a href="https://github.com/curtlsmith/KUREAS/tree/main/SYS" target="_blank" rel="noopener noreferrer" style={{color:'white',textDecoration:'underline',textDecorationStyle:'dotted',textUnderlineOffset:'3px'}}>KUREAS-SYS</a></h1>
                         </div>
-                        <span className="text-sm opacity-90 flex-1 text-center">v1.4 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>System Evaluation Module</strong></span>
+                        <span className="text-sm opacity-90 flex-1 text-center">v1.5 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>System Evaluation Module</strong></span>
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <button
                                 onClick={loadSystemDefinition}
@@ -23965,6 +24931,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             settings={settings}
                             pidDiagram={pidDiagram}
                             applyCCFExpansion={applyCCFExpansion}
+                            buildCCFContext={buildCCFContext}
                         />
                     )}
 
@@ -23986,6 +24953,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             settings={settings}
                             pidDiagram={pidDiagram}
                             applyCCFExpansion={applyCCFExpansion}
+                            buildCCFContext={buildCCFContext}
                         />
                     )}
 
@@ -23993,6 +24961,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                         <AnalysisProgressModal
                             stage={analysisProgressStage}
                             message={analysisProgressMsg}
+                            stages={analysisProgressStages}
                             onCancel={() => {
                                 analysisCancelledRef.current = true;
                                 setShowAnalysisProgress(false);
@@ -24022,6 +24991,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             sscsInSystem={sscsInSystem}
                             superComponents={superComponents}
                             linkedSystemProbabilities={linkedSystemProbabilities}
+                            onAnalysisReady={() => setShowAnalysisProgress(false)}
                         />
                     )}
 
