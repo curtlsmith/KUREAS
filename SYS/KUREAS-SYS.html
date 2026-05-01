@@ -4707,7 +4707,7 @@
             );
         }
 
-        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext }) {
+        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext, parseTruncationThreshold }) {
             const [fileFormat, setFileFormat] = useState(() => {
                 return localStorage.getItem('KUREAS_SYS_reportFormat') || 'word';
             });
@@ -24954,6 +24954,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             pidDiagram={pidDiagram}
                             applyCCFExpansion={applyCCFExpansion}
                             buildCCFContext={buildCCFContext}
+                            parseTruncationThreshold={parseTruncationThreshold}
                         />
                     )}
 
