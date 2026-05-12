@@ -5016,9 +5016,21 @@
                     return 1 - probs.reduce((prod, p) => prod * (1 - p), 1.0); // MCUB
                 };
 
+                // Helper: get event probability, handling NOT- complement prefix.
+                // Cut sets that contain complement events (from NOT keywords in system
+                // logic) carry NOT-X labels; a direct lookup misses them and silently
+                // returns 0, zeroing out the product for those cut sets.
+                const getEventProb = (ev) => {
+                    const isComplement = ev.startsWith('NOT-');
+                    const base = isComplement ? ev.slice(4) : ev;
+                    const data = combinedEventData[base] || combinedEventData[ev];
+                    if (!data || data.probability === null || data.probability === undefined) return 0;
+                    return isComplement ? (1.0 - data.probability) : data.probability;
+                };
+
                 // Precompute per-cut-set products
                 const csProbs = validCutSets.map(cs =>
-                    cs.events.reduce((prod, ev) => prod * (combinedEventData[ev]?.probability ?? 0), 1.0)
+                    cs.events.reduce((prod, ev) => prod * getEventProb(ev), 1.0)
                 );
 
                 // Map: event name → indices of cut sets containing it
@@ -15591,8 +15603,23 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 });
             }, [sscsInSystem]);
 
-            // Track changes to mark system as having unsaved changes
+            // Track changes to mark system as having unsaved changes.
+            //
+            // The useEffect below fires whenever the tracked state values change,
+            // including (a) on initial mount with default empty values, and
+            // (b) right after a load operation sets all of these from file. Both
+            // of those are NOT user edits, so we suppress the flag flip for them
+            // via a ref that's true on mount and gets set to true again whenever
+            // the load handler explicitly clears unsaved changes.
+            //
+            // The pattern: setHasUnsavedChanges(false) at load time also bumps
+            // skipNextChangeFlag, which the effect consumes on its next run.
+            const skipNextChangeFlag = useRef(true); // true on first render
             useEffect(() => {
+                if (skipNextChangeFlag.current) {
+                    skipNextChangeFlag.current = false;
+                    return;
+                }
                 setHasUnsavedChanges(true);
             }, [systemName, systemAcronym, systemDescription, sscsInSystem, superComponents, systemLogic]);
 
@@ -16176,7 +16203,11 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                 // Clear the selected item to refresh the Edit pane
                                 setSelectedItem(null);
                                 // Note: failureLogicTree is loaded but will be regenerated from systemLogic
-                                // Clear unsaved changes flag after loading
+                                // Clear unsaved changes flag after loading. The state setters
+                                // above will trigger the change-tracking useEffect on the next
+                                // render, which would flip the flag back to true — suppress
+                                // that one-shot via skipNextChangeFlag.
+                                skipNextChangeFlag.current = true;
                                 setHasUnsavedChanges(false);
                             } catch (err) {
                                 alert('Error parsing system file: ' + err.message);
@@ -18271,13 +18302,19 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 // Merge basic event data with CCF events
                 const eventData = { ...basicEventData, ...ccfEvents };
                 
-                // Get probability for an event
+                // Get probability for an event. NOT- prefixed events are complements:
+                // look up the base event and return (1 - p). Without this, the bail-out
+                // check below returns null for every cut set that contains a complement
+                // (e.g. NOT-RCS-LOCA-CL2), which collapses the entire BDD result to null
+                // and hides the System Failure Probability box and importance measures.
                 const getEventProb = (eventName) => {
-                    const data = eventData[eventName];
+                    const isComplement = eventName.startsWith('NOT-');
+                    const baseName = isComplement ? eventName.slice(4) : eventName;
+                    const data = eventData[baseName] || eventData[eventName];
                     if (!data || data.probability === null || data.probability === undefined) {
                         return null;
                     }
-                    return data.probability;
+                    return isComplement ? (1.0 - data.probability) : data.probability;
                 };
                 
                 // Check if all events have valid probabilities
@@ -18321,10 +18358,16 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 let totalProb = 0;
                 let termsComputed = 0;
                 
-                // Get probability for an event
+                // Get probability for an event. NOT- prefixed events are complements:
+                // look up the base event and return (1 - p). The previous direct lookup
+                // returned 0 for any NOT- event because basicEventData only contains
+                // base names, silently zeroing out cut sets that contained complements.
                 const getEventProb = (eventName) => {
-                    const data = eventData[eventName];
-                    return data?.probability || 0;
+                    const isComplement = eventName.startsWith('NOT-');
+                    const baseName = isComplement ? eventName.slice(4) : eventName;
+                    const data = eventData[baseName] || eventData[eventName];
+                    if (!data || data.probability === null || data.probability === undefined) return 0;
+                    return isComplement ? (1.0 - data.probability) : data.probability;
                 };
                 
                 // Calculate probability of intersection of multiple cut sets
@@ -18423,8 +18466,21 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 if (!tree) {
                     return { probability: 0, method: 'BDD', details: { numCutSets: 0, numEvents: 0 } };
                 }
-                // evaluateBDDTree handles both the {name: {probability}} object form and Maps.
-                const probability = evaluateBDDTree(tree, eventData);
+                // Build a probMap keyed by the event names that actually appear in the BDD
+                // tree (including NOT- prefixed complements). For NOT-X we store (1 - p_X)
+                // so evaluateBDDTree's lookup returns the correct complement value. Without
+                // this, NOT- nodes resolve to 0 and the BDD result is wrong (typically null
+                // or 0), which hides the System Failure Probability box and importance
+                // measures in the cut-set tab.
+                const probMap = new Map();
+                for (const name of tree.eventList) {
+                    const isComplement = name.startsWith('NOT-');
+                    const base = isComplement ? name.slice(4) : name;
+                    const data = eventData[base] || eventData[name];
+                    const baseProb = (data && data.probability !== null && data.probability !== undefined) ? data.probability : 0;
+                    probMap.set(name, isComplement ? (1.0 - baseProb) : baseProb);
+                }
+                const probability = evaluateBDDTree(tree, probMap);
                 return {
                     probability,
                     method: 'BDD',
@@ -18589,9 +18645,18 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 if (root === null) return 0;
                 if (root === 'ONE') return 1;
 
+                // The probMap is expected to contain the literal event names as they
+                // appear in the BDD tree, including any NOT- prefix. For NOT- events
+                // the caller is responsible for storing the pre-complemented value
+                // (1 - p_base) under the NOT-X key. See buildImportanceEngine and
+                // calculateBDDMemoized for the two callers that prepare this map.
                 const getProb = typeof probMap.get === 'function'
                     ? (name) => probMap.get(name) ?? 0
-                    : (name) => probMap[name]?.probability ?? probMap[name] ?? 0;
+                    : (name) => {
+                        const entry = probMap[name];
+                        if (entry && typeof entry === 'object') return entry.probability ?? 0;
+                        return entry ?? 0;
+                    };
 
                 const evalCache = new Map();
 
@@ -18634,9 +18699,17 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
 
                     // Reusable Map to avoid per-call allocations during BDD evaluation.
                     // We construct it once here, and mutate one entry per calcProb call.
+                    // NOT- prefixed events are complements of their base events — store
+                    // (1 - p_base) so evaluateBDDTree's lookup returns the correct value
+                    // for the complement node. Without this, NOT-X gets stored as 0
+                    // (because combinedEventData["NOT-X"] is undefined), and BDD evaluation
+                    // gives wrong system probabilities and zero importance.
                     const probMap = new Map();
                     for (const name of allEventsSet) {
-                        probMap.set(name, combinedEventData[name]?.probability ?? 0);
+                        const isComplement = name.startsWith('NOT-');
+                        const base = isComplement ? name.slice(4) : name;
+                        const baseProb = combinedEventData[base]?.probability ?? combinedEventData[name]?.probability ?? 0;
+                        probMap.set(name, isComplement ? (1.0 - baseProb) : baseProb);
                     }
 
                     const calcProb = (overrideName, overrideVal) => {
@@ -18678,6 +18751,19 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
 
                     const n = validCutSets.length;
 
+                    // Helper: get event probability, handling NOT- complement prefix.
+                    // Without this, a cut set containing NOT-X gets its product silently
+                    // zeroed (because combinedEventData["NOT-X"] is undefined), which
+                    // hides those cut sets from the MCUB sum and propagates bad importance
+                    // measures for every event in such cut sets.
+                    const getEventProb = (eventName) => {
+                        const isComplement = eventName.startsWith('NOT-');
+                        const baseName = isComplement ? eventName.slice(4) : eventName;
+                        const data = combinedEventData[baseName] || combinedEventData[eventName];
+                        if (!data || data.probability === null || data.probability === undefined) return 0;
+                        return isComplement ? (1.0 - data.probability) : data.probability;
+                    };
+
                     // Per-cut-set probability product
                     const csProbs = new Array(n);
                     // log(1 - P_i) per cut set, used by MCUB path
@@ -18689,7 +18775,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         const events = validCutSets[i].events;
                         let prod = 1.0;
                         for (let j = 0; j < events.length; j++) {
-                            prod *= (combinedEventData[events[j]]?.probability ?? 0);
+                            prod *= getEventProb(events[j]);
                         }
                         csProbs[i] = prod;
                         // Clamp 1 - P_i to a strictly positive number; log(0) is -Infinity.
@@ -18771,7 +18857,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         for (let j = 0; j < events.length; j++) {
                             const e = events[j];
                             if (e === evName) prod *= overrideVal;
-                            else prod *= (combinedEventData[e]?.probability ?? 0);
+                            else prod *= getEventProb(e);
                         }
                         return prod;
                     };
@@ -21555,6 +21641,31 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 const [plotYAxis, setPlotYAxis] = useState(() => {
                     return localStorage.getItem('KUREAS_SYS_plotYAxis') || 'rir';
                 });
+                // Reliability Designer state: per-event multiplier exponent.
+                // The actual multiplier is multiplierBase^exponent. multiplierBase is
+                // user-selectable (×2, ×5, or ×10) and the exponent range is wide
+                // enough that users can drag through several decades of change.
+                // Probabilities are clamped to [0, 1] at recalculation time.
+                const [eventOverrides, setEventOverrides] = useState({}); // { eventName: exponent }
+                // Multiplier base — choose how aggressive a single step is.
+                // ×2: fine-grained tuning (each step doubles/halves).
+                // ×5: midpoint, the original default.
+                // ×10: order-of-magnitude steps for quick exploration.
+                const [multiplierBase, setMultiplierBase] = useState(5);
+                // Free-text filter for the events table; matched against the event
+                // name and description (case-insensitive substring). When non-empty,
+                // only matching events are displayed.
+                const [designerFilter, setDesignerFilter] = useState('');
+                // Reliability Designer table sort. Columns: 'name', 'description', 'rir',
+                // 'rrr', 'nominalProb', 'currentProb'. Sort direction: 'asc' | 'desc'.
+                const [designerSort, setDesignerSort] = useState({ col: 'name', dir: 'asc' });
+                // Quantification method used for live recalc and importance measures
+                // on the Reliability Designer tab. Defaults to the project's configured
+                // method so the designer's nominal value matches the Cut Sets tab when
+                // the user first opens it. Switching to BDD pays a one-time tree-build
+                // cost (paid in the designerRecalc useMemo) but then live drags stay fast
+                // because evaluateBDDTree just walks the cached tree with a fresh probMap.
+                const [designerMethod, setDesignerMethod] = useState(() => settings?.quantificationMethod || 'mcub');
                 const modalRef = useRef(null);
                 
                 // Save axis selections to localStorage when they change
@@ -22082,6 +22193,269 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                     setImportanceProgress({ current: 0, total: 0 });
                     setImportanceError(null);
                 }, [cutSets, mcubValue, basicEventData, ccfEvents, settings]);
+
+                // ── Reliability Designer recalculator ──────────────────────────────
+                // Builds a fast multi-event override function for the Reliability
+                // Designer tab. Unlike buildImportanceEngine (which overrides ONE event
+                // at a time), this needs to apply many simultaneous overrides as the
+                // user drags multiple sliders.
+                //
+                // Cost per recalc depends on the chosen quantification method:
+                //   • MCUB / Rare: O(|cutSets| × |events_per_cutSet|) per call. Always
+                //     fast — typically sub-millisecond for any realistic system.
+                //   • BDD:         The BDD tree is built ONCE up-front (cost paid in
+                //     this useMemo) and reused for every slider drag. Each drag costs
+                //     O(BDD nodes) for the evaluateBDDTree walk — also fast in practice.
+                //     The one-time build can take a few seconds on very large systems
+                //     (hundreds of cut sets, many shared events) so we surface the
+                //     method as a user choice rather than hardcoding it.
+                //
+                // We accept an `overrides` map of { eventName: multiplierExponent }
+                // where the actual multiplier is multiplierBase^exponent. exponent=0
+                // means nominal. Probabilities are clamped to [0, 1] at every step.
+                const designerRecalc = React.useMemo(() => {
+                    if (!cutSets || cutSets.length === 0) return null;
+
+                    const combinedEventData = { ...basicEventData, ...ccfEvents };
+                    const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
+                    if (validCutSets.length === 0) return null;
+
+                    const method = designerMethod;
+
+                    // Get the probability of any event (base, CCF, or NOT-X) under a set
+                    // of overrides. The overrides map's semantics depend on the event kind:
+                    //
+                    //   • Base SSC/basic event X:  overrides[X] is the multiplier exponent
+                    //                              applied to P(X). 0 = nominal, +n = ×base^n.
+                    //   • CCF event X_CCF:         overrides[X_CCF] is the multiplier
+                    //                              exponent applied to β. The CCF's actual
+                    //                              probability is β' × Q', where Q' is the
+                    //                              constituent base event's *overridden*
+                    //                              probability — so adjusting the base
+                    //                              event automatically drags the CCF along.
+                    //                              This matches the underlying physics: a
+                    //                              CCF event is, by definition, β × Q.
+                    //   • NOT-X complement:        always 1 - P(X under override).
+                    //
+                    // The exponent's base is the user-selected multiplierBase (×2/×5/×10).
+                    const base = multiplierBase;
+                    const getOverriddenProb = (eventName, overrides) => {
+                        const isComplement = eventName.startsWith('NOT-');
+                        const baseName = isComplement ? eventName.slice(4) : eventName;
+                        const data = combinedEventData[baseName] || combinedEventData[eventName];
+                        if (!data || data.probability === null || data.probability === undefined) return 0;
+
+                        let p;
+                        if (data.isCCF && data.ccfGroup && data.ccfGroup.length > 0) {
+                            const nomBeta = (data.ccfBeta !== undefined && data.ccfBeta !== null) ? data.ccfBeta : 0.02;
+                            const baseEv = data.ccfGroup[0];
+                            const baseData = combinedEventData[baseEv];
+                            const nomBaseProb = (baseData && baseData.probability !== null && baseData.probability !== undefined) ? baseData.probability : 0;
+
+                            const betaExp = overrides[baseName];
+                            let beta = nomBeta;
+                            if (betaExp !== undefined && betaExp !== 0) {
+                                beta = beta * Math.pow(base, betaExp);
+                                if (beta > 1) beta = 1;
+                                if (beta < 0) beta = 0;
+                            }
+                            const baseExp = overrides[baseEv];
+                            let baseProb = nomBaseProb;
+                            if (baseExp !== undefined && baseExp !== 0) {
+                                baseProb = baseProb * Math.pow(base, baseExp);
+                                if (baseProb > 1) baseProb = 1;
+                                if (baseProb < 0) baseProb = 0;
+                            }
+                            p = beta * baseProb;
+                            if (p > 1) p = 1;
+                            if (p < 0) p = 0;
+                        } else {
+                            p = data.probability;
+                            const exp = overrides[baseName];
+                            if (exp !== undefined && exp !== 0) {
+                                p = p * Math.pow(base, exp);
+                                if (p > 1) p = 1;
+                                if (p < 0) p = 0;
+                            }
+                        }
+                        return isComplement ? (1.0 - p) : p;
+                    };
+
+                    // Pre-build BDD tree once if BDD is selected. The tree is structural
+                    // (depends only on which events appear in which cut sets, not on the
+                    // probabilities themselves), so we can build it now and re-evaluate
+                    // it on each slider drag with a fresh probMap. The probMap stores
+                    // pre-complemented values under NOT- keys; see calculateBDDMemoized
+                    // for the same pattern.
+                    let bddTree = null;
+                    let bddEventList = null;
+                    if (method === 'bdd') {
+                        const cutSetEvents = validCutSets.map(cs => cs.events);
+                        const allEventsSet = new Set();
+                        validCutSets.forEach(cs => cs.events.forEach(e => allEventsSet.add(e)));
+                        bddTree = buildBDDTree(cutSetEvents, allEventsSet);
+                        bddEventList = bddTree ? bddTree.eventList : [];
+                    }
+
+                    const recalc = (overrides) => {
+                        if (method === 'bdd' && bddTree) {
+                            // Build a probMap keyed by the literal event names that appear
+                            // in the BDD tree (including NOT- variants). For NOT- events
+                            // we store (1 - p_base_under_override) so evaluateBDDTree's
+                            // direct lookup returns the correct complement value. Then
+                            // walk the cached BDD tree. The probMap construction is
+                            // O(|events_in_tree|) per call; evaluateBDDTree is O(BDD nodes).
+                            const probMap = new Map();
+                            for (const name of bddEventList) {
+                                probMap.set(name, getOverriddenProb(name, overrides));
+                            }
+                            return evaluateBDDTree(bddTree, probMap);
+                        }
+
+                        // MCUB and Rare both need the per-cut-set product first.
+                        const csProbs = validCutSets.map(cs => {
+                            let prod = 1.0;
+                            for (const ev of cs.events) {
+                                prod *= getOverriddenProb(ev, overrides);
+                            }
+                            return prod;
+                        });
+
+                        if (method === 'rare') {
+                            return Math.min(1.0, csProbs.reduce((s, p) => s + p, 0));
+                        }
+                        // MCUB: 1 - ∏(1 - P_i)
+                        let product = 1.0;
+                        for (const p of csProbs) product *= (1.0 - p);
+                        return 1.0 - product;
+                    };
+                    recalc.getOverriddenProb = getOverriddenProb;
+                    recalc.method = method;
+                    return recalc;
+                }, [cutSets, basicEventData, ccfEvents, multiplierBase, designerMethod]);
+
+                // List of basic events to display in the designer. Excludes CCF events
+                // (those are derived) and unresolved linked events (they have no
+                // independent probability to adjust). Each entry carries the nominal
+                // probability and description for rendering.
+                const designerEvents = React.useMemo(() => {
+                    if (!cutSets || cutSets.length === 0) return [];
+                    const seen = new Set();
+                    const out = [];
+                    const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
+                    const combinedEventData = { ...basicEventData, ...ccfEvents };
+                    for (const cs of validCutSets) {
+                        for (const ev of cs.events) {
+                            // For NOT-X events, surface the base event name (X). The slider
+                            // adjusts the underlying probability; the NOT- view is just a
+                            // complement at recompute time.
+                            const isComplement = ev.startsWith('NOT-');
+                            const name = isComplement ? ev.slice(4) : ev;
+                            if (seen.has(name)) continue;
+                            const data = combinedEventData[name];
+                            if (!data || data.probability === null || data.probability === undefined) continue;
+                            if (data.isLinked) continue;
+                            seen.add(name);
+
+                            // CCF events get a different "kind" so the table can render
+                            // them with a beta slider rather than a direct-probability
+                            // slider. The nominal probability stored here is the original
+                            // β × Q from CCF expansion; it'll be recomputed dynamically
+                            // in the table cells when either β or the base Q is adjusted.
+                            if (data.isCCF) {
+                                const baseEv = (data.ccfGroup && data.ccfGroup[0]) || null;
+                                const baseData = baseEv ? combinedEventData[baseEv] : null;
+                                out.push({
+                                    name,
+                                    description: data.description || '',
+                                    kind: 'ccf',
+                                    nominalProb: data.probability,
+                                    nominalBeta: (data.ccfBeta !== undefined && data.ccfBeta !== null) ? data.ccfBeta : 0.02,
+                                    ccfGroup: data.ccfGroup || [],
+                                    baseEventName: baseEv,
+                                    baseEventProb: baseData?.probability ?? null,
+                                    isHouseEvent: false
+                                });
+                            } else {
+                                out.push({
+                                    name,
+                                    description: data.description || '',
+                                    kind: 'basic',
+                                    nominalProb: data.probability,
+                                    isHouseEvent: data.isHouseEvent || false
+                                });
+                            }
+                        }
+                    }
+                    // Sort alphabetically for stable, predictable initial ordering. The
+                    // UI provides interactive sort controls on top of this baseline.
+                    out.sort((a, b) => a.name.localeCompare(b.name));
+                    return out;
+                }, [cutSets, basicEventData, ccfEvents]);
+
+                // Memoized nominal system probability under the designer's current
+                // quantification method. This is what the "Nominal" box displays and
+                // what the "× nominal" ratio is computed against. It can differ from
+                // mcubValue (the Cut Sets tab's value) if the user selects a different
+                // method in the designer than the project default — that's expected
+                // and the method indicator in the UI makes the choice explicit.
+                const designerNominalProb = React.useMemo(() => {
+                    if (!designerRecalc) return null;
+                    return designerRecalc({});
+                }, [designerRecalc]);
+
+                // Per-event RIR/RRR for the Reliability Designer table.
+                //
+                // These are nominal importance measures — computed once from the
+                // unmodified system — and are shown for context so the user can pick
+                // which events are worth adjusting. They are NOT recomputed as sliders
+                // move; that would be both expensive and confusing (importance is
+                // typically defined with respect to a fixed nominal).
+                //
+                // We build directly here (rather than waiting on the lazy compute used
+                // by the Importance tab) so the values are available as soon as the
+                // designer tab is opened. The cost is O(events × cutSets) which is
+                // fine for typical models. For CCF events the slider on this tab
+                // adjusts β, so RIR/RRR for the CCF event under (β=1, β=0) is the
+                // economically meaningful interpretation: "if the CCF certainly
+                // happened" vs "if CCF were eliminated entirely". The math is
+                // identical to a regular basic event because the engine just patches
+                // the event's stored probability.
+                const designerImportance = React.useMemo(() => {
+                    if (!designerRecalc || designerEvents.length === 0) return {};
+
+                    const combinedEventData = { ...basicEventData, ...ccfEvents };
+                    const validCutSets = cutSets.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
+                    if (validCutSets.length === 0) return {};
+
+                    // Match the designer's recalc method so RIR/RRR are consistent
+                    // with the live system probability shown above. buildImportanceEngine
+                    // reads settings.quantificationMethod to choose between its BDD path
+                    // (build-tree-once then patch one event's prob at a time) and its
+                    // MCUB path (O(|affected|) per event using a precomputed log-sum).
+                    const importanceSettings = { ...settings, quantificationMethod: designerMethod };
+                    const systemProb = designerNominalProb;
+                    if (!systemProb || systemProb <= 0) return {};
+
+                    const engine = buildImportanceEngine(validCutSets, combinedEventData, systemProb, importanceSettings);
+
+                    const out = {};
+                    for (const ev of designerEvents) {
+                        const measures = engine(ev.name);
+                        if (measures) {
+                            out[ev.name] = {
+                                rir: measures.rir,
+                                rrr: measures.rrr
+                            };
+                        }
+                    }
+                    return out;
+                }, [designerRecalc, designerEvents, designerNominalProb, cutSets, basicEventData, ccfEvents, settings, designerMethod]);
+
+                // Reset overrides when the underlying cut-set/event data changes
+                React.useEffect(() => {
+                    setEventOverrides({});
+                }, [cutSets, basicEventData, ccfEvents]);
 
                 // The compute function. Defined inline rather than as a callback so it
                 // closes over the current cutSets/basicEventData/etc. — we don't want
@@ -22739,11 +23113,17 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                         >
                                             Importance
                                         </button>
+                                        <button
+                                            onClick={() => setActiveRightTab('designer')}
+                                            className={`flex-1 px-4 py-2 text-sm ${activeRightTab === 'designer' ? 'bg-blue-100 border-b-2 border-blue-600' : ''}`}
+                                        >
+                                            Reliability Designer
+                                        </button>
                                     </div>
                                     
                                     {/* Tab Content */}
                                     <div className="flex-1 overflow-y-auto p-4">
-                                        {activeRightTab === 'cutsets' ? (
+                                        {activeRightTab === 'cutsets' && (
                                             <CutSetViewer 
                                                 cutSets={cutSets} 
                                                 fontSizeClass={fontSizeClass}
@@ -22756,7 +23136,8 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                                 highlightedEvent={highlightedEvent}
                                                 setHighlightedEvent={setHighlightedEvent}
                                             />
-                                        ) : (
+                                        )}
+                                        {activeRightTab === 'importance' && (
                                             <div>
                                                 {/* Importance measures are computed lazily — only when this tab
                                                     is opened. While computing, show progress with a cancel
@@ -23163,6 +23544,550 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                                         </td>
                                                                                     </tr>
                                                                                 ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
+                                        {activeRightTab === 'designer' && (
+                                            <div>
+                                                {/* Reliability Designer
+                                                    ────────────────────
+                                                    Per-event probability multiplier sliders. Each slider is a
+                                                    discrete 7-position stepper covering 5^-3 .. 5^3 (factor of
+                                                    1/125 to ×125). Adjusting a slider triggers an immediate
+                                                    recomputation of system failure probability via the
+                                                    designerRecalc memo above. We don't store recomputed values
+                                                    in state — they're derived on every render from
+                                                    eventOverrides + designerRecalc, which keeps the data flow
+                                                    simple and avoids stale-state bugs. */}
+                                                {(() => {
+                                                    if (!designerRecalc || designerEvents.length === 0) {
+                                                        return (
+                                                            <div className="text-center p-8 text-gray-500">
+                                                                <p>No basic events available</p>
+                                                                <p className="text-xs mt-2">Generate cut sets first</p>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // Compute current system probability with overrides applied.
+                                                    // Nominal is memoized via designerNominalProb above (constant
+                                                    // for the lifetime of the cut-set set); current is recomputed
+                                                    // on every slider change which is what we want for live feedback.
+                                                    const currentProb = designerRecalc(eventOverrides);
+                                                    const nominalProb = designerNominalProb;
+                                                    const probDisplayMode = settings?.showProbability || '1';
+
+                                                    // Multiplier range. ±10 is generous enough that even at
+                                                    // base=2 (the smallest step) the user can sweep more than
+                                                    // three orders of magnitude either direction; at base=10
+                                                    // it's 10 decades. Out-of-range probabilities are clamped
+                                                    // to [0, 1] inside designerRecalc.
+                                                    const EXP_MIN = -10, EXP_MAX = 10;
+                                                    const expLabel = (e) => {
+                                                        if (e === 0) return '×1';
+                                                        const f = Math.pow(multiplierBase, Math.abs(e));
+                                                        // Format compactly: integer for small exponents, then
+                                                        // scientific notation for larger ones so the label
+                                                        // doesn't overflow the cell.
+                                                        const fStr = f >= 1e4
+                                                            ? f.toExponential(0).replace('e+', 'e')
+                                                            : (Number.isInteger(f) ? String(f) : f.toFixed(2));
+                                                        return (e > 0 ? '×' : '÷') + fStr;
+                                                    };
+
+                                                    // Count active overrides (exponent ≠ 0)
+                                                    const activeCount = Object.values(eventOverrides).filter(e => e !== 0).length;
+
+                                                    // Color shift for the current-probability box based on direction
+                                                    const direction = (() => {
+                                                        if (currentProb === null || nominalProb === null) return 'same';
+                                                        if (Math.abs(currentProb - nominalProb) < nominalProb * 1e-9) return 'same';
+                                                        return currentProb > nominalProb ? 'worse' : 'better';
+                                                    })();
+                                                    const currentColors = direction === 'worse'
+                                                        ? { border: '#dc2626', bg: settings?.background === 'dark' ? '#7f1d1d' : '#fef2f2', text: settings?.background === 'dark' ? '#fca5a5' : '#991b1b', val: settings?.background === 'dark' ? '#fecaca' : '#b91c1c' }
+                                                        : direction === 'better'
+                                                        ? { border: '#22c55e', bg: settings?.background === 'dark' ? '#064e3b' : '#f0fdf4', text: settings?.background === 'dark' ? '#86efac' : '#166534', val: settings?.background === 'dark' ? '#6ee7b7' : '#15803d' }
+                                                        : { border: '#3b82f6', bg: settings?.background === 'dark' ? '#1e3a5f' : '#eff6ff', text: settings?.background === 'dark' ? '#93c5fd' : '#1e40af', val: settings?.background === 'dark' ? '#bfdbfe' : '#1d4ed8' };
+
+                                                    return (
+                                                        <div>
+                                                            {/* Pinned top section: probability boxes + controls bar.
+                                                                position:sticky with top:-1rem (offsetting the parent's
+                                                                p-4 padding) keeps this block glued to the top of the
+                                                                scroll container while the table scrolls underneath.
+                                                                The negative top works because the parent's padding
+                                                                creates the space the sticky element scrolls past;
+                                                                pulling back by -1rem makes the block actually rest
+                                                                at the visible top edge. */}
+                                                            <div className="space-y-3 pb-3" style={{
+                                                                position: 'sticky',
+                                                                top: '-1rem',
+                                                                zIndex: 20,
+                                                                marginTop: '-1rem',
+                                                                paddingTop: '1rem',
+                                                                marginLeft: '-1rem',
+                                                                marginRight: '-1rem',
+                                                                paddingLeft: '1rem',
+                                                                paddingRight: '1rem',
+                                                                backgroundColor: backgroundStyle.backgroundColor || (settings?.background === 'dark' ? '#111827' : '#ffffff'),
+                                                                borderBottom: `1px solid ${backgroundStyle.borderColor || '#e5e7eb'}`
+                                                            }}>
+                                                                {/* Top: nominal + current probability side-by-side */}
+                                                                <div className="flex gap-3 flex-wrap">
+                                                                    <div className="flex-1 p-3 border-2 rounded" style={{
+                                                                        minWidth: '220px',
+                                                                        borderColor: '#9ca3af',
+                                                                        backgroundColor: settings?.background === 'dark' ? '#374151' : '#f9fafb'
+                                                                    }}>
+                                                                        <div className={`text-xs font-semibold`} style={{
+                                                                            color: settings?.background === 'dark' ? '#d1d5db' : '#4b5563'
+                                                                        }}>
+                                                                            Nominal System Failure Probability
+                                                                        </div>
+                                                                        <div className="font-mono text-lg" style={{
+                                                                            color: settings?.background === 'dark' ? '#e5e7eb' : '#1f2937'
+                                                                        }}>
+                                                                            {formatProbability(nominalProb, probDisplayMode)}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex-1 p-3 border-2 rounded" style={{
+                                                                        minWidth: '220px',
+                                                                        borderColor: currentColors.border,
+                                                                        backgroundColor: currentColors.bg
+                                                                    }}>
+                                                                        <div className={`text-xs font-semibold flex items-center gap-2`} style={{
+                                                                            color: currentColors.text
+                                                                        }}>
+                                                                            <span>Current System Failure Probability</span>
+                                                                            {direction === 'worse' && <span>{'\u25B2'}</span>}
+                                                                            {direction === 'better' && <span>{'\u25BC'}</span>}
+                                                                        </div>
+                                                                        <div className="font-mono text-lg flex items-baseline gap-2" style={{
+                                                                            color: currentColors.val
+                                                                        }}>
+                                                                            <span>{formatProbability(currentProb, probDisplayMode)}</span>
+                                                                            {direction !== 'same' && nominalProb > 0 && (
+                                                                                <span className="text-xs opacity-80">
+                                                                                    ({(currentProb / nominalProb).toFixed(2)}× nominal)
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Controls bar */}
+                                                                <div className="flex items-center justify-between gap-2 flex-wrap p-2 border rounded text-xs" style={{
+                                                                    backgroundColor: settings?.background === 'dark' ? '#1e3a5f' : '#eff6ff',
+                                                                    borderColor: settings?.background === 'dark' ? '#3b82f6' : '#93c5fd'
+                                                                }}>
+                                                                    <div className="flex items-center gap-3 flex-wrap" style={{
+                                                                        color: settings?.background === 'dark' ? '#93c5fd' : '#1d4ed8'
+                                                                    }}>
+                                                                        <span className="font-semibold">
+                                                                            {(() => {
+                                                                                const filterText = designerFilter.trim().toLowerCase();
+                                                                                const ccfCount = designerEvents.filter(e => e.kind === 'ccf').length;
+                                                                                if (filterText) {
+                                                                                    const matched = designerEvents.filter(ev =>
+                                                                                        ev.name.toLowerCase().includes(filterText) ||
+                                                                                        (ev.description || '').toLowerCase().includes(filterText)
+                                                                                    ).length;
+                                                                                    return (
+                                                                                        <>
+                                                                                            Showing {matched} of {designerEvents.length} events
+                                                                                            {ccfCount > 0 && <span className="font-normal opacity-80"> ({ccfCount} CCF total)</span>}
+                                                                                        </>
+                                                                                    );
+                                                                                }
+                                                                                return (
+                                                                                    <>
+                                                                                        {designerEvents.length} events
+                                                                                        {ccfCount > 0 && <span className="font-normal opacity-80"> ({ccfCount} CCF)</span>}
+                                                                                    </>
+                                                                                );
+                                                                            })()}
+                                                                            {activeCount > 0 && (
+                                                                                <span className="ml-2 font-normal">
+                                                                                    &mdash; {activeCount} adjusted
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                        {/* Method selector: choose how the designer
+                                                                            quantifies the system probability. Defaults
+                                                                            to the project's configured method so the
+                                                                            initial nominal matches the Cut Sets tab.
+                                                                            Switching to BDD pays a one-time tree-build
+                                                                            cost (visible as a brief pause) then makes
+                                                                            slider drags exact rather than upper-bound. */}
+                                                                        <span className="font-normal flex items-center gap-1">
+                                                                            <span>&mdash; Method:</span>
+                                                                            <div className="flex border rounded overflow-hidden" style={{ borderColor: '#9ca3af' }}>
+                                                                                {[
+                                                                                    { id: 'mcub', label: 'MCUB', tip: 'Minimal Cut-set Upper Bound. Fast, conservative; always an upper bound on the true probability.' },
+                                                                                    { id: 'bdd', label: 'BDD', tip: 'Binary Decision Diagram. Exact (handles shared events correctly); slower one-time build but live drags stay fast.' },
+                                                                                    { id: 'rare', label: 'Rare Event', tip: 'Sum of cut-set probabilities. Fastest; accurate only when cut-set probabilities are small.' }
+                                                                                ].map((m, idx, arr) => (
+                                                                                    <button
+                                                                                        key={m.id}
+                                                                                        onClick={() => setDesignerMethod(m.id)}
+                                                                                        className="px-2 py-0.5 text-xs font-semibold"
+                                                                                        style={{
+                                                                                            backgroundColor: designerMethod === m.id
+                                                                                                ? '#2563eb'
+                                                                                                : (settings?.background === 'dark' ? '#374151' : '#f3f4f6'),
+                                                                                            color: designerMethod === m.id ? '#fff' : (backgroundStyle.color || '#1f2937'),
+                                                                                            borderRight: idx !== arr.length - 1 ? '1px solid #9ca3af' : 'none',
+                                                                                            fontFamily: 'monospace'
+                                                                                        }}
+                                                                                        title={m.tip}
+                                                                                    >{m.label}</button>
+                                                                                ))}
+                                                                            </div>
+                                                                            {designerMethod !== (settings?.quantificationMethod || 'mcub') && (
+                                                                                <span className="opacity-70 text-xs ml-1" title="The designer's method differs from the project's configured method, so the Nominal value here may differ from the Cut Sets tab.">
+                                                                                    (project: {(settings?.quantificationMethod || 'mcub').toUpperCase().replace('RARE', 'Rare Event')})
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        {/* Multiplier base selector — controls the step
+                                                                            size of every slider in the table.
+                                                                            ×2 for fine-grained tuning, ×5 mid, ×10
+                                                                            for fast order-of-magnitude exploration.
+                                                                            Changing the base rescales the EFFECT of
+                                                                            existing exponent overrides; the exponent
+                                                                            integers themselves are preserved (so an
+                                                                            event sitting at exp=2 becomes ×4, ×25, or
+                                                                            ×100 depending on this setting). */}
+                                                                        <span className="text-xs font-semibold" style={{
+                                                                            color: settings?.background === 'dark' ? '#93c5fd' : '#1d4ed8'
+                                                                        }}>Step:</span>
+                                                                        <div className="flex border rounded overflow-hidden" style={{ borderColor: '#9ca3af' }}>
+                                                                            {[2, 5, 10].map(b => (
+                                                                                <button
+                                                                                    key={b}
+                                                                                    onClick={() => setMultiplierBase(b)}
+                                                                                    className="px-2 py-1 text-xs font-semibold"
+                                                                                    style={{
+                                                                                        backgroundColor: multiplierBase === b
+                                                                                            ? '#2563eb'
+                                                                                            : (settings?.background === 'dark' ? '#374151' : '#f3f4f6'),
+                                                                                        color: multiplierBase === b ? '#fff' : (backgroundStyle.color || '#1f2937'),
+                                                                                        borderRight: b !== 10 ? '1px solid #9ca3af' : 'none'
+                                                                                    }}
+                                                                                    title={`Each slider step multiplies/divides by ${b}`}
+                                                                                >×{b}</button>
+                                                                            ))}
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => setEventOverrides({})}
+                                                                            disabled={activeCount === 0}
+                                                                            className="px-3 py-1 rounded font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                            style={{
+                                                                                backgroundColor: activeCount > 0 ? '#6b7280' : '#d1d5db',
+                                                                                color: '#fff'
+                                                                            }}
+                                                                            title="Reset all multipliers to ×1 (nominal)"
+                                                                        >
+                                                                            Reset All
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Filter bar — case-insensitive substring match
+                                                                    against event name and description. A small ✕
+                                                                    button appears when the filter has text so the
+                                                                    user can clear it without selecting the input. */}
+                                                                <div className="flex items-center gap-2 p-2 border rounded text-xs" style={{
+                                                                    backgroundColor: settings?.background === 'dark' ? '#1e3a5f' : '#eff6ff',
+                                                                    borderColor: settings?.background === 'dark' ? '#3b82f6' : '#93c5fd'
+                                                                }}>
+                                                                    <span className="font-semibold whitespace-nowrap" style={{
+                                                                        color: settings?.background === 'dark' ? '#93c5fd' : '#1d4ed8'
+                                                                    }}>
+                                                                        Filter:
+                                                                    </span>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={designerFilter}
+                                                                        onChange={(e) => setDesignerFilter(e.target.value)}
+                                                                        placeholder={`Search event name or description\u2026`}
+                                                                        className="flex-1 px-2 py-1 border rounded font-mono"
+                                                                        style={{
+                                                                            minWidth: '180px',
+                                                                            backgroundColor: settings?.background === 'dark' ? '#1f2937' : '#fff',
+                                                                            borderColor: designerFilter ? '#22c55e' : '#d1d5db',
+                                                                            color: backgroundStyle.color,
+                                                                            outline: 'none'
+                                                                        }}
+                                                                    />
+                                                                    {designerFilter && (
+                                                                        <button
+                                                                            onClick={() => setDesignerFilter('')}
+                                                                            className="px-2 py-1 rounded font-semibold"
+                                                                            style={{ backgroundColor: '#6b7280', color: '#fff' }}
+                                                                            title="Clear filter"
+                                                                        >
+                                                                            {'\u2715'}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Event table with sliders.
+                                                                The sticky header above keeps the totals visible while
+                                                                this scrolls. */}
+                                                            {(() => {
+                                                                // Helpers shared by all rows: produce the row's
+                                                                // (nominalProb, currentProb) accounting for CCF
+                                                                // recoupling. For a CCF event we always show the
+                                                                // derived β × Q in the probability columns, so a
+                                                                // base-event slider change updates the CCF row's
+                                                                // Current P too even though the CCF row's own slider
+                                                                // is still at ×1.
+                                                                const rowProbsFor = (ev) => {
+                                                                    // Use the recalc's exposed getOverriddenProb
+                                                                    // helper so the math stays in one place.
+                                                                    const nomP = designerRecalc.getOverriddenProb(ev.name, {});
+                                                                    const curP = designerRecalc.getOverriddenProb(ev.name, eventOverrides);
+                                                                    return { nominal: nomP, current: curP };
+                                                                };
+
+                                                                // Apply free-text filter (case-insensitive substring
+                                                                // match against name and description). Done before
+                                                                // mapping to rows so we don't compute probabilities
+                                                                // for events we won't display.
+                                                                const filterText = designerFilter.trim().toLowerCase();
+                                                                const filteredEvents = filterText
+                                                                    ? designerEvents.filter(ev =>
+                                                                        ev.name.toLowerCase().includes(filterText) ||
+                                                                        (ev.description || '').toLowerCase().includes(filterText)
+                                                                    )
+                                                                    : designerEvents;
+
+                                                                // Build sortable rows array
+                                                                const rows = filteredEvents.map(ev => {
+                                                                    const exp = eventOverrides[ev.name] !== undefined ? eventOverrides[ev.name] : 0;
+                                                                    const { nominal, current } = rowProbsFor(ev);
+                                                                    const imp = designerImportance[ev.name] || {};
+                                                                    return {
+                                                                        ev, exp,
+                                                                        nominal, current,
+                                                                        rir: imp.rir !== undefined ? imp.rir : null,
+                                                                        rrr: imp.rrr !== undefined ? imp.rrr : null
+                                                                    };
+                                                                });
+
+                                                                // Apply current sort. For numeric columns, treat
+                                                                // null as -Infinity in asc and +Infinity in desc so
+                                                                // missing data always ends up at the bottom.
+                                                                const sortFor = (r) => {
+                                                                    switch (designerSort.col) {
+                                                                        case 'name': return r.ev.name.toLowerCase();
+                                                                        case 'description': return (r.ev.description || '').toLowerCase();
+                                                                        case 'rir': return r.rir;
+                                                                        case 'rrr': return r.rrr;
+                                                                        case 'nominalProb': return r.nominal;
+                                                                        case 'currentProb': return r.current;
+                                                                        default: return r.ev.name.toLowerCase();
+                                                                    }
+                                                                };
+                                                                const cmp = (a, b) => {
+                                                                    const va = sortFor(a), vb = sortFor(b);
+                                                                    if (typeof va === 'string' && typeof vb === 'string') {
+                                                                        return designerSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                                                                    }
+                                                                    // Numeric (or null) — push nulls to the bottom
+                                                                    const sentinel = designerSort.dir === 'asc' ? Infinity : -Infinity;
+                                                                    const xa = (va === null || va === undefined || isNaN(va)) ? sentinel : va;
+                                                                    const xb = (vb === null || vb === undefined || isNaN(vb)) ? sentinel : vb;
+                                                                    return designerSort.dir === 'asc' ? xa - xb : xb - xa;
+                                                                };
+                                                                rows.sort(cmp);
+
+                                                                const toggleSort = (col) => {
+                                                                    setDesignerSort(prev => prev.col === col
+                                                                        ? { col, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+                                                                        : { col, dir: 'asc' }
+                                                                    );
+                                                                };
+                                                                const SortIcon = ({ col }) => {
+                                                                    if (designerSort.col !== col) return <span className="text-gray-300 ml-1">{'\u21C5'}</span>;
+                                                                    return <span className="ml-1">{designerSort.dir === 'asc' ? '\u25B2' : '\u25BC'}</span>;
+                                                                };
+
+                                                                const formatRatio = (v) => {
+                                                                    if (v === null || v === undefined || isNaN(v)) return 'N/A';
+                                                                    if (v === 999 || !isFinite(v)) return '\u221E';
+                                                                    return v.toFixed(2);
+                                                                };
+
+                                                                return (
+                                                                    <div className="mt-3 border rounded overflow-hidden" style={{ borderColor: backgroundStyle.borderColor }}>
+                                                                        <table className="w-full text-xs">
+                                                                            <thead style={{
+                                                                                backgroundColor: settings?.background === 'dark' ? '#374151' : '#f3f4f6'
+                                                                            }}>
+                                                                                <tr>
+                                                                                    <th onClick={() => toggleSort('name')}
+                                                                                        className="px-2 py-1 text-left border-b cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '18%' }}>
+                                                                                        Event<SortIcon col="name" />
+                                                                                    </th>
+                                                                                    <th onClick={() => toggleSort('description')}
+                                                                                        className="px-2 py-1 text-left border-b cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '20%' }}>
+                                                                                        Description<SortIcon col="description" />
+                                                                                    </th>
+                                                                                    <th onClick={() => toggleSort('rir')}
+                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '8%' }}
+                                                                                        title="Risk Increase Ratio: P(system | event=1) / P(system)">
+                                                                                        RIR<SortIcon col="rir" />
+                                                                                    </th>
+                                                                                    <th onClick={() => toggleSort('rrr')}
+                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '8%' }}
+                                                                                        title="Risk Reduction Ratio: P(system) / P(system | event=0)">
+                                                                                        RRR<SortIcon col="rrr" />
+                                                                                    </th>
+                                                                                    <th onClick={() => toggleSort('nominalProb')}
+                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '10%' }}>
+                                                                                        Nominal P<SortIcon col="nominalProb" />
+                                                                                    </th>
+                                                                                    <th className="px-2 py-1 text-center border-b"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '26%' }}>
+                                                                                        Multiplier
+                                                                                    </th>
+                                                                                    <th onClick={() => toggleSort('currentProb')}
+                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '10%' }}>
+                                                                                        Current P<SortIcon col="currentProb" />
+                                                                                    </th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {rows.map((r, idx) => {
+                                                                                    const ev = r.ev;
+                                                                                    const exp = r.exp;
+                                                                                    const isCCF = ev.kind === 'ccf';
+                                                                                    // For CCF rows the current value can drift from
+                                                                                    // nominal even without touching the CCF row's
+                                                                                    // own slider (because the base event's slider
+                                                                                    // changes Q). Detect that to color the row.
+                                                                                    const ccfDrift = isCCF && r.current !== r.nominal && Math.abs(r.current - r.nominal) > r.nominal * 1e-12;
+                                                                                    const adjusted = exp !== 0;
+                                                                                    const rowBg = adjusted
+                                                                                        ? (settings?.background === 'dark' ? '#1e3352' : '#eff6ff')
+                                                                                        : ccfDrift
+                                                                                            ? (settings?.background === 'dark' ? '#1f2e3a' : '#f0f9ff')
+                                                                                            : (idx % 2 === 0
+                                                                                                ? 'transparent'
+                                                                                                : (settings?.background === 'dark' ? '#1f2937' : '#f3f4f6'));
+                                                                                    const sliderColor = exp === 0
+                                                                                        ? (settings?.background === 'dark' ? '#9ca3af' : '#6b7280')
+                                                                                        : (exp > 0
+                                                                                            ? (settings?.background === 'dark' ? '#fca5a5' : '#b91c1c')
+                                                                                            : (settings?.background === 'dark' ? '#86efac' : '#15803d'));
+                                                                                    const currentColor = (r.current !== r.nominal && Math.abs(r.current - r.nominal) > r.nominal * 1e-12)
+                                                                                        ? (r.current > r.nominal
+                                                                                            ? (settings?.background === 'dark' ? '#fca5a5' : '#b91c1c')
+                                                                                            : (settings?.background === 'dark' ? '#86efac' : '#15803d'))
+                                                                                        : undefined;
+                                                                                    return (
+                                                                                        <tr key={ev.name} style={{ backgroundColor: rowBg }}>
+                                                                                            <td className="px-2 py-1 border-b font-mono align-middle"
+                                                                                                style={{ borderColor: backgroundStyle.borderColor, wordBreak: 'break-all' }}>
+                                                                                                {ev.name}
+                                                                                                {ev.isHouseEvent && <span className="ml-1 text-purple-600" title="House event">{'\u2302'}</span>}
+                                                                                                {isCCF && (
+                                                                                                    <span className="ml-1 text-pink-600" title={`CCF event — adjusts β. Group: ${(ev.ccfGroup || []).join(', ')}`}>
+                                                                                                        {'\u26A1'}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-1 border-b align-middle text-gray-600"
+                                                                                                style={{ borderColor: backgroundStyle.borderColor, wordBreak: 'break-word' }}>
+                                                                                                {ev.description}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle"
+                                                                                                style={{ borderColor: backgroundStyle.borderColor }}>
+                                                                                                {formatRatio(r.rir)}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle"
+                                                                                                style={{ borderColor: backgroundStyle.borderColor }}>
+                                                                                                {formatRatio(r.rrr)}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle"
+                                                                                                style={{ borderColor: backgroundStyle.borderColor }}>
+                                                                                                {formatProbability(r.nominal, probDisplayMode)}
+                                                                                                {isCCF && <div className="text-xs text-gray-500" title="β × Q">β={ev.nominalBeta.toExponential(2)}</div>}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-1 border-b align-middle"
+                                                                                                style={{ borderColor: backgroundStyle.borderColor }}>
+                                                                                                <div className="flex items-center gap-1 justify-center">
+                                                                                                    <button
+                                                                                                        onClick={() => setEventOverrides(prev => ({ ...prev, [ev.name]: Math.max(EXP_MIN, (prev[ev.name] || 0) - 1) }))}
+                                                                                                        disabled={exp <= EXP_MIN}
+                                                                                                        className="px-1.5 py-0.5 rounded text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                                                        style={{ backgroundColor: '#6b7280', color: '#fff', minWidth: '20px' }}
+                                                                                                        title={isCCF ? `Decrease β by factor of ${multiplierBase}` : `Decrease by factor of ${multiplierBase}`}
+                                                                                                    >
+                                                                                                        {'\u2212'}
+                                                                                                    </button>
+                                                                                                    <input
+                                                                                                        type="range"
+                                                                                                        min={EXP_MIN}
+                                                                                                        max={EXP_MAX}
+                                                                                                        step={1}
+                                                                                                        value={exp}
+                                                                                                        onChange={(e) => {
+                                                                                                            const v = parseInt(e.target.value, 10);
+                                                                                                            setEventOverrides(prev => ({ ...prev, [ev.name]: v }));
+                                                                                                        }}
+                                                                                                        style={{ flex: 1, maxWidth: '110px', accentColor: sliderColor }}
+                                                                                                        title={isCCF
+                                                                                                            ? `Adjusts β by powers of ${multiplierBase} (current: ${expLabel(exp)} × ${ev.nominalBeta.toExponential(2)})`
+                                                                                                            : `Adjusts probability by powers of ${multiplierBase} (current: ${expLabel(exp)})`}
+                                                                                                    />
+                                                                                                    <button
+                                                                                                        onClick={() => setEventOverrides(prev => ({ ...prev, [ev.name]: Math.min(EXP_MAX, (prev[ev.name] || 0) + 1) }))}
+                                                                                                        disabled={exp >= EXP_MAX}
+                                                                                                        className="px-1.5 py-0.5 rounded text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                                                        style={{ backgroundColor: '#6b7280', color: '#fff', minWidth: '20px' }}
+                                                                                                        title={isCCF ? `Increase β by factor of ${multiplierBase}` : `Increase by factor of ${multiplierBase}`}
+                                                                                                    >
+                                                                                                        {'+'}
+                                                                                                    </button>
+                                                                                                    <span className="font-mono font-semibold ml-1" style={{
+                                                                                                        minWidth: '40px',
+                                                                                                        textAlign: 'right',
+                                                                                                        color: sliderColor
+                                                                                                    }}>
+                                                                                                        {isCCF ? `β${expLabel(exp)}` : expLabel(exp)}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            </td>
+                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle" style={{
+                                                                                                borderColor: backgroundStyle.borderColor,
+                                                                                                color: currentColor,
+                                                                                                fontWeight: currentColor ? 'bold' : 'normal'
+                                                                                            }}>
+                                                                                                {formatProbability(r.current, probDisplayMode)}
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    );
+                                                                                })}
                                                                             </tbody>
                                                                         </table>
                                                                     </div>
