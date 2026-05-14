@@ -52,7 +52,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.1 | Hazard analysis, initiating event frequency quantification, and screening |
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.3 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
-| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.5 | System modeling, P&ID, FMEA, failure analysis, CCF, importance measures, and comparison function |
+| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.6 | System modeling, P&ID, FMEA, failure analysis, CCF, Reliability Designer™, importance measures, and comparison function |
 | **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | vX.0 | Process Operational Logic (POL) diagrams and event tree generation |
 | **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
 | **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | vX.0 | General-purpose `.KNOW` file viewer and editor |
@@ -151,6 +151,7 @@ System-level knowledge management: define structures, systems, and components (S
   - Configurable scatter plot of any two importance measures with labeled data points
 - **FMEA editor** — full-screen modal with SSC list and auto-generated Mermaid.js FMEA block diagrams; add effects, severity, detection, and mitigation fields per failure mode
 - **P&ID editor** — full-screen Piping and Instrumentation Diagram editor with SSC icons based upon the ISA5.1 P&ID symbol standard
+- **Reliability Designer™** — A way to quickly modify component failure probabilities (higher or lower) and see the impact on the overall system. Then, for an adjusted component probability, there is an estimate (using Bayesian inference) of how many tests would be required to meet that reliability target with 95% probability.
 - **Supercomponents** — group SSCs into logical assemblies for organization
 - **Common-Cause Failures** — automatically apply a beta-factor based CCF events to cut sets
 - **Comparison** — Compare two system designs to support risk-informed decision making
