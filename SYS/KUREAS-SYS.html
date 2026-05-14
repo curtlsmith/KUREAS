@@ -45,6 +45,7 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jstat@1.9.6/dist/jstat.min.js"></script>
 	 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEzUlEQVR4AcRXSUxUWRQ9r4oZmZpBpGkGATdudKUrh5hoXLgEosbExKEdAJV2ionzEDXRxKgxNmgjLETAGIdoTEx04caliImhAYONAgKFNHSoiaq+99f313/1XxVVHZP+4f733rn3vnv+rffvv9jwP18agcrKSv+PliraUyXmOPzsGgGetLW1gaW1uRl/HDmCxj170FhXBx6bz59HW2urpmebiEJ2zRcuoKGmBg27d+P3Xbs04XXTmTPGHhyTxSDAC/j9cH/+jD+3bkXnsmXoXL4c71auxJdr1+BzuTSTiLeZGTieP8c73bdzxQrNv2vVKvQSIe/4uMVdJsBqIgGfD5IwxrpI4vXC8ewZerdtg2tgIGhpsyF18WJUUGbTliwJ4vrMSkBXxDTowXu2b4eLMmj4UvD0pUux4M4dzFm0yIDNEysBIcz6wDxSBjj406fg4O7BwYA93yl4Jv0UC5qakLJwISNKsRJQmqlBPwUfe/IE3XRm3ENDQSMKnrV6Ncpv30ZSRUUQV8wkAn4yEELOgD/M0/s8How9fKg9uXdkhDz1Pwr+07p1KG9oQFJpqQ6GHyQC4c1kjRb8wQP07tgBT0jw3MpKlN+4gcTCQtkpzEoiIIQAZ8Fsy/kwZ4HT7rh/H730fntGRw1TQU+et2kT5l+9ioR58wx8tolEYDZjP6V9lApWz86d8I6NBc0peD69fvMvXUJ8bm4Qj2JmISCEnAV+ei0LHPzePe3Jvd++GVsLux0FtbUopuoXl51t4NFOLARUjn63G19bWtBDafdOTARNiGze5s0oPnUKcRkZQTyGmZUAbSoEP7O+C70Fw1RI+vbuxczkpA7qA+n+fv0azo8fdSD2wUpAsYdvehp8+BQqOLu78enkSfltUBmGwaIiEMZXg/mMOB4/xtDNm+CfSgNjuMVEwJaUhNLLl1HR2Ah7aqoRhrPzhfBx+hLyF9VQRDGJmgAHL6G+oIC+8TlVVZi7ZYu0vYc+tf1Hj2L6wwcJn21hJWA+gLq3FvzcOeRT5RMJCbCnpaGADmXo5/Wft2/x6fRpeB0ORHtZCSg88zZuxFz64NgSEw1tUkkJiujwxefkGBhPRjs6MNzUFPV5UBMIyYJITgao4HAAQ8gmgzqegn37IOLiDJir5cDFi5h49Qp+bmwMjXqiJqC2taCckXzKTNbatZLOMzyM/mPH4Orrk3DVwqYCLRgVHGEBA0B8Xh6K6PAll5UFAP0++eYN/qJMzJgrp64zD9ERMHso5tzz/Xz4MOwpKZJ2pKUFX+/ehY9KuaQwLX4IAT4DufRq5qxfD9DZgH75nE4MnD2LKcoGKIs6LA1qArSJEHLSueJJniELe3o6Cg8exBzqgM0kuEPuP34czv5+qPZQE8B/u5LLy/ELnYe4zExpg4mXLzF45Qp8U1MSzgslASHUPQE7RBRqTLLWrAkULHo1uUsCYSxDt25hjNo4SoO0hYWAPTNT26D4xAkUsVCxyaYmkyug5BlmYaOaUVhfj7Lr17U+gYsVS+GhQ2AioW4GgSo6RCwbqLWqpf9w9nd14cD79zhA46/UXldTNWR9NLKBGpe6Fy9QT6V5f2cnWH6jec2jR6iqrgbv8Z2IRqC9vV1I0tEh2gj7LpKO8FjWkWyZxL8AAAD//4MEZNkAAAAGSURBVAMAE0k4X2fO1c4AAAAASUVORK5CYII=" type="image/png">
     <style>
         body {
@@ -4213,9 +4214,9 @@
                                                 if (fm.timeToOperate) opTime = fm.timeToOperate + ' hrs';
                                                 else if (fm.missionTime) opTime = fm.missionTime + ' hrs';
                                                 const notes = [];
-                                                if (fm.data?.distribution_type) notes.push('Dist: '+fm.data.distribution_type);
+                                                if (fm.data?.distribution_type) notes.push('Distribution: '+fm.data.distribution_type);
                                                 if (units==='hft' && fm.pipeLength) notes.push('Pipe: '+fm.pipeLength+' ft');
-                                                if (fm.failureModel && fm.failureModel!=='0') notes.push('FM'+fm.failureModel);
+                                                if (fm.failureModel && fm.failureModel!=='0' && fm.failureModel!=='2') notes.push('FM'+fm.failureModel);
                                                 if (fm.inspInterval) notes.push('Insp: '+fm.inspInterval+' hrs');
                                                 if (fm.tauRepair) notes.push('Tau: '+fm.tauRepair+' hrs');
                                                 rows.push([ ssc.name||'', fm.mode||'', fm.data?.description||'', failProb, failRate, opTime, fm.source||'', notes.join('; ') ]);
@@ -5347,12 +5348,12 @@
                                 } else if (shapeParam !== undefined) {
                                     distText += '(' + shapeParam + ')';
                                 }
-                                notes.push('Dist: ' + distText);
+                                notes.push('Distribution: ' + distText);
                             }
                             if (units === 'hft' && fm.pipeLength) {
                                 notes.push('Pipe: ' + fm.pipeLength + ' ft');
                             }
-                            if (fm.failureModel && fm.failureModel !== '0') {
+                            if (fm.failureModel && fm.failureModel !== '0' && fm.failureModel !== '2') {
                                 notes.push('FM' + fm.failureModel);
                             }
                             if (fm.inspInterval) {
@@ -6147,12 +6148,12 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                 } else if (shapeParam !== undefined) {
                                     distText += '(' + shapeParam + ')';
                                 }
-                                notes.push('Dist: ' + distText);
+                                notes.push('Distribution: ' + distText);
                             }
                             if (units === 'hft' && fm.pipeLength) {
                                 notes.push('Pipe: ' + fm.pipeLength + ' ft');
                             }
-                            if (fm.failureModel && fm.failureModel !== '0') {
+                            if (fm.failureModel && fm.failureModel !== '0' && fm.failureModel !== '2') {
                                 notes.push('FM' + fm.failureModel);
                             }
                             if (fm.inspInterval) {
@@ -21628,7 +21629,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
             function FailureAnalysisModal({ onClose, settings, backgroundStyle, fontSizeClass, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, linkedSystemProbabilities = {}, onAnalysisReady }) {
                 const [activeLeftTab, setActiveLeftTab] = useState('text');
                 const [activeRightTab, setActiveRightTab] = useState('cutsets');
-                const [leftPaneWidth, setLeftPaneWidth] = useState(50); // percentage
+                const [leftPaneWidth, setLeftPaneWidth] = useState(45); // percentage
                 const [isResizing, setIsResizing] = useState(false);
                 const [expandedNodes, setExpandedNodes] = useState(new Set(['top']));
                 const [showConnectors, setShowConnectors] = useState(false);
@@ -21659,6 +21660,9 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 // Reliability Designer table sort. Columns: 'name', 'description', 'rir',
                 // 'rrr', 'nominalProb', 'currentProb'. Sort direction: 'asc' | 'desc'.
                 const [designerSort, setDesignerSort] = useState({ col: 'name', dir: 'asc' });
+                // Which optional columns are visible in the Reliability Designer table.
+                // All three are on by default; users can toggle any off to save space.
+                const [designerShow, setDesignerShow] = useState({ description: true, importance: true, reliability: true });
                 // Quantification method used for live recalc and importance measures
                 // on the Reliability Designer tab. Defaults to the project's configured
                 // method so the designer's nominal value matches the Cut Sets tab when
@@ -21841,7 +21845,21 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                         isLinked: probResult.isLinked,
                                         linkedSystemName: probResult.linkedSystemName,
                                         probabilityType: fm.probabilityType,
-                                        qualitativeLevel: fm.qualitativeLevel
+                                        qualitativeLevel: fm.qualitativeLevel,
+                                        failureModel: fm.failureModel || '0',
+                                        distType: fm.data?.distribution_type || 'CNI',
+                                        distShape: fm.data?.distribution_shape_parameter,
+                                        distScale: fm.data?.distribution_scale_parameter,
+                                        distMean: fm.data?.mean,
+                                        fmLambda: fm.lambda,
+                                        fmMissionTime: fm.missionTime,
+                                        fmInspInterval: fm.inspInterval,
+                                        fmDemandProb: fm.demandProb,
+                                        fmDemandN: fm.demandN,
+                                        fmTauRepair: fm.tauRepair,
+                                        fmUnits: fm.data?.units,
+                                        fmPipeLength: fm.pipeLength,
+                                        fmTimeToOperate: fm.timeToOperate
                                     };
                                 });
                             } else {
@@ -21858,7 +21876,21 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                     linkedSystemName: probResult.linkedSystemName,
                                     linkedResolved: probResult.linkedResolved,
                                     probabilityType: fm.probabilityType,
-                                    qualitativeLevel: fm.qualitativeLevel
+                                    qualitativeLevel: fm.qualitativeLevel,
+                                    failureModel: fm.failureModel || '0',
+                                    distType: fm.data?.distribution_type || 'CNI',
+                                    distShape: fm.data?.distribution_shape_parameter,
+                                    distScale: fm.data?.distribution_scale_parameter,
+                                    distMean: fm.data?.mean,
+                                    fmLambda: fm.lambda,
+                                    fmMissionTime: fm.missionTime,
+                                    fmInspInterval: fm.inspInterval,
+                                    fmDemandProb: fm.demandProb,
+                                    fmDemandN: fm.demandN,
+                                    fmTauRepair: fm.tauRepair,
+                                    fmUnits: fm.data?.units,
+                                    fmPipeLength: fm.pipeLength,
+                                    fmTimeToOperate: fm.timeToOperate
                                 };
                             }
                         }
@@ -22382,7 +22414,21 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                                     description: data.description || '',
                                     kind: 'basic',
                                     nominalProb: data.probability,
-                                    isHouseEvent: data.isHouseEvent || false
+                                    isHouseEvent: data.isHouseEvent || false,
+                                    failureModel: data.failureModel || '0',
+                                    distType: data.distType || 'CNI',
+                                    distShape: data.distShape,
+                                    distScale: data.distScale,
+                                    distMean: data.distMean,
+                                    fmLambda: data.fmLambda,
+                                    fmMissionTime: data.fmMissionTime,
+                                    fmInspInterval: data.fmInspInterval,
+                                    fmDemandProb: data.fmDemandProb,
+                                    fmDemandN: data.fmDemandN,
+                                    fmTauRepair: data.fmTauRepair,
+                                    fmUnits: data.fmUnits,
+                                    fmPipeLength: data.fmPipeLength,
+                                    fmTimeToOperate: data.fmTimeToOperate
                                 });
                             }
                         }
@@ -22585,7 +22631,207 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                         return newSet;
                     });
                 };
-                
+
+                // ── Reliability Testing Calculator ──────────────────────────────────
+                // Computes the number of successful tests (demand-based) or successful
+                // operating hours (time-based) required such that the 95th percentile
+                // of the posterior failure-probability distribution is ≤ currentP.
+                //
+                // Case 1 – currentP > nominalP (slider increased): Jeffreys noninformative prior.
+                //   Demand:     Beta(0.5, 0.5)
+                //   Time-based: Gamma(0.5, rate=0) — improper; search starts at T=1,
+                //               giving posterior Gamma(0.5, scale = 1/T).
+                //
+                // Case 2 – currentP < nominalP (reliability improvement goal):
+                //   Uses the informative conjugate prior from the event's own distribution.
+                //
+                // Returns: { label, value, isTesting, increased }
+                //   increased – true when this is a Case 1 (noninformative prior) result
+                //
+                // Uses jStat (loaded via CDN) for Beta and Gamma quantile functions.
+                const computeReliabilityTesting = (ev, currentP, nominalP) => {
+                    if (ev.isHouseEvent || ev.kind === 'ccf') return null;
+                    if (currentP === null || currentP === undefined || isNaN(currentP)) return null;
+                    if (currentP <= 0) return { label: 'Approx. tests required', value: 0, isTesting: true, increased: false };
+
+                    const fm = ev.failureModel || '0';
+                    const distType = (ev.distType || 'CNI').toLowerCase();
+                    const fmUnits = ev.fmUnits || '';
+                    const refNominal = (nominalP !== undefined && nominalP !== null) ? nominalP : ev.nominalProb;
+                    const increased = currentP > (refNominal || 0);
+
+                    // FM 0 with units='hft' (per hour per foot, pipes) is time-based in nature
+                    const isHftPipe = (fm === '0' && fmUnits === 'hft');
+
+                    // Helper: resolve mean of the informative prior distribution
+                    const getMean = () => {
+                        const sh = parseFloat(ev.distShape);
+                        const sc = parseFloat(ev.distScale);
+                        const dm = parseFloat(ev.distMean);
+                        if (distType === 'beta') {
+                            if (!isNaN(sh) && !isNaN(sc) && (sh + sc) > 0) return sh / (sh + sc);
+                        }
+                        if (distType === 'gamma') {
+                            if (!isNaN(sh) && !isNaN(sc)) return sh * sc;
+                        }
+                        if (!isNaN(dm) && dm > 0) return dm;
+                        if (!isNaN(sh) && sh > 0) return sh;
+                        const nomP = ev.nominalProb;
+                        return (nomP !== null && nomP > 0) ? nomP : null;
+                    };
+
+                    // ── DEMAND-BASED (FM 0, 1) ────────────────────────────────────
+                    // FM 0 with units='hft' is treated as time-based (see below)
+                    const isDemand = (['0', '1'].includes(fm)) && !isHftPipe;
+                    if (isDemand) {
+                        let alpha, betaP;
+
+                        if (increased) {
+                            // Case 1: Jeffreys noninformative prior Beta(0.5, 0.5)
+                            alpha = 0.5; betaP = 0.5;
+                        } else {
+                            // Case 2: informative prior from event distribution
+                            if (distType === 'beta') {
+                                const sh = parseFloat(ev.distShape);
+                                const sc = parseFloat(ev.distScale);
+                                if (!isNaN(sh) && sh > 0 && !isNaN(sc) && sc > 0) {
+                                    alpha = sh; betaP = sc;
+                                }
+                            }
+                            if (alpha === undefined) {
+                                const mean = getMean();
+                                if (!mean || mean <= 0 || mean >= 1) return null;
+                                alpha = 0.5;
+                                betaP = alpha * ((1 / mean) - 1);
+                            }
+                            if (!isFinite(alpha) || !isFinite(betaP) || alpha <= 0 || betaP <= 0) return null;
+                        }
+
+                        const jStat = window.jStat;
+                        if (!jStat) return null;
+                        const MAX_N = 100000;
+
+                        // Quick check: already satisfied at N=0?
+                        if (jStat.beta.inv(0.95, alpha, betaP) <= currentP) {
+                            return { label: 'Approx. tests required', value: 0, isTesting: true, increased };
+                        }
+
+                        // Binary search — doubling phase to find upper bound
+                        let hi = 1;
+                        while (hi <= MAX_N && jStat.beta.inv(0.95, alpha, betaP + hi) > currentP) {
+                            hi = Math.min(hi * 2, MAX_N + 1);
+                        }
+                        if (hi > MAX_N && jStat.beta.inv(0.95, alpha, betaP + MAX_N) > currentP) {
+                            return { label: 'Approx. tests required', value: '>' + MAX_N, isTesting: true, increased };
+                        }
+
+                        // Binary search between lo and hi
+                        let lo = Math.floor(hi / 2);
+                        while (lo < hi - 1) {
+                            const mid = Math.floor((lo + hi) / 2);
+                            if (jStat.beta.inv(0.95, alpha, betaP + mid) <= currentP) hi = mid;
+                            else lo = mid;
+                        }
+                        return { label: 'Approx. tests required', value: hi, isTesting: true, increased };
+                    }
+
+                    // ── TIME-BASED (FM 2, 3, 4, and FM 0 with units='hft') ────────
+                    const isTimeBased = ['2', '3', '4'].includes(fm) || isHftPipe;
+                    if (!isTimeBased) return null;
+
+                    // Convert 95th-percentile failure rate → failure probability
+                    const rateToProbability = (rate) => {
+                        if (isHftPipe) {
+                            // P = 1 - exp(-pipeLength * rate * timeToOperate)
+                            const pl = parseFloat(ev.fmPipeLength) || 0;
+                            const tt = parseFloat(ev.fmTimeToOperate) || 24;
+                            if (pl <= 0) return rate;
+                            return 1 - Math.exp(-pl * rate * tt);
+                        }
+                        if (fm === '2') {
+                            const mt = parseFloat(ev.fmMissionTime) || 0;
+                            if (mt <= 0) return rate;
+                            return 1 - Math.exp(-rate * mt);
+                        }
+                        if (fm === '3') {
+                            const ii = parseFloat(ev.fmInspInterval) || 0;
+                            if (ii <= 0) return rate;
+                            const li = rate * ii;
+                            return li > 0 ? 1 + (Math.exp(-li) - 1) / li : 0;
+                        }
+                        if (fm === '4') {
+                            const mt = parseFloat(ev.fmMissionTime) || 0;
+                            const tau = parseFloat(ev.fmTauRepair) || 0;
+                            if (mt <= 0 || tau <= 0) return rate;
+                            return (rate * tau) * (1 - Math.exp(-(rate + tau) * mt)) / (1 + rate * tau);
+                        }
+                        return rate;
+                    };
+
+                    const jStat = window.jStat;
+                    if (!jStat) return null;
+
+                    let gAlpha, rateParam0;
+
+                    if (increased) {
+                        // Case 1: Jeffreys noninformative prior Gamma(0.5, rate=0)
+                        // Posterior after T hours: Gamma(0.5, scale = 1/T)
+                        // Search starts at T=1 (T=0 gives improper prior, infinite 95th pct)
+                        gAlpha = 0.5;
+                        rateParam0 = 0;
+                    } else {
+                        // Case 2: informative prior from event distribution
+                        // Gamma prior: shape=gAlpha, scale=gScale, mean = gAlpha * gScale
+                        // rate parameter = alpha / mean  →  scale = mean / alpha
+                        let gScale;
+                        if (distType === 'gamma') {
+                            const sh = parseFloat(ev.distShape);
+                            const sc = parseFloat(ev.distScale);
+                            if (!isNaN(sh) && sh > 0 && !isNaN(sc) && sc > 0) {
+                                gAlpha = sh; gScale = sc;
+                            }
+                        }
+                        if (gAlpha === undefined) {
+                            const mean = getMean();
+                            if (!mean || mean <= 0) return null;
+                            gAlpha = 0.5;
+                            gScale = mean / gAlpha;
+                        }
+                        if (!isFinite(gAlpha) || !isFinite(gScale) || gAlpha <= 0 || gScale <= 0) return null;
+                        rateParam0 = 1 / gScale;
+                    }
+
+                    // Posterior after T failure-free hours: Gamma(gAlpha, scale = 1/(rateParam0 + T))
+                    const prob95atT = (T) => {
+                        if (T === 0 && rateParam0 === 0) return Infinity; // improper prior at T=0
+                        const scalePosterior = 1 / (rateParam0 + T);
+                        return rateToProbability(jStat.gamma.inv(0.95, gAlpha, scalePosterior));
+                    };
+
+                    const MAX_T = 1000000;
+                    const startT = (rateParam0 === 0) ? 1 : 0; // skip T=0 for improper prior
+
+                    if (prob95atT(startT) <= currentP) {
+                        return { label: 'Approx. operating hours req.', value: startT, isTesting: false, increased };
+                    }
+
+                    // Binary search — doubling phase to find upper bound
+                    let hi = Math.max(1, startT);
+                    while (hi <= MAX_T && prob95atT(hi) > currentP) hi = Math.min(hi * 2, MAX_T + 1);
+                    if (hi > MAX_T && prob95atT(MAX_T) > currentP) {
+                        return { label: 'Approx. operating hours req.', value: '>' + MAX_T, isTesting: false, increased };
+                    }
+
+                    // Binary search between lo and hi
+                    let lo = Math.max(0, Math.floor(hi / 2));
+                    while (lo < hi - 1) {
+                        const mid = Math.floor((lo + hi) / 2);
+                        if (prob95atT(mid) <= currentP) hi = mid;
+                        else lo = mid;
+                    }
+                    return { label: 'Approx. operating hours req.', value: hi, isTesting: false, increased };
+                };
+
                 const handleResizeStart = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -23691,6 +23937,31 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                     <div className="flex items-center gap-3 flex-wrap" style={{
                                                                         color: settings?.background === 'dark' ? '#93c5fd' : '#1d4ed8'
                                                                     }}>
+                                                                        {/* Show column toggles */}
+                                                                        <span className="font-normal flex items-center gap-1">
+                                                                            <span className="font-semibold">Show:</span>
+                                                                            <div className="flex border rounded overflow-hidden" style={{ borderColor: '#9ca3af' }}>
+                                                                                {[
+                                                                                    { key: 'description', label: 'Description' },
+                                                                                    { key: 'importance', label: 'Importance' },
+                                                                                    { key: 'reliability', label: 'Rel. Testing' }
+                                                                                ].map((opt, idx, arr) => (
+                                                                                    <button
+                                                                                        key={opt.key}
+                                                                                        onClick={() => setDesignerShow(prev => ({ ...prev, [opt.key]: !prev[opt.key] }))}
+                                                                                        className="px-2 py-0.5 text-xs font-semibold"
+                                                                                        style={{
+                                                                                            backgroundColor: designerShow[opt.key]
+                                                                                                ? '#2563eb'
+                                                                                                : (settings?.background === 'dark' ? '#374151' : '#f3f4f6'),
+                                                                                            color: designerShow[opt.key] ? '#fff' : (backgroundStyle.color || '#1f2937'),
+                                                                                            borderRight: idx !== arr.length - 1 ? '1px solid #9ca3af' : 'none'
+                                                                                        }}
+                                                                                        title={`Toggle ${opt.label} column`}
+                                                                                    >{opt.label}</button>
+                                                                                ))}
+                                                                            </div>
+                                                                        </span>
                                                                         <span className="font-semibold">
                                                                             {(() => {
                                                                                 const filterText = designerFilter.trim().toLowerCase();
@@ -23732,8 +24003,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                             <div className="flex border rounded overflow-hidden" style={{ borderColor: '#9ca3af' }}>
                                                                                 {[
                                                                                     { id: 'mcub', label: 'MCUB', tip: 'Minimal Cut-set Upper Bound. Fast, conservative; always an upper bound on the true probability.' },
-                                                                                    { id: 'bdd', label: 'BDD', tip: 'Binary Decision Diagram. Exact (handles shared events correctly); slower one-time build but live drags stay fast.' },
-                                                                                    { id: 'rare', label: 'Rare Event', tip: 'Sum of cut-set probabilities. Fastest; accurate only when cut-set probabilities are small.' }
+                                                                                    { id: 'bdd', label: 'BDD', tip: 'Binary Decision Diagram. Exact (handles shared events correctly); slower one-time build but live drags stay fast.' }
                                                                                 ].map((m, idx, arr) => (
                                                                                     <button
                                                                                         key={m.id}
@@ -23943,25 +24213,29 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                                         style={{ borderColor: backgroundStyle.borderColor, width: '18%' }}>
                                                                                         Event<SortIcon col="name" />
                                                                                     </th>
+                                                                                    {designerShow.description && (
                                                                                     <th onClick={() => toggleSort('description')}
                                                                                         className="px-2 py-1 text-left border-b cursor-pointer hover:bg-gray-200 select-none"
                                                                                         style={{ borderColor: backgroundStyle.borderColor, width: '20%' }}>
                                                                                         Description<SortIcon col="description" />
                                                                                     </th>
+                                                                                    )}
+                                                                                    {designerShow.importance && (<>
                                                                                     <th onClick={() => toggleSort('rir')}
-                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        className="px-2 py-1 text-center border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
                                                                                         style={{ borderColor: backgroundStyle.borderColor, width: '8%' }}
                                                                                         title="Risk Increase Ratio: P(system | event=1) / P(system)">
                                                                                         RIR<SortIcon col="rir" />
                                                                                     </th>
                                                                                     <th onClick={() => toggleSort('rrr')}
-                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        className="px-2 py-1 text-center border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
                                                                                         style={{ borderColor: backgroundStyle.borderColor, width: '8%' }}
                                                                                         title="Risk Reduction Ratio: P(system) / P(system | event=0)">
                                                                                         RRR<SortIcon col="rrr" />
                                                                                     </th>
+                                                                                    </>)}
                                                                                     <th onClick={() => toggleSort('nominalProb')}
-                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        className="px-2 py-1 text-center border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
                                                                                         style={{ borderColor: backgroundStyle.borderColor, width: '10%' }}>
                                                                                         Nominal P<SortIcon col="nominalProb" />
                                                                                     </th>
@@ -23970,10 +24244,17 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                                         Multiplier
                                                                                     </th>
                                                                                     <th onClick={() => toggleSort('currentProb')}
-                                                                                        className="px-2 py-1 text-right border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
+                                                                                        className="px-2 py-1 text-center border-b font-mono cursor-pointer hover:bg-gray-200 select-none"
                                                                                         style={{ borderColor: backgroundStyle.borderColor, width: '10%' }}>
                                                                                         Current P<SortIcon col="currentProb" />
                                                                                     </th>
+                                                                                    {designerShow.reliability && (
+                                                                                    <th className="px-2 py-1 text-center border-b"
+                                                                                        style={{ borderColor: backgroundStyle.borderColor, width: '14%' }}
+                                                                                        title="Approximate tests or operating hours required so that the 95th-percentile failure probability equals Current P (Bayesian posterior update)">
+                                                                                        Reliability Testing
+                                                                                    </th>
+                                                                                    )}
                                                                                 </tr>
                                                                             </thead>
                                                                             <tbody>
@@ -24016,19 +24297,23 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                                                     </span>
                                                                                                 )}
                                                                                             </td>
+                                                                                            {designerShow.description && (
                                                                                             <td className="px-2 py-1 border-b align-middle text-gray-600"
                                                                                                 style={{ borderColor: backgroundStyle.borderColor, wordBreak: 'break-word' }}>
                                                                                                 {ev.description}
                                                                                             </td>
-                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle"
+                                                                                            )}
+                                                                                            {designerShow.importance && (<>
+                                                                                            <td className="px-2 py-1 border-b text-center font-mono align-middle"
                                                                                                 style={{ borderColor: backgroundStyle.borderColor }}>
                                                                                                 {formatRatio(r.rir)}
                                                                                             </td>
-                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle"
+                                                                                            <td className="px-2 py-1 border-b text-center font-mono align-middle"
                                                                                                 style={{ borderColor: backgroundStyle.borderColor }}>
                                                                                                 {formatRatio(r.rrr)}
                                                                                             </td>
-                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle"
+                                                                                            </>)}
+                                                                                            <td className="px-2 py-1 border-b text-center font-mono align-middle"
                                                                                                 style={{ borderColor: backgroundStyle.borderColor }}>
                                                                                                 {formatProbability(r.nominal, probDisplayMode)}
                                                                                                 {isCCF && <div className="text-xs text-gray-500" title="β × Q">β={ev.nominalBeta.toExponential(2)}</div>}
@@ -24069,8 +24354,8 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                                                     >
                                                                                                         {'+'}
                                                                                                     </button>
-                                                                                                    <span className="font-mono font-semibold ml-1" style={{
-                                                                                                        minWidth: '40px',
+                                                                                                    <span className="font-mono font-semibold" style={{
+                                                                                                        minWidth: '36px',
                                                                                                         textAlign: 'right',
                                                                                                         color: sliderColor
                                                                                                     }}>
@@ -24078,13 +24363,36 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                                                     </span>
                                                                                                 </div>
                                                                                             </td>
-                                                                                            <td className="px-2 py-1 border-b text-right font-mono align-middle" style={{
+                                                                                            <td className="px-2 py-1 border-b text-center font-mono align-middle" style={{
                                                                                                 borderColor: backgroundStyle.borderColor,
                                                                                                 color: currentColor,
                                                                                                 fontWeight: currentColor ? 'bold' : 'normal'
                                                                                             }}>
                                                                                                 {formatProbability(r.current, probDisplayMode)}
                                                                                             </td>
+                                                                                            {designerShow.reliability && (
+                                                                                            <td className="px-2 py-1 border-b text-center align-middle"
+                                                                                                style={{ borderColor: backgroundStyle.borderColor }}>
+                                                                                                {(() => {
+                                                                                                    if (isCCF || ev.isHouseEvent) return <span className="text-gray-400 text-xs">—</span>;
+                                                                                                    if (r.current === r.nominal) return <span className="text-gray-400 text-xs">—</span>;
+                                                                                                    const rtResult = computeReliabilityTesting(ev, r.current, r.nominal);
+                                                                                                    if (!rtResult || rtResult.value === null) return <span className="text-gray-400 text-xs">N/A</span>;
+                                                                                                    const val = rtResult.value;
+                                                                                                    const valStr = typeof val === 'number' ? val.toLocaleString() : String(val);
+                                                                                                    // Green for improvement (Case 2), amber for relaxed goal (Case 1)
+                                                                                                    const valColor = rtResult.increased
+                                                                                                        ? (settings?.background === 'dark' ? '#fcd34d' : '#b45309')
+                                                                                                        : (settings?.background === 'dark' ? '#86efac' : '#15803d');
+                                                                                                    return (
+                                                                                                        <div className="flex flex-col items-center gap-0.5">
+                                                                                                            <span className="font-mono font-semibold text-xs" style={{ color: valColor }}>{valStr}</span>
+                                                                                                            <span className="text-gray-500" style={{ fontSize: '10px' }}>{rtResult.isTesting ? 'tests' : 'op. hours'}</span>
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })()}
+                                                                                            </td>
+                                                                                            )}
                                                                                         </tr>
                                                                                     );
                                                                                 })}
@@ -24553,7 +24861,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <h1 className="text-lg font-bold"><a href="https://github.com/curtlsmith/KUREAS/tree/main/SYS" target="_blank" rel="noopener noreferrer" style={{color:'white',textDecoration:'underline',textDecorationStyle:'dotted',textUnderlineOffset:'3px'}}>KUREAS-SYS</a></h1>
                         </div>
-                        <span className="text-sm opacity-90 flex-1 text-center">v1.5 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>System Evaluation Module</strong></span>
+                        <span className="text-sm opacity-90 flex-1 text-center">v1.6 Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems: <strong>System Evaluation Module</strong></span>
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <button
                                 onClick={loadSystemDefinition}
@@ -25159,7 +25467,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                 Check Script
                                             </button>
                                         </div>
-                                        <Tooltip text="Describe how the system works using System Modeling Script. Each line represents a 'SYSTEM WORKS =' expression ending with a semicolon. Click keywords or SSCs above to insert them at the cursor position. Line numbers are shown on the left.">
+                                        <Tooltip text="Describe how the system works using a How the System Works (HtSW) Modeling Script. The 'SYSTEM WORKS =' expression describes how the system works. Valid lines end with a semicolon. Click keywords or SSCs below to insert them at the cursor position.">
                                             <InfoIcon />
                                         </Tooltip>
                                     </div>
