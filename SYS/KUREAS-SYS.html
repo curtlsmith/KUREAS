@@ -444,92 +444,7 @@
             );
         }
 
-        // Add Supercomponent Modal Component
-        function AddSupercomponentModal({ onSave, onCancel, backgroundStyle }) {
-            const [name, setName] = useState('');
-            const [description, setDescription] = useState('');
-            const [error, setError] = useState('');
 
-            const handleSave = () => {
-                if (!name.trim()) {
-                    setError('Unique Supercomponent Name is required');
-                    return;
-                }
-                onSave({ name: name.trim(), description: description.trim() });
-            };
-
-            return (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{
-                        backgroundColor: backgroundStyle.paneBackground,
-                        color: backgroundStyle.color
-                    }}>
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold mb-4">Create Supercomponent</h2>
-
-                            <div className="mb-4">
-                                <label className="block font-bold mb-2 text-sm">
-                                    Unique Supercomponent Name <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => {
-                                        setName(e.target.value);
-                                        setError('');
-                                    }}
-                                    className="w-full px-3 py-2 border rounded"
-                                    placeholder="e.g., TRAIN-A"
-                                    style={{
-                                        backgroundColor: backgroundStyle.backgroundColor,
-                                        color: backgroundStyle.color,
-                                        borderColor: backgroundStyle.borderColor
-                                    }}
-                                    autoFocus
-                                />
-                                {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
-                            </div>
-
-                            <div className="mb-6">
-                                <label className="block font-bold mb-2 text-sm">
-                                    Supercomponent Description <span className="text-gray-500">(optional)</span>
-                                </label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows="3"
-                                    className="w-full px-3 py-2 border rounded"
-                                    placeholder="Brief description of this supercomponent"
-                                    style={{
-                                        backgroundColor: backgroundStyle.backgroundColor,
-                                        color: backgroundStyle.color,
-                                        borderColor: backgroundStyle.borderColor
-                                    }}
-                                />
-                            </div>
-
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={onCancel}
-                                    className="px-4 py-2 border rounded hover:bg-gray-100"
-                                    style={{ borderColor: backgroundStyle.borderColor }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                                >
-                                    Create Supercomponent
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // Add SSC Modal Component
         function AddSSCModal({ systemName, sscType, componentType, failureModes, onSave, onCancel, backgroundStyle, existingSSCs }) {
             // Extract acronym from componentType (text in parentheses)
             const acronymMatch = componentType.match(/\(([^)]+)\)/);
@@ -577,26 +492,51 @@
                         <div className="p-6">
                             <h2 className="text-xl font-bold mb-4">Add SSC to System</h2>
                             
-                            <div className="mb-4 text-sm space-y-2">
+                            <div className="mb-4 text-sm space-y-2 p-3 rounded" style={{
+                                backgroundColor: backgroundStyle.backgroundColor,
+                                border: `1px solid ${backgroundStyle.borderColor}`
+                            }}>
                                 <div><strong>System:</strong> {systemName || 'Untitled'}</div>
                                 <div><strong>SSC Type:</strong> {sscType}</div>
                                 <div><strong>Component Type:</strong> {componentType}</div>
-                                {failureModes && failureModes.length > 0 && (() => {
-                                    const firstMode = failureModes[0].data;
-                                    const units = firstMode.units;
-                                    const meanValue = firstMode.mean;
-                                    
-                                    if (units === 'd') {
-                                        return <div><strong>Failure Probability:</strong> {meanValue}</div>;
-                                    } else if (units === 'h') {
-                                        return <div><strong>Failure Rate (per hour):</strong> {meanValue}</div>;
-                                    } else if (units === 'y') {
-                                        return <div><strong>Failure Rate (per year):</strong> {meanValue}</div>;
-                                    } else if (units === 'hft') {
-                                        return <div><strong>Failure Rate (per hour per foot):</strong> {meanValue}</div>;
-                                    }
-                                    return null;
-                                })()}
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block font-bold mb-2 text-sm">
+                                    Failure Modes Included ({(failureModes || []).length})
+                                </label>
+                                <div className="max-h-48 overflow-y-auto border rounded p-2" style={{
+                                    backgroundColor: backgroundStyle.backgroundColor,
+                                    borderColor: backgroundStyle.borderColor
+                                }}>
+                                    {(!failureModes || failureModes.length === 0) ? (
+                                        <div className="text-center text-gray-500 py-3 text-sm">No failure modes defined</div>
+                                    ) : (
+                                        failureModes.map((fm, idx) => {
+                                            const units = fm.data?.units;
+                                            const unitLabel = units === 'h' ? '/hr' : units === 'y' ? '/yr' : units === 'hft' ? '/hr/ft' : units === 'd' ? ' (probability)' : '';
+                                            return (
+                                                <div key={idx} className="flex items-start gap-2 px-2 py-1.5 rounded" style={{
+                                                    borderBottom: idx < failureModes.length - 1 ? `1px solid ${backgroundStyle.borderColor}` : 'none'
+                                                }}>
+                                                    <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
+                                                    <div className="flex-1 text-sm">
+                                                        <div className="font-medium">{fm.mode || 'Unnamed Mode'}</div>
+                                                        {fm.data?.description && (
+                                                            <div className="text-xs text-gray-500 mt-0.5">{fm.data.description}</div>
+                                                        )}
+                                                        {fm.data?.mean && (
+                                                            <div className="text-xs text-gray-400 mt-0.5">
+                                                                Mean: {fm.data.mean}{unitLabel}
+                                                                {fm.data?.ef ? <span className="ml-2">EF: {fm.data.ef}</span> : null}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
                             </div>
 
                             <div className="mb-4">
@@ -2385,7 +2325,7 @@
 
         // System Logic Editor Component
         // Text-based Logic Editor with line numbers
-        function SystemLogicEditor({ tokens, onChange, keywords, sscsInSystem, superComponents, boundaryConditions = [], fontSizeClass, backgroundStyle, onCursorChange }) {
+        function SystemLogicEditor({ tokens, onChange, keywords, sscsInSystem, boundaryConditions = [], fontSizeClass, backgroundStyle, onCursorChange }) {
             const textareaRef = useRef(null);
             const lineNumbersRef = useRef(null);
             
@@ -2602,11 +2542,7 @@
                                 const matchingSSC = sscsInSystem.find(ssc => ssc.name.toUpperCase() === wordUpper);
                                 newTokens.push({ type: 'ssc', value: matchingSSC.name, deletable: true });
                             }
-                            // Check if it's a supercomponent
-                            else if (superComponents.find(sc => sc.name.toUpperCase() === wordUpper)) {
-                                const matchingSupercomp = superComponents.find(sc => sc.name.toUpperCase() === wordUpper);
-                                newTokens.push({ type: 'supercomp', value: matchingSupercomp.name, deletable: true });
-                            }
+
                             // Check if it's a boundary condition
                             else if (boundaryConditions.find(bc => bc.name.toUpperCase() === wordUpper)) {
                                 const matchingBC = boundaryConditions.find(bc => bc.name.toUpperCase() === wordUpper);
@@ -2715,7 +2651,7 @@
                     textarea.focus();
                     textarea.setSelectionRange(newCursorPos, newCursorPos);
                 }, 0);
-            }, [text, onChange, keywords, sscsInSystem, superComponents, boundaryConditions]);
+            }, [text, onChange, keywords, sscsInSystem, boundaryConditions]);
             
             // Expose insertAtCursor to parent via callback
             useEffect(() => {
@@ -3229,7 +3165,7 @@
         }
         
         // ==================== EXPORT MODAL ====================
-        function ExportModal({ onClose, sscsInSystem, systemName, systemDescription, systemLogic, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext }) {
+        function ExportModal({ onClose, sscsInSystem, systemName, systemDescription, systemLogic, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext }) {
             const allSSCs = sscsInSystem || [];
             const [selectedSSCs, setSelectedSSCs] = React.useState(() => new Set(allSSCs.map((_, i) => i)));
             const [format, setFormat] = React.useState('knowRPT');
@@ -3556,7 +3492,7 @@
                 // Parse failure logic tree
                 let failureTree;
                 try {
-                    failureTree = parseSystemWorksExpression(systemLogic, systemName, superComponents);
+                    failureTree = parseSystemWorksExpression(systemLogic, systemName);
                 } catch(e) {
                     alert('Error parsing system logic: ' + e.message);
                     return;
@@ -3839,7 +3775,7 @@
 
                 if (hasLogic) {
                     try {
-                        const parsed = parseSystemWorksExpression(systemLogic, systemName, superComponents);
+                        const parsed = parseSystemWorksExpression(systemLogic, systemName);
                         if (parsed) {
                             const expandMulti = (node) => {
                                 if (node.type === 'BASIC') {
@@ -4284,9 +4220,9 @@
                         },
 
                         supercomponentInformation: {
-                            available: superComponents.length > 0,
+                            available: false,
                             title: 'Supercomponent Information',
-                            content: superComponents.map(sc => ({
+                            content: [/* removed */].map(sc => ({
                                 type: 'supercomponent',
                                 name: sc.name,
                                 description: sc.description || '',
@@ -4515,7 +4451,7 @@
             );
         }
 
-        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext, parseTruncationThreshold }) {
+        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext, parseTruncationThreshold }) {
             const [fileFormat, setFileFormat] = useState(() => {
                 return localStorage.getItem('KUREAS_SYS_reportFormat') || 'word';
             });
@@ -4549,7 +4485,7 @@
                 { id: 'sscInfo', label: 'SSC Information', enabled: true },
                 { id: 'fmeaInfo', label: 'FMEA Information', enabled: true },
                 { id: 'systemWorks', label: 'System Works Expression', enabled: true },
-                { id: 'supercomp', label: 'Supercomponent Information', enabled: true },
+                
                 { id: 'ftLogic', label: 'Fault Tree Logic', enabled: true },
                 { id: 'ftGraphic', label: 'Fault Tree Graphic', enabled: true },
                 { id: 'ftCutSets', label: 'Fault Tree Cut Sets', enabled: true },
@@ -4801,7 +4737,7 @@
                 if (!hasFailureInfo) return null;
                 
                 try {
-                    const parsed = parseSystemWorksExpression(systemLogic, systemName, superComponents);
+                    const parsed = parseSystemWorksExpression(systemLogic, systemName);
                     if (!parsed) return null;
                     
                     // Transform basic events for SSCs with multiple failure modes into OR gates
@@ -4872,7 +4808,7 @@
                     console.error('Error parsing system logic:', err);
                     return null;
                 }
-            }, [systemLogic, systemName, sscsInSystem, superComponents, basicEventData, hasFailureInfo, parseSystemWorksExpression]);
+            }, [systemLogic, systemName, sscsInSystem, basicEventData, hasFailureInfo, parseSystemWorksExpression]);
             
             // Generate cut sets and system failure probability
             const { cutSets, mcubValue, quantMethod, ccfEvents } = React.useMemo(() => {
@@ -5134,7 +5070,7 @@
                             case 'sscInfo':       body += generateHTMLSSCInfoSection(); break;
                             case 'fmeaInfo':      body += await generateHTMLFMEAInfoSectionAsync(renderMermaidToImage); break;
                             case 'systemWorks':   body += generateHTMLSystemWorksSection(); break;
-                            case 'supercomp':     body += generateHTMLSupercompSection(); break;
+                            
                             case 'ftLogic':       body += generateHTMLFTLogicSection(); break;
                             case 'ftGraphic':     body += generateHTMLFTGraphicSection(); break;
                             case 'ftCutSets':     if (hasFailureInfo) body += generateHTMLFTCutSetsSection(); break;
@@ -5202,8 +5138,7 @@
                         case 'systemWorks':
                             markdown += generateSystemWorksSection();
                             break;
-                        case 'supercomp':
-                            markdown += generateSupercompSection();
+                        
                             break;
                         case 'ftLogic':
                             if (hasFailureInfo) markdown += generateFTLogicSection();
@@ -5592,29 +5527,7 @@
                 return section;
             };
             
-            const generateSupercompSection = () => {
-                // Don't show supercomponent section at all if none exist
-                if (superComponents.length === 0) {
-                    return '';
-                }
-                
-                let section = '## Supercomponent Information\n\n';
-                
-                superComponents.forEach(sc => {
-                    section += `### ${sc.name}\n\n`;
-                    if (sc.description) {
-                        section += `${sc.description}\n\n`;
-                    }
-                    section += '**Contains SSCs:**\n\n';
-                    sc.sscs.forEach(ssc => {
-                        section += `- ${ssc.name}\n`;
-                    });
-                    section += '\n';
-                });
-                
-                return section;
-            };
-            
+
             const generateFTLogicSection = () => {
                 let section = '## Fault Tree Logic\n\n';
                 
@@ -5979,9 +5892,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             case 'systemWorks':
                                 html += generateHTMLSystemWorksSection();
                                 break;
-                            case 'supercomp':
-                                html += generateHTMLSupercompSection();
-                                break;
+
                             case 'ftLogic':
                                 html += generateHTMLFTLogicSection();
                                 break;
@@ -6463,29 +6374,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 return html;
             };
             
-            const generateHTMLSupercompSection = () => {
-                // Don't show supercomponent section at all if none exist
-                if (superComponents.length === 0) {
-                    return '';
-                }
-                
-                let html = `<h1>Supercomponent Information</h1>\n`;
-                
-                superComponents.forEach(sc => {
-                    html += `<h2>${escapeHtml(sc.name)}</h2>\n`;
-                    if (sc.description) {
-                        html += `<p>${escapeHtml(sc.description)}</p>\n`;
-                    }
-                    html += `<p><strong>Contains SSCs:</strong></p>\n<ul>\n`;
-                    sc.sscs.forEach(ssc => {
-                        html += `<li>${escapeHtml(ssc.name)}</li>\n`;
-                    });
-                    html += `</ul>\n`;
-                });
-                
-                return html;
-            };
-            
+
             const generateHTMLFTLogicSection = () => {
                 let html = `<h1>Fault Tree Logic</h1>\n`;
                 
@@ -8081,7 +7970,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             <h2 className="text-xl font-bold mb-2">Check Script Results</h2>
                             <p className="text-sm text-gray-600 mb-4">
                                 The following identifiers were found in the script but are not recognized as SSCs, 
-                                Supercomponents, Boundary Conditions, or defined variables. 
+                                Boundary Conditions, or defined variables. 
                                 Select the ones you would like to add as new SSCs.
                             </p>
                             
@@ -15477,7 +15366,6 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             const [systemDescription, setSystemDescription] = useState('');
             const [loadedSysFile, setLoadedSysFile] = useState(''); // Track loaded SYS file name
             const [sscsInSystem, setSscsInSystem] = useState([]);
-            const [superComponents, setSuperComponents] = useState([]);
             const [systemLogic, setSystemLogic] = useState([
                 { type: 'keyword', value: 'SYSTEM WORKS =', deletable: false }
             ]);
@@ -15536,19 +15424,14 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             const savedLayout = SettingsManager.loadLayout();
             const [paneAWidth, setPaneAWidth] = useState(savedLayout?.paneAWidth || 250);
             const [isResizing, setIsResizing] = useState(false);
-            const [showAddSupercompModal, setShowAddSupercompModal] = useState(false);
             const [showNewSSCModal, setShowNewSSCModal] = useState(false);
             const [modalMode, setModalMode] = useState('ssc');
             const [showEditSSCModal, setShowEditSSCModal] = useState(false);
             const [editSSCTargetFMIndex, setEditSSCTargetFMIndex] = useState(null); // Index of FM to scroll to in EditSSCModal
             const [showReportModal, setShowReportModal] = useState(false);
             const [showExportModal, setShowExportModal] = useState(false);
-            const [pendingSupercompSSC, setPendingSupercompSSC] = useState(null);
-            const [targetSupercomp, setTargetSupercomp] = useState(null);
             const [paneEWidth, setPaneEWidth] = useState((savedLayout?.paneEWidth && savedLayout.paneEWidth >= 25) ? savedLayout.paneEWidth : 40);
             const [isResizingE, setIsResizingE] = useState(false);
-            const [paneCHeight, setPaneCHeight] = useState(savedLayout?.paneCHeight || 60);
-            const [isResizingC, setIsResizingC] = useState(false);
             const containerRef = useRef(null);
             const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
             const [leftColWidth, setLeftColWidth] = useState(savedLayout?.leftColWidth || 33); // percentage
@@ -15567,6 +15450,13 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 { label: 'Importance Measures' },
             ]);
             const analysisCancelledRef = useRef(false);
+            // Cache for "How the System Fails" results.
+            // Stores { fingerprint, cutSets, mcubValue, quantMethod, quantDetails,
+            //          ccfEvents, basicEventData, failureLogicTree }
+            // Cleared whenever systemLogic or sscsInSystem changes.
+            const failureAnalysisCacheRef = useRef(null);
+            const [cachedAnalysisResults, setCachedAnalysisResults] = useState(null);
+            const [showPreparingResults, setShowPreparingResults] = useState(false);
             const [showLinkedFilesPrompt, setShowLinkedFilesPrompt] = useState(false);
             const [linkedFilesPromptData, setLinkedFilesPromptData] = useState(null);
             const [showFMEAModal, setShowFMEAModal] = useState(false);
@@ -15622,7 +15512,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     return;
                 }
                 setHasUnsavedChanges(true);
-            }, [systemName, systemAcronym, systemDescription, sscsInSystem, superComponents, systemLogic]);
+            }, [systemName, systemAcronym, systemDescription, sscsInSystem, systemLogic]);
 
             // Keep selectedItem in sync with sscsInSystem (e.g., when FMEA modal updates an SSC)
             useEffect(() => {
@@ -15657,7 +15547,6 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             
             // Check if any meaningful data has been loaded (SYS file, reliability data, SEQ file, or user has added SSCs/modified script)
             const hasDataLoaded = sscsInSystem.length > 0 || 
-                                  superComponents.length > 0 || 
                                   boundaryConditions.length > 0 || 
                                   reliabilityData.length > 0 ||
                                   systemLogic.length > 1 ||
@@ -15682,16 +15571,6 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         const constrainedPercentage = Math.max(25, Math.min(65, percentage));
                         setPaneEWidth(constrainedPercentage);
                     }
-                    if (isResizingC) {
-                        const container = document.querySelector('.left-column-cd');
-                        if (container) {
-                            const rect = container.getBoundingClientRect();
-                            const relativeY = e.clientY - rect.top;
-                            const percentage = (relativeY / rect.height) * 100;
-                            const constrainedPercentage = Math.max(15, Math.min(90, percentage));
-                            setPaneCHeight(constrainedPercentage);
-                        }
-                    }
                     if (isResizingLeftCol) {
                         const container = document.querySelector('.middle-bottom-row');
                         if (container) {
@@ -15705,21 +15584,19 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 };
 
                 const handleMouseUp = () => {
-                    if (isResizing || isResizingE || isResizingC || isResizingLeftCol) {
+                    if (isResizing || isResizingE || isResizingLeftCol) {
                         SettingsManager.saveLayout({
                             paneAWidth,
                             paneEWidth,
-                            paneCHeight,
                             leftColWidth
                         });
                     }
                     setIsResizing(false);
                     setIsResizingE(false);
-                    setIsResizingC(false);
                     setIsResizingLeftCol(false);
                 };
 
-                if (isResizing || isResizingE || isResizingC || isResizingLeftCol) {
+                if (isResizing || isResizingE || isResizingLeftCol) {
                     document.addEventListener('mousemove', handleMouseMove);
                     document.addEventListener('mouseup', handleMouseUp);
                 }
@@ -15728,7 +15605,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     document.removeEventListener('mousemove', handleMouseMove);
                     document.removeEventListener('mouseup', handleMouseUp);
                 };
-            }, [isResizing, isResizingE, isResizingC, isResizingLeftCol, paneAWidth, paneEWidth, paneCHeight, leftColWidth]);
+            }, [isResizing, isResizingE, isResizingLeftCol, paneAWidth, paneEWidth, leftColWidth]);
 
             // Build tree from reliability data
             const buildTree = useCallback((data, sources = []) => {
@@ -16016,7 +15893,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 // Compute failure logic tree if system logic exists
                 let failureLogicTree = null;
                 try {
-                    const parsed = parseSystemWorksExpression(systemLogic, systemName, superComponents);
+                    const parsed = parseSystemWorksExpression(systemLogic, systemName);
                     if (parsed) {
                         failureLogicTree = parsed;
                     }
@@ -16069,7 +15946,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             beta:           { type: 'number',  description: 'Beta parameter for Gamma/Beta distribution (FM4/FM5)' },
                             fmeaEntries:    { type: 'array',   description: 'FMEA failure mode entries for this SSC' }
                         }},
-                        superComponents:    { type: 'array',   description: 'Higher-level groupings of SSCs (super-components / trains)', itemSchema: {
+                        _superComponentsRemoved: { type: 'array', description: 'REMOVED - use script modules instead', itemSchema: {
                             id:     { type: 'string', description: 'Unique super-component identifier' },
                             name:   { type: 'string', description: 'Super-component display name' },
                             sscIds: { type: 'array',  description: 'Array of SSC ids belonging to this super-component' }
@@ -16113,7 +15990,6 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     systemAcronym,
                     systemDescription,
                     sscsInSystem,
-                    superComponents,
                     boundaryConditions,
                     systemLogic,
                     failureLogicTree,
@@ -16159,7 +16035,6 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                 setSystemAcronym(data.systemAcronym || '');
                                 setSystemDescription(data.systemDescription || '');
                                 setSscsInSystem(data.sscsInSystem || []);
-                                setSuperComponents(data.superComponents || []);
                                 setBoundaryConditions(data.boundaryConditions || []);
                                 const rawLogic = data.systemLogic || [
                                     { type: 'keyword', value: 'SYSTEM WORKS =', deletable: false }
@@ -16566,7 +16441,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             const itemTokens = innerTokens.filter(t =>
                                 t !== nToken &&
                                 (t.type === 'ssc' || t.type === 'ssc_fm' || t.type === 'text' || t.type === 'identifier' ||
-                                 t.type === 'unknown' || t.type === 'gateRef' || t.type === 'supercomp' || t.type === 'boundary')
+                                 t.type === 'unknown' || t.type === 'gateRef' || t.type === 'boundary')
                             );
                             if (itemTokens.length === 0) {
                                 errors.push(`Line ${lineNum}: COMBINE() has no items listed after N.`);
@@ -16604,7 +16479,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             }
                             const innerTokens = fixedLogic.slice(openPos + 1, closePos).filter(t =>
                                 t.type === 'ssc' || t.type === 'ssc_fm' || t.type === 'text' || t.type === 'identifier' ||
-                                t.type === 'unknown' || t.type === 'gateRef' || t.type === 'supercomp' || t.type === 'boundary'
+                                t.type === 'unknown' || t.type === 'gateRef' || t.type === 'boundary'
                             );
                             if (innerTokens.length === 0) {
                                 errors.push(`Line ${lineNum}: ${kwName}() has no items listed.`);
@@ -16617,7 +16492,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 // Get all known identifiers
                 const knownKeywords = new Set(keywords.map(k => k.toUpperCase()));
                 const knownSSCs = new Set(sscsInSystem.map(ssc => ssc.name.toUpperCase()));
-                const knownSupercomps = new Set(superComponents.map(sc => sc.name.toUpperCase()));
+                const knownSupercomps = new Set();
                 const knownBCs = new Set(boundaryConditions.map(bc => bc.name.toUpperCase()));
                 
                 // Get variables defined in the script (tokens that end with =)
@@ -16650,8 +16525,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             !definedVariables.has(refVal) &&
                             !definedVariables.has(refVal + '=') &&
                             !knownSSCs.has(refVal) &&
-                            !knownSupercomps.has(refVal) &&
-                            !knownBCs.has(refVal)) {
+                                    !knownBCs.has(refVal)) {
                             // Add without brackets so it can be created as a valid SSC name
                             unknowns.add(token.value);
                         }
@@ -16668,8 +16542,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         if (!/^\d+$/.test(token.value)) {
                             if (!knownKeywords.has(val) && 
                                 !knownSSCs.has(val) && 
-                                !knownSupercomps.has(val) && 
-                                !knownBCs.has(val) &&
+                                        !knownBCs.has(val) &&
                                 !definedVariables.has(val) &&
                                 !definedVariables.has(val + '=') &&
                                 !definedModules.has(val)) {
@@ -16892,40 +16765,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 setPendingIncorporateComponent(null);
             };
 
-            // Handle supercomponent drop
-            const handleSupercompDrop = (e, targetSupercompId = null) => {
-                e.preventDefault();
-                setDropTarget(null);
-                setIsDragging(false);
-
-                try {
-                    const data = JSON.parse(e.dataTransfer.getData('application/json'));
-                    if (data.type === 'ssc') {
-                        setPendingSupercompSSC(data.data);
-                        setTargetSupercomp(targetSupercompId);
-                        
-                        if (targetSupercompId) {
-                            // Add to existing supercomponent
-                            setSuperComponents(prev => prev.map(sc => {
-                                if (sc.id === targetSupercompId) {
-                                    return {
-                                        ...sc,
-                                        sscs: [...sc.sscs, data.data]
-                                    };
-                                }
-                                return sc;
-                            }));
-                        } else {
-                            // Create new supercomponent
-                            setShowAddSupercompModal(true);
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error handling supercomp drop:', err);
-                }
-            };
-
-                        // Handle new SSC creation or failure mode addition
+            // Handle new SSC creation or failure mode addition
             const handleNewSSC = (data, isUpdate = false) => {
                 if (isUpdate) {
                     // Update existing SSC with new failure mode
@@ -16952,53 +16792,21 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 setShowEditSSCModal(false);
             };
 
-            // Handle supercomponent creation
-            const handleAddSupercomp = ({ name, description }) => {
-                if (pendingSupercompSSC) {
-                    const newSupercomp = {
-                        id: Date.now(),
-                        name: name,
-                        description: description,
-                        sscs: [pendingSupercompSSC]
-                    };
-                    setSuperComponents(prev => [...prev, newSupercomp]);
-                    setShowAddSupercompModal(false);
-                    setPendingSupercompSSC(null);
-                    setTargetSupercomp(null);
-                }
-            };
-
-            // Delete SSC from system
+// Delete SSC from system
             const deleteSSC = (sscId) => {
                 if (confirm('Are you sure you want to remove this SSC from the system?')) {
                     setSscsInSystem(prev => prev.filter(s => s.id !== sscId));
-                    // Also remove from any supercomponents
-                    setSuperComponents(prev => prev.map(sc => ({
-                        ...sc,
-                        sscs: sc.sscs.filter(s => s.id !== sscId)
-                    })).filter(sc => sc.sscs.length > 0)); // Remove empty supercomponents
                     if (selectedItem?.type === 'ssc' && selectedItem?.data.id === sscId) {
                         setSelectedItem(null);
                     }
                 }
             };
 
-            // Delete supercomponent
-            const deleteSupercomp = (supercompId) => {
-                if (confirm('Are you sure you want to delete this supercomponent?')) {
-                    setSuperComponents(prev => prev.filter(sc => sc.id !== supercompId));
-                    if (selectedItem?.type === 'supercomp' && selectedItem?.data.id === supercompId) {
-                        setSelectedItem(null);
-                    }
-                }
-            };
-
-            // Evaluate a linked system file and return its failure probability (MCUB)
+// Evaluate a linked system file and return its failure probability (MCUB)
             const evaluateLinkedSystemFile = (fileContent, linkedSettings) => {
                 try {
                     const data = JSON.parse(fileContent);
                     const linkedSSCs = data.sscsInSystem || [];
-                    const linkedSuperComps = data.superComponents || [];
                     const linkedSystemLogic = data.systemLogic || [];
                     const linkedSystemName = data.systemName || 'Linked System';
                     
@@ -17074,7 +16882,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     }
                     
                     // Parse system logic
-                    const linkedParsed = parseSystemWorksExpression(linkedSystemLogic, linkedSystemName, linkedSuperComps);
+                    const linkedParsed = parseSystemWorksExpression(linkedSystemLogic, linkedSystemName);
                     if (!linkedParsed) return null;
                     
                     // Expand multi-mode SSCs
@@ -17166,6 +16974,30 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             // Helper: yield to the browser so React can flush state updates
             const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 
+            // ── Failure Analysis Cache ────────────────────────────────────────────
+            // Compute a lightweight fingerprint of the inputs that drive "How the
+            // System Fails". When the fingerprint matches the stored cache, we can
+            // skip the progress animation and recomputation entirely.
+            const buildAnalysisFingerprint = React.useCallback((logic, sscs) => {
+                // Stringify just the fields that affect analysis output
+                const logicKey = logic.map(t => t.type + ':' + t.value).join('|');
+                const sscsKey = sscs.map(s => {
+                    const fms = (s.failureModes || []).map(fm =>
+                        [fm.id, fm.failureModel, fm.probability, fm.probabilityType,
+                         fm.qualitativeLevel, fm.logicFlag, fm.linkedSystemFile,
+                         fm.betaFactor, fm.ccfGroup].join(',')
+                    ).join(';');
+                    return s.id + '~' + s.name + '~' + fms;
+                }).join('||');
+                return logicKey + '####' + sscsKey;
+            }, []);
+
+            // Invalidate the cache whenever systemLogic or sscsInSystem changes
+            React.useEffect(() => {
+                failureAnalysisCacheRef.current = null;
+                setCachedAnalysisResults(null);
+            }, [systemLogic, sscsInSystem]);
+
             // Run the 4-stage progress sequence then open the failure analysis modal
             const runFailureAnalysisWithProgress = async (onReadyToOpen) => {
                 analysisCancelledRef.current = false;
@@ -17229,8 +17061,24 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 }
             };
 
-            // Handle opening failure analysis - check for linked systems first
+            // Handle opening failure analysis - check cache first, then linked systems
             const handleOpenFailureAnalysis = async () => {
+                // ── Cache check ──────────────────────────────────────────────────
+                const fingerprint = buildAnalysisFingerprint(systemLogic, sscsInSystem);
+                const cached = failureAnalysisCacheRef.current;
+                if (cached && cached.fingerprint === fingerprint) {
+                    // Cache hit — show a brief "Preparing Results" overlay first so the
+                    // user gets immediate feedback while React renders the large modal.
+                    setCachedAnalysisResults(cached);
+                    setShowPreparingResults(true);
+                    await yieldToBrowser();
+                    await yieldToBrowser();
+                    setShowFailureAnalysis(true);
+                    return;
+                }
+                // Cache miss — run full analysis
+                setCachedAnalysisResults(null);
+
                 const linkedFiles = getLinkedSystemFiles();
                 
                 if (linkedFiles.length === 0) {
@@ -18908,7 +18756,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             
             // ==================== END CUT SET GENERATION ====================
             
-            function parseSystemWorksExpression(tokens, systemName, superComponents = []) {
+            function parseSystemWorksExpression(tokens, systemName) {
                 // Normalize: collapse [ keyword + name + ] keyword sequences into module tokens
                 tokens = normalizeBracketTokens(tokens);
                 // Extract variables first (old style with =)
@@ -19052,11 +18900,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 let gateCounter = 1;
                 const gates = [];
                 
-                // Create a lookup map for supercomponents
                 const supercompMap = {};
-                superComponents.forEach(sc => {
-                    supercompMap[sc.name.toUpperCase()] = sc;
-                });
                 
                 // Process modules first to create their gates
                 const moduleGates = {};
@@ -19211,8 +19055,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 return buildFailureTree(topNode, gates);
             }
 
-            function translateWorksToFailure(tokens, variables, startGateId, gates, modules = {}, moduleGates = {}, supercompMap = {}, houseEvents = {}, ifThenRules = []) {
-                // Expand variables, replace module references with gate references, and expand supercomponents
+            function translateWorksToFailure(tokens, variables, startGateId, gates, modules = {}, moduleGates = {}, supercompMap = {}, houseEvents = {}, ifThenRules = []) { // supercompMap kept as empty arg for compat
+                // Expand variables and replace module references with gate references
                 const expandedTokens = [];
                 let localGateCounter = startGateId;
                 
@@ -19227,20 +19071,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             expandedTokens.push({ type: 'text', value: token.value });
                         }
                     } else if (token.type === 'supercomp') {
-                        const supercompKey = token.value.toUpperCase();
-                        const supercomp = supercompMap[supercompKey];
-                        if (supercomp && supercomp.sscs && supercomp.sscs.length > 0) {
-                            const supercompGateName = token.value;
-                            gates.push({
-                                id: supercompGateName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-                                label: supercompGateName,
-                                type: 'OR',
-                                children: supercomp.sscs.map(ssc => ssc.name)
-                            });
-                            expandedTokens.push({ type: 'gateRef', value: supercompGateName });
-                        } else {
-                            expandedTokens.push({ type: 'text', value: token.value });
-                        }
+                        // supercomp token no longer used — treat as text
+                        expandedTokens.push({ type: 'text', value: token.value });
                     } else if ((token.type === 'identifier' || token.type === 'text' || token.type === 'unknown' || token.type === 'ssc') && 
                                moduleGates[token.value.toUpperCase()]) {
                         expandedTokens.push({ type: 'gateRef', value: moduleGates[token.value.toUpperCase()] });
@@ -19268,7 +19100,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         if (closeIdx < 0) break;
                         const innerTokens = expandedTokens.slice(openIdx + 1, closeIdx).filter(t =>
                             t.type === 'ssc' || t.type === 'ssc_fm' || t.type === 'text' || t.type === 'identifier' ||
-                            t.type === 'unknown' || t.type === 'gateRef' || t.type === 'supercomp' || t.type === 'boundary'
+                            t.type === 'unknown' || t.type === 'gateRef' || t.type === 'boundary'
                         );
                         if (innerTokens.length === 0) break;
                         // Build replacement: ( item1 AND/OR item2 AND/OR ... )
@@ -19302,11 +19134,11 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                 // First inner token should be the N number
                                 const nToken = innerTokens.find(t => t.type === 'number');
                                 const k = nToken ? parseInt(nToken.value, 10) : 1;
-                                // Remaining tokens are the items (SSC, text, identifier, gateRef, supercomp)
+                                // Remaining tokens are the items (SSC, text, identifier, gateRef)
                                 const itemTokens = innerTokens.filter(t =>
                                     t !== nToken &&
                                     (t.type === 'ssc' || t.type === 'text' || t.type === 'identifier' ||
-                                     t.type === 'unknown' || t.type === 'gateRef' || t.type === 'supercomp' || t.type === 'boundary')
+                                     t.type === 'unknown' || t.type === 'gateRef' || t.type === 'boundary')
                                 );
                                 const items = itemTokens.map(t => t.value);
                                 const m = items.length;
@@ -19517,7 +19349,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         // Collect items from variable or sequential SSCs
                         if (tks[1].type === 'variable' && variables[tks[1].value]) {
                             for (const t of variables[tks[1].value]) {
-                                if (t.type === 'ssc' || t.type === 'supercomp' || 
+                                if (t.type === 'ssc' || 
                                     t.type === 'text' || t.type === 'identifier' || t.type === 'unknown') {
                                     items.push(t.value);
                                 }
@@ -19728,7 +19560,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     } else if (tok.value === 'AND' || tok.value === 'OR') {
                         flat.push(tok);
                         i++;
-                    } else if (tok.type === 'ssc' || tok.type === 'supercomp' ||
+                    } else if (tok.type === 'ssc' ||
                                tok.type === 'text' || tok.type === 'gateRef' ||
                                tok.type === 'identifier' || tok.type === 'unknown' ||
                                tok.type === 'keyword' /* catchall */) {
@@ -19953,8 +19785,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     const items = [];
                     for (const group of orGroups) {
                         for (const token of group) {
-                            // Accept SSC, supercomp, text, identifier, unknown, or gateRef token types
-                            if (token.type === 'ssc' || token.type === 'supercomp' || 
+                            // Accept SSC, text, identifier, unknown, or gateRef token types
+                            if (token.type === 'ssc' || 
                                 token.type === 'text' || token.type === 'identifier' || 
                                 token.type === 'unknown' || token.type === 'gateRef') {
                                 items.push(token.value);
@@ -19998,8 +19830,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     // No OR, collect SSCs and gate references
                     const items = [];
                     for (const token of tokens) {
-                        // Accept SSC, supercomp, text, identifier, unknown, or gateRef token types
-                        if (token.type === 'ssc' || token.type === 'supercomp' || 
+                        // Accept SSC, text, identifier, unknown, or gateRef token types
+                        if (token.type === 'ssc' || 
                             token.type === 'text' || token.type === 'identifier' || 
                             token.type === 'unknown' || token.type === 'gateRef') {
                             items.push(token.value);
@@ -20115,7 +19947,6 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 currentSystemDescription,
                 currentSystemLogic,
                 currentSscsInSystem,
-                currentSuperComponents,
                 parseSystemWorksExpression,
                 generateMinimalCutSets,
                 calculateCutSetProbability,
@@ -20348,7 +20179,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 // ============================================================
                 // Calculate all results for a system - same as FailureAnalysisModal
                 // ============================================================
-                const calculateSystemResults = (systemLogic, systemName, sscsInSystem, superComponents) => {
+                const calculateSystemResults = (systemLogic, systemName, sscsInSystem) => {
                     if (!systemLogic || systemLogic.length <= 1 || !sscsInSystem || sscsInSystem.length === 0) {
                         return { systemProb: null, cutSets: [], importanceMeasures: [], error: 'No system logic or SSCs' };
                     }
@@ -20357,7 +20188,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         const basicEventData = buildBasicEventData(sscsInSystem, {});
                         
                         // Parse the system logic
-                        let failureLogicTree = parseSystemWorksExpression(systemLogic, systemName, superComponents || []);
+                        let failureLogicTree = parseSystemWorksExpression(systemLogic, systemName);
                         if (!failureLogicTree || !failureLogicTree.children || failureLogicTree.children.length === 0) {
                             return { systemProb: null, cutSets: [], importanceMeasures: [], error: 'Failed to parse system logic' };
                         }
@@ -20537,7 +20368,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 // ============================================================
                 const yieldUI = () => new Promise(r => setTimeout(r, 0));
 
-                const runCalculateAsync = async (sysLogic, sysName, sscs, superComps, label, onStageUpdate, cancelRef) => {
+                const runCalculateAsync = async (sysLogic, sysName, sscs, label, onStageUpdate, cancelRef) => {
                     const stages = [
                         'Building failure logic tree\u2026',
                         'Generating minimal cut sets\u2026',
@@ -20555,7 +20386,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     let basicEventData = {};
                     try {
                         basicEventData = buildBasicEventData(sscs, {});
-                        let tree = parseSystemWorksExpression(sysLogic, sysName, superComps || []);
+                        let tree = parseSystemWorksExpression(sysLogic, sysName);
                         if (!tree || !tree.children || tree.children.length === 0) {
                             return { systemProb: null, cutSets: [], importanceMeasures: [], error: 'Failed to parse system logic', cutSetCount: 0, method: 'N/A' };
                         }
@@ -20682,7 +20513,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     currentCancelledRef.current = false;
                     setComputeProgress({ visible: true, stage: 0, message: 'Initializing\u2026', label: 'Current System' });
                     runCalculateAsync(
-                        currentSystemLogic, currentSystemName, currentSscsInSystem, currentSuperComponents,
+                        currentSystemLogic, currentSystemName, currentSscsInSystem,
                         'current',
                         (stage, msg) => setComputeProgress(p => ({ ...p, stage, message: msg })),
                         currentCancelledRef
@@ -20703,7 +20534,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     loadedCancelledRef.current = false;
                     setComputeProgress({ visible: true, stage: 0, message: 'Initializing\u2026', label: 'Loaded System' });
                     runCalculateAsync(
-                        loadedProject.systemLogic, loadedProject.systemName, loadedProject.sscsInSystem, loadedProject.superComponents,
+                        loadedProject.systemLogic, loadedProject.systemName, loadedProject.sscsInSystem,
                         'loaded',
                         (stage, msg) => setComputeProgress(p => ({ ...p, stage, message: msg })),
                         loadedCancelledRef
@@ -20780,7 +20611,6 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             systemDescription: json.systemDescription || '',
                             systemLogic: json.systemLogic || [],
                             sscsInSystem: json.sscsInSystem || [],
-                            superComponents: json.superComponents || []
                         });
                     } catch (err) {
                         setError(err.message || 'Failed to load file');
@@ -21626,7 +21456,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
             }
 
             // Failure Analysis Modal Component
-            function FailureAnalysisModal({ onClose, settings, backgroundStyle, fontSizeClass, systemName, systemDescription, systemLogic, sscsInSystem, superComponents, linkedSystemProbabilities = {}, onAnalysisReady }) {
+            function FailureAnalysisModal({ onClose, settings, backgroundStyle, fontSizeClass, systemName, systemDescription, systemLogic, sscsInSystem, linkedSystemProbabilities = {}, cachedResults, onAnalysisReady }) {
                 const [activeLeftTab, setActiveLeftTab] = useState('text');
                 const [activeRightTab, setActiveRightTab] = useState('cutsets');
                 const [leftPaneWidth, setLeftPaneWidth] = useState(45); // percentage
@@ -21683,6 +21513,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 
                 // Build basic event probability data from SSCs (computed first for use in tree)
                 const basicEventData = React.useMemo(() => {
+                    if (cachedResults) return cachedResults.basicEventData;
                     const data = {};
                     
                     // Helper to get probability from a failure mode
@@ -21980,8 +21811,9 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 
                 // Parse the system logic to create failure tree
                 const failureLogicTree = React.useMemo(() => {
+                    if (cachedResults) return cachedResults.failureLogicTree;
                     try {
-                        const parsed = parseSystemWorksExpression(systemLogic, systemName, superComponents);
+                        const parsed = parseSystemWorksExpression(systemLogic, systemName);
                         if (parsed) {
                             // Transform basic events for SSCs with multiple failure modes into OR gates
                             const expandMultiModeSscs = (node) => {
@@ -22074,10 +21906,17 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                         type: 'OR',
                         children: []
                     };
-                }, [systemLogic, systemName, sscsInSystem, superComponents, basicEventData]);
+                }, [systemLogic, systemName, sscsInSystem, basicEventData]);
                 
                 // Generate actual cut sets from fault tree
                 const { cutSets, mcubValue, quantMethod, quantDetails, ccfEvents } = React.useMemo(() => {
+                    if (cachedResults) return {
+                        cutSets: cachedResults.cutSets,
+                        mcubValue: cachedResults.mcubValue,
+                        quantMethod: cachedResults.quantMethod,
+                        quantDetails: cachedResults.quantDetails,
+                        ccfEvents: cachedResults.ccfEvents,
+                    };
                     if (!failureLogicTree || !failureLogicTree.children || failureLogicTree.children.length === 0) {
                         return { cutSets: [], mcubValue: null, quantMethod: 'mcub', quantDetails: null, ccfEvents: {} };
                     }
@@ -22612,11 +22451,19 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 // between the dialog disappearing and the results window appearing.
                 React.useEffect(() => {
                     if (typeof onAnalysisReady === 'function') {
-                        onAnalysisReady();
+                        // Pass computed results back to parent so it can populate the cache.
+                        // When cachedResults was already supplied (cache hit), pass null
+                        // so the parent knows not to re-store anything.
+                        onAnalysisReady(cachedResults ? null : {
+                            cutSets,
+                            mcubValue,
+                            quantMethod,
+                            quantDetails,
+                            ccfEvents,
+                            basicEventData,
+                            failureLogicTree,
+                        });
                     }
-                    // Intentionally only fires once — after the first render. Subsequent
-                    // recomputes (e.g. user toggles a setting) don't need to re-signal
-                    // because the progress dialog isn't shown for those.
                     // eslint-disable-next-line react-hooks/exhaustive-deps
                 }, []);
 
@@ -25133,12 +24980,10 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                     overflow: 'hidden'
                                 }}>
                                     {/* PANE C - SSCs in System */}
-                                    <div className="flex flex-col border-b" style={{
+                                    <div className="flex flex-col flex-1" style={{
                                         backgroundColor: backgroundStyle.paneBackground,
                                         borderColor: backgroundStyle.borderColor,
-                                        height: `${paneCHeight}%`,
-                                        minHeight: '15%',
-                                        maxHeight: '90%'
+                                        overflow: 'hidden'
                                     }}>
                                         <div className="p-2 border-b flex items-center justify-between" style={{
                                             borderColor: backgroundStyle.borderColor,
@@ -25211,7 +25056,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                 onDrop={handleSSCDrop}
                                             >
                                                 {isDragging ? (
-                                                    <span className="text-blue-600 font-medium">\u2193 Drop here to add as new SSC</span>
+                                                    <span className="text-blue-600 font-medium">&#x2193; Drop here to add as new SSC</span>
                                                 ) : (
                                                     <span>Drop components here to add new SSC...</span>
                                                 )}
@@ -25345,92 +25190,6 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                         </div>
                                     </div>
 
-                                    {/* Horizontal Resizer between C and D */}
-                                    <div
-                                        className="resizer-horizontal"
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            setIsResizingC(true);
-                                        }}
-                                    />
-
-                                    {/* PANE D - Supercomponents */}
-                                    <div className="flex-1 flex flex-col" style={{
-                                        backgroundColor: backgroundStyle.paneBackground
-                                    }}>
-                                        <div className="p-2 border-b flex items-center justify-between" style={{
-                                            borderColor: backgroundStyle.borderColor,
-                                            backgroundColor: settings.background === 'dark' ? '#1f2937' : '#f3f4f6'
-                                        }}>
-                                            <h3 className={`font-bold ${fontSizeClass}`}>Supercomponents</h3>
-                                            <Tooltip text="Drag System SSCs into this area to create a 'supercomponent.' A supercomponent is a group of components that, if one fails, the supercomponent fails (i.e., components in series).">
-                                                <InfoIcon />
-                                            </Tooltip>
-                                        </div>
-                                        <div 
-                                            className={`flex-1 overflow-y-auto p-2 ${fontSizeClass} ${isDragging && dropTarget !== 'ssc' ? 'drop-zone' : ''}`}
-                                            onDragOver={(e) => {
-                                                e.preventDefault();
-                                                setDropTarget('supercomp');
-                                            }}
-                                            onDragLeave={() => setDropTarget(null)}
-                                            onDrop={(e) => handleSupercompDrop(e)}
-                                        >
-                                            {superComponents.length === 0 && (
-                                                <div className="text-center py-8 text-xs" style={{
-                                                    color: settings.background === 'dark' ? '#9ca3af' : '#6b7280'
-                                                }}>
-                                                    Drag SSCs here to create supercomponents
-                                                </div>
-                                            )}
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {superComponents.map((sc) => (
-                                                    <div
-                                                        key={sc.id}
-                                                        className={`p-2 border rounded cursor-pointer hover:shadow relative group`}
-                                                        style={{
-                                                            backgroundColor: selectedItem?.type === 'supercomp' && selectedItem?.data.id === sc.id
-                                                                ? '#dbeafe'
-                                                                : backgroundStyle.backgroundColor,
-                                                            borderColor: backgroundStyle.borderColor
-                                                        }}
-                                                        onClick={() => setSelectedItem({ type: 'supercomp', data: sc })}
-                                                        onDragOver={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                        }}
-                                                        onDrop={(e) => {
-                                                            e.stopPropagation();
-                                                            handleSupercompDrop(e, sc.id);
-                                                        }}
-                                                    >
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                deleteSupercomp(sc.id);
-                                                            }}
-                                                            className="absolute top-1 right-1 text-red-600 hover:text-red-800 opacity-0 group-hover:opacity-100"
-                                                            title="Delete Supercomponent"
-                                                        >
-                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                                                            </svg>
-                                                        </button>
-                                                        <div className="text-xs">
-                                                            <div className="font-bold mb-1">
-                                                                {sc.name} ({sc.sscs.map(s => s.name).join(', ')})
-                                                            </div>
-                                                            {sc.description && (
-                                                                <div className="text-xs text-gray-600">{sc.description}</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 {/* Resizer between left column and E/F */}
@@ -25560,17 +25319,6 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                             );
                                         })}
                                         
-                                        {/* Supercomponents with description tooltips */}
-                                        {superComponents.map((sc) => (
-                                            <Tooltip key={sc.id} text={sc.description || `Supercomponent: ${sc.sscs.map(s => s.name).join(', ')}`}>
-                                                <button
-                                                    onClick={() => handleTokenInsert(sc.name)}
-                                                    className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200" style={{ fontSize: '11px' }}
-                                                >
-                                                    {sc.name}
-                                                </button>
-                                            </Tooltip>
-                                        ))}
                                         
                                         {/* Boundary Conditions with description and type tooltips, and delete option */}
                                         {boundaryConditions.map((bc) => {
@@ -25622,7 +25370,6 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                             onChange={setSystemLogic}
                                             keywords={keywords}
                                             sscsInSystem={sscsInSystem}
-                                            superComponents={superComponents}
                                             boundaryConditions={boundaryConditions}
                                             fontSizeClass={fontSizeClass}
                                             backgroundStyle={backgroundStyle}
@@ -25656,7 +25403,7 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                 The 'How the System Works' script models system behavior. Key concepts:
                                                 <ul className="list-disc ml-4 mt-1 space-y-0.5">
                                                     <li>Comment lines begin with '#'; end each line with ';'</li>
-                                                    <li>Keywords shown in <span className="text-blue-600 font-semibold">blue</span>, SSCs in <span className="text-green-600 font-semibold">green</span>, Supercomponents in <span className="text-amber-600 font-semibold">amber</span>, boundary conditions in <span className="text-purple-600 font-semibold">purple</span></li>
+                                                    <li>Keywords shown in <span className="text-blue-600 font-semibold">blue</span>, SSCs in <span className="text-green-600 font-semibold">green</span>, boundary conditions in <span className="text-purple-600 font-semibold">purple</span></li>
                                                     <li>Names with spaces must be surrounded by square brackets [ ]</li>
                                                     <li>Modules: <code>[name]= ...</code></li>
                                                     <li><span className="text-blue-600 font-semibold">WORKS / FAILS</span>: assert state; voting: <code>2 PUMPS= WORKS</code></li>
@@ -25719,10 +25466,6 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                                                                     if (selectedItem.type === 'ssc') {
                                                                         setSscsInSystem(prev => prev.map(s =>
                                                                             s.id === selectedItem.data.id ? { ...s, name: newValue } : s
-                                                                        ));
-                                                                    } else if (selectedItem.type === 'supercomp') {
-                                                                        setSuperComponents(prev => prev.map(sc =>
-                                                                            sc.id === selectedItem.data.id ? { ...sc, name: newValue } : sc
                                                                         ));
                                                                     }
                                                                 }}
@@ -25794,10 +25537,6 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                                                                 if (selectedItem.type === 'ssc') {
                                                                     setSscsInSystem(prev => prev.map(s =>
                                                                         s.id === selectedItem.data.id ? { ...s, description: newValue } : s
-                                                                    ));
-                                                                } else if (selectedItem.type === 'supercomp') {
-                                                                    setSuperComponents(prev => prev.map(sc =>
-                                                                        sc.id === selectedItem.data.id ? { ...sc, description: newValue } : sc
                                                                     ));
                                                                 }
                                                             }}
@@ -26121,8 +25860,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                                                         )}
                                                     </div>
                                                 )}
-                                                {/* Supercomponent-specific content */}
-                                                {selectedItem.type === 'supercomp' && (
+                                                {false && (
                                                     <div 
                                                         className="border rounded p-2 flex flex-col"
                                                         style={{
@@ -26218,7 +25956,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                                             <div className="text-center py-8 text-xs" style={{
                                                 color: settings.background === 'dark' ? '#9ca3af' : '#6b7280'
                                             }}>
-                                                Click on an SSC or Supercomponent to edit
+                                                Click on an SSC to edit
                                             </div>
                                         )}
                                     </div>
@@ -26259,17 +25997,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                         />
                     )}
 
-                    {showAddSupercompModal && pendingSupercompSSC && (
-                        <AddSupercomponentModal
-                            onSave={handleAddSupercomp}
-                            onCancel={() => {
-                                setShowAddSupercompModal(false);
-                                setPendingSupercompSSC(null);
-                                setTargetSupercomp(null);
-                            }}
-                            backgroundStyle={backgroundStyle}
-                        />
-                    )}
+
 
                     {showNewSSCModal && (
                         <NewSSCModal
@@ -26316,7 +26044,6 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             systemName={systemName}
                             systemDescription={systemDescription}
                             systemLogic={systemLogic}
-                            superComponents={superComponents}
                             hasFailureInfo={systemLogic && systemLogic.length > 1}
                             parseSystemWorksExpression={parseSystemWorksExpression}
                             generateMinimalCutSets={generateMinimalCutSets}
@@ -26338,7 +26065,6 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             systemDescription={systemDescription}
                             systemLogic={systemLogic}
                             sscsInSystem={sscsInSystem}
-                            superComponents={superComponents}
                             hasFailureInfo={systemLogic && systemLogic.length > 1}
                             parseSystemWorksExpression={parseSystemWorksExpression}
                             generateMinimalCutSets={generateMinimalCutSets}
@@ -26365,6 +26091,26 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                         />
                     )}
 
+                    {showPreparingResults && (
+                        <div className="fixed inset-0 flex items-center justify-center z-[9999]"
+                             style={{ background: 'rgba(0,0,0,0.55)' }}>
+                            <div className="bg-white rounded-xl shadow-2xl p-6 w-80 max-w-full mx-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-red-800 flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-4 h-4 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold text-gray-800 text-sm">Preparing Results</div>
+                                        <div className="text-xs text-gray-500 mt-0.5">Loading previously computed analysis&#x2026;</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {showLinkedFilesPrompt && linkedFilesPromptData && (
                         <LinkedFilesPromptModal
                             missingFiles={linkedFilesPromptData.missingFiles}
@@ -26385,9 +26131,17 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             systemDescription={systemDescription}
                             systemLogic={systemLogic}
                             sscsInSystem={sscsInSystem}
-                            superComponents={superComponents}
                             linkedSystemProbabilities={linkedSystemProbabilities}
-                            onAnalysisReady={() => setShowAnalysisProgress(false)}
+                            cachedResults={cachedAnalysisResults}
+                            onAnalysisReady={(results) => {
+                                setShowAnalysisProgress(false);
+                                setShowPreparingResults(false);
+                                // Populate cache if we just ran a fresh analysis
+                                if (results && !cachedAnalysisResults) {
+                                    const fingerprint = buildAnalysisFingerprint(systemLogic, sscsInSystem);
+                                    failureAnalysisCacheRef.current = { fingerprint, ...results };
+                                }
+                            }}
                         />
                     )}
 
@@ -26427,8 +26181,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             currentSystemDescription={systemDescription}
                             currentSystemLogic={systemLogic}
                             currentSscsInSystem={sscsInSystem}
-                            currentSuperComponents={superComponents}
-                            parseSystemWorksExpression={parseSystemWorksExpression}
+                                                        parseSystemWorksExpression={parseSystemWorksExpression}
                             generateMinimalCutSets={generateMinimalCutSets}
                             calculateCutSetProbability={calculateCutSetProbability}
                             calculateMCUB={calculateMCUB}
