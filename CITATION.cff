@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+message: >
+  If you use KUREAS in your work, please cite it using the metadata below.
+
+title: >
+  KUREAS: Knowledgebase with Uncertainty for Risk Engineering Analysis of Systems
+
+abstract: >
+  KUREAS is an open-source, browser-based suite of single-file
+  HTML applications for probabilistic risk assessment (PRA) and
+  reliability engineering in nuclear and industrial safety
+  contexts. The suite targets SAPHIRE compatibility and is
+  designed for use in DOE Safety Analysis Documents and similar
+  regulatory environments. Modules include fault-tree and
+  event-tree editors, hazard analysis, system evaluation with
+  importance measures and common-cause failure modeling, 3-D
+  facility visualization, sequence analysis, external hazard
+  risk analysis, a knowledge-base container, a report generator,
+  and a general-purpose utility suite. All modules run entirely
+  in the browser with no build step and no server requirement.
+
+authors:
+  - family-names: Smith
+    given-names: Curtis Lee
+    alias: curtlsmith
+
+  - name: "Claude.ai (Anthropic)"
+    website: "https://claude.ai"
+
+version: "1.x"
+
+date-released: "2026-05-25"
+
+license: MIT
+
+repository-code: "https://github.com/curtlsmith/KUREAS"
+
+url: "https://github.com/curtlsmith/KUREAS"
+
+keywords:
+  - probabilistic risk assessment
+  - PRA
+  - reliability engineering
+  - nuclear safety
+  - fault tree analysis
+  - event tree analysis
+  - hazard analysis
+  - SAPHIRE
+  - importance measures
+  - common-cause failure
+  - browser-based
+  - single-file HTML
+  - DOE safety analysis
+  - FMEA
+  - cut set analysis
+  - BDD quantification
