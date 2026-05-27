@@ -87,12 +87,21 @@
         }
         .tree-node-draggable {
             cursor: grab;
+            transition: background-color 0.1s, border-left 0.1s;
         }
         .tree-node-draggable:hover {
-            background-color: #e0f2fe;
+            background-color: #bfdbfe;
+            border-left: 3px solid #2563eb;
+            padding-left: calc(0.5rem - 3px);
+            box-shadow: inset 0 0 0 1px #93c5fd;
+        }
+        .tree-node-draggable:hover .tree-node-drag-grip {
+            opacity: 0.8 !important;
+            color: #2563eb;
         }
         .tree-node-draggable:active {
             cursor: grabbing;
+            background-color: #93c5fd;
         }
         .modal-overlay {
             position: fixed;
@@ -2235,7 +2244,7 @@
 
             const handleExpand = (e) => {
                 e.stopPropagation();
-                if (hasChildren && !isSource) {
+                if (hasChildren) {
                     onExpand(node.id);
                 }
             };
@@ -2294,6 +2303,7 @@
                         onClick={handleExpand}
                         draggable={isDraggable}
                         onDragStart={(e) => isDraggable && onDragStart(e, node)}
+                        title={isDraggable ? 'Drag to SSC list to create a component' : undefined}
                     >
                         {hasChildren && (
                             <span className="mr-1">
@@ -2301,6 +2311,9 @@
                             </span>
                         )}
                         {!hasChildren && <span className="mr-1" style={{ width: '12px', display: 'inline-block' }}></span>}
+                        {isDraggable && (
+                            <span className="tree-node-drag-grip mr-1" style={{ opacity: 0.4, fontSize: '10px', letterSpacing: '-1px', lineHeight: 1 }}>&#x2807;</span>
+                        )}
                         <span>{node.label}</span>
                     </div>
                     {hasChildren && isExpanded && (
@@ -15609,94 +15622,125 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
 
             // Build tree from reliability data
             const buildTree = useCallback((data, sources = []) => {
-                const systemMap = new Map();
+                // Build a source lookup map: id -> source object
+                const sourceById = new Map();
+                if (sources && sources.length > 0) {
+                    sources.forEach(src => sourceById.set(src.id, src));
+                }
+                const defaultSource = sources && sources.length > 0 ? sources[0] : null;
 
-                data.forEach(item => {
-                    const system = item.system || 'Assorted Components';
-                    const sscType = item.ssc_type;
-                    const componentType = item.component_type;
-                    const failureMode = item.failure_mode;
-
-                    if (!systemMap.has(system)) {
-                        systemMap.set(system, new Map());
+                // Resolve source for each data item
+                const resolveSource = (item) => {
+                    if (item.sourceId && sourceById.has(item.sourceId)) {
+                        return sourceById.get(item.sourceId);
                     }
-                    const sscTypeMap = systemMap.get(system);
+                    return defaultSource;
+                };
 
-                    if (!sscTypeMap.has(sscType)) {
-                        sscTypeMap.set(sscType, new Map());
-                    }
-                    const componentTypeMap = sscTypeMap.get(sscType);
-
-                    if (!componentTypeMap.has(componentType)) {
-                        componentTypeMap.set(componentType, []);
-                    }
-                    componentTypeMap.get(componentType).push({
-                        mode: failureMode,
-                        data: item
-                    });
-                });
-
-                const tree = [];
                 let nodeId = 0;
 
-                // Create source nodes if they exist
-                const sourceNodes = [];
                 if (sources && sources.length > 0) {
-                    sources.forEach((source, sourceIdx) => {
+                    // Group data items by their resolved source id
+                    const dataBySourceId = new Map();
+                    sources.forEach(src => dataBySourceId.set(src.id, []));
+
+                    data.forEach(item => {
+                        const src = resolveSource(item);
+                        const sid = src ? src.id : (defaultSource ? defaultSource.id : '__none__');
+                        if (!dataBySourceId.has(sid)) dataBySourceId.set(sid, []);
+                        dataBySourceId.get(sid).push(item);
+                    });
+
+                    const sourceNodes = [];
+                    sources.forEach(source => {
+                        const srcData = dataBySourceId.get(source.id) || [];
+
+                        // Build system map for this source's data
+                        const systemMap = new Map();
+                        srcData.forEach(item => {
+                            const system = item.system || 'Assorted Components';
+                            const sscType = item.ssc_type;
+                            const componentType = item.component_type;
+                            const failureMode = item.failure_mode;
+
+                            if (!systemMap.has(system)) systemMap.set(system, new Map());
+                            const sscTypeMap = systemMap.get(system);
+                            if (!sscTypeMap.has(sscType)) sscTypeMap.set(sscType, new Map());
+                            const componentTypeMap = sscTypeMap.get(sscType);
+                            if (!componentTypeMap.has(componentType)) componentTypeMap.set(componentType, []);
+                            componentTypeMap.get(componentType).push({ mode: failureMode, data: item });
+                        });
+
+                        const systemNodes = [];
+                        systemMap.forEach((sscTypeMap, system) => {
+                            const systemNode = { id: `system-${nodeId++}`, label: system, children: [] };
+                            let sscTypeId = 0;
+                            sscTypeMap.forEach((componentTypeMap, sscType) => {
+                                const sscTypeNode = { id: `${systemNode.id}-ssctype-${sscTypeId++}`, label: sscType, children: [] };
+                                let componentTypeId = 0;
+                                componentTypeMap.forEach((failureModes, componentType) => {
+                                    sscTypeNode.children.push({
+                                        id: `${sscTypeNode.id}-component-${componentTypeId++}`,
+                                        label: componentType,
+                                        failureModes: failureModes,
+                                        sscType: sscType,
+                                        system: system,
+                                        source: source
+                                    });
+                                });
+                                systemNode.children.push(sscTypeNode);
+                            });
+                            systemNodes.push(systemNode);
+                        });
+                        systemNodes.sort((a, b) => a.label.localeCompare(b.label));
+
                         sourceNodes.push({
                             id: `source-${nodeId++}`,
                             label: source.name,
                             isSource: true,
                             description: source.description,
-                            children: []
+                            children: systemNodes
                         });
                     });
-                }
-
-                // Build system nodes
-                const systemNodes = [];
-                systemMap.forEach((sscTypeMap, system) => {
-                    const systemNode = {
-                        id: `system-${nodeId++}`,
-                        label: system,
-                        children: []
-                    };
-
-                    let sscTypeId = 0;
-                    sscTypeMap.forEach((componentTypeMap, sscType) => {
-                        const sscTypeNode = {
-                            id: `${systemNode.id}-ssctype-${sscTypeId++}`,
-                            label: sscType,
-                            children: []
-                        };
-
-                        let componentTypeId = 0;
-                        componentTypeMap.forEach((failureModes, componentType) => {
-                            const componentTypeNode = {
-                                id: `${sscTypeNode.id}-component-${componentTypeId++}`,
-                                label: componentType,
-                                failureModes: failureModes,
-                                sscType: sscType,
-                                system: system,
-                                source: sources && sources.length > 0 ? sources[0] : null
-                            };
-                            sscTypeNode.children.push(componentTypeNode);
-                        });
-
-                        systemNode.children.push(sscTypeNode);
-                    });
-
-                    systemNodes.push(systemNode);
-                });
-
-                // Sort system nodes alphabetically
-                systemNodes.sort((a, b) => a.label.localeCompare(b.label));
-                
-                // If we have sources, nest systems under the first source
-                if (sourceNodes.length > 0) {
-                    sourceNodes[0].children = systemNodes;
                     return sourceNodes;
                 } else {
+                    // No sources — flat system tree
+                    const systemMap = new Map();
+                    data.forEach(item => {
+                        const system = item.system || 'Assorted Components';
+                        const sscType = item.ssc_type;
+                        const componentType = item.component_type;
+                        const failureMode = item.failure_mode;
+                        if (!systemMap.has(system)) systemMap.set(system, new Map());
+                        const sscTypeMap = systemMap.get(system);
+                        if (!sscTypeMap.has(sscType)) sscTypeMap.set(sscType, new Map());
+                        const componentTypeMap = sscTypeMap.get(sscType);
+                        if (!componentTypeMap.has(componentType)) componentTypeMap.set(componentType, []);
+                        componentTypeMap.get(componentType).push({ mode: failureMode, data: item });
+                    });
+
+                    const systemNodes = [];
+                    systemMap.forEach((sscTypeMap, system) => {
+                        const systemNode = { id: `system-${nodeId++}`, label: system, children: [] };
+                        let sscTypeId = 0;
+                        sscTypeMap.forEach((componentTypeMap, sscType) => {
+                            const sscTypeNode = { id: `${systemNode.id}-ssctype-${sscTypeId++}`, label: sscType, children: [] };
+                            let componentTypeId = 0;
+                            componentTypeMap.forEach((failureModes, componentType) => {
+                                sscTypeNode.children.push({
+                                    id: `${sscTypeNode.id}-component-${componentTypeId++}`,
+                                    label: componentType,
+                                    failureModes: failureModes,
+                                    sscType: sscType,
+                                    system: system,
+                                    source: null
+                                });
+                            });
+                            systemNode.children.push(sscTypeNode);
+                        });
+                        systemNodes.push(systemNode);
+                    });
+                    systemNodes.sort((a, b) => a.label.localeCompare(b.label));
                     return systemNodes;
                 }
             }, []);
@@ -15705,36 +15749,48 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             const parseCSV = (csvText) => {
                 const lines = csvText.split('\n');
                 const data = [];
-                let sourceName = '';
-                let sourceDescription = '';
+                // sourcesMap: ordered list of { id, name, description }
+                const sourcesMap = [];
+                let pendingId = null;
+                let pendingName = '';
+                let pendingDesc = '';
+
+                const flushPending = () => {
+                    if (pendingId !== null || pendingName) {
+                        sourcesMap.push({
+                            id: pendingId || ('SOURCE-' + (sourcesMap.length + 1)),
+                            name: pendingName,
+                            description: pendingDesc
+                        });
+                    }
+                    pendingId = null; pendingName = ''; pendingDesc = '';
+                };
 
                 for (let line of lines) {
                     line = line.trim();
-                    
-                    // Skip empty lines
                     if (!line) continue;
-                    
-                    // Skip comments
                     if (line.startsWith('*')) continue;
-                    
-                    // Check for source name
-                    if (line.toLowerCase().startsWith('source name:')) {
-                        sourceName = line.substring('source name:'.length).trim();
+
+                    const ll = line.toLowerCase();
+
+                    if (ll.startsWith('source id:')) {
+                        flushPending();
+                        pendingId = line.substring('source id:'.length).trim();
                         continue;
                     }
-                    
-                    // Check for source description
-                    if (line.toLowerCase().startsWith('source description:')) {
-                        sourceDescription = line.substring('source description:'.length).trim();
+                    if (ll.startsWith('source name:')) {
+                        pendingName = line.substring('source name:'.length).trim();
                         continue;
                     }
-                    
+                    if (ll.startsWith('source description:')) {
+                        pendingDesc = line.substring('source description:'.length).trim();
+                        continue;
+                    }
+
                     // Parse data line
-                    // Split by comma but respect quotes
                     const values = [];
                     let current = '';
                     let inQuotes = false;
-                    
                     for (let i = 0; i < line.length; i++) {
                         const char = line[i];
                         if (char === '"') {
@@ -15747,11 +15803,11 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         }
                     }
                     values.push(current.trim());
-                    
-                    // Clean up quotes from values
                     const cleanValues = values.map(v => v.replace(/^["']|["']$/g, ''));
-                    
+
                     if (cleanValues.length >= 10) {
+                        // Column 10 (index 10) is the optional source ID reference
+                        const rowSourceId = cleanValues.length >= 11 ? cleanValues[10].trim() : '';
                         data.push({
                             index: data.length + 1,
                             system: cleanValues[0],
@@ -15763,15 +15819,18 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                             distribution_type: cleanValues[6],
                             mean: cleanValues[7],
                             distribution_shape_parameter: cleanValues[8],
-                            distribution_scale_parameter: cleanValues[9]
+                            distribution_scale_parameter: cleanValues[9],
+                            sourceId: rowSourceId || null
                         });
                     }
                 }
 
-                const source = sourceName ? [{ name: sourceName, description: sourceDescription }] : [];
-                return { data, source };
-            };
+                // Flush any trailing pending source block
+                flushPending();
 
+                const sources = sourcesMap.length > 0 ? sourcesMap : [];
+                return { data, sources };
+            };
             // Load reliability data
             const loadReliabilityData = () => {
                 const input = document.createElement('input');
@@ -15840,7 +15899,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                     // Parse CSV / relDB
                                     const result = parseCSV(event.target.result);
                                     data = result.data;
-                                    sources = result.source;
+                                    sources = result.sources;
                                 } else {
                                     // Parse JSON (legacy)
                                     const json = JSON.parse(event.target.result);
@@ -15848,17 +15907,17 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                     sources = json.source || [];
                                 }
                                 
-                                // Check if source already exists
+                                // Check if any source already exists
                                 if (sources && sources.length > 0) {
-                                    const existingSource = treeData.find(node => 
-                                        node.isSource && 
-                                        node.label === sources[0].name && 
-                                        node.description === sources[0].description
+                                    const duplicates = sources.filter(src =>
+                                        treeData.find(node =>
+                                            node.isSource && node.label === src.name
+                                        )
                                     );
-                                    
-                                    if (existingSource) {
+                                    if (duplicates.length > 0) {
+                                        const names = duplicates.map(d => d.name).join(', ');
                                         const proceed = confirm(
-                                            `A database named "${sources[0].name}" appears to already be loaded. Do you still want to add it?`
+                                            `A database named "${names}" appears to already be loaded. Do you still want to add it?`
                                         );
                                         if (!proceed) return;
                                     }
@@ -16663,8 +16722,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             // Handle SSC addition from modal
             const handleAddSSC = ({ name, description }) => {
                 if (pendingSSC) {
-                    // Get source name from the component's source
-                    const sourceName = pendingSSC.source?.name || '';
+                    // Get source object from the component
+                    const sourceObj = pendingSSC.source || null;
                     
                     // Set all failure modes as applicable by default
                     // If units are 'h' (per hour), default to Fails While Operating (Poisson) model
@@ -16676,8 +16735,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         // For FM2, set lambda from mean and default mission time if not set
                         lambda: fm.data?.units === 'h' ? (fm.lambda || fm.data?.mean || '') : fm.lambda,
                         missionTime: fm.data?.units === 'h' ? (fm.missionTime || '24') : fm.missionTime,
-                        // Add source from the relDB source name
-                        source: fm.source || sourceName
+                        // Add source from the relDB source object
+                        source: fm.source || (sourceObj ? (sourceObj.name + (sourceObj.description ? ' — ' + sourceObj.description : '')) : '')
                     }));
                     
                     const newSSC = {
@@ -16688,7 +16747,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         failureModes: failureModesWithApplicable,
                         sscType: pendingSSC.sscType,
                         system: pendingSSC.system,
-                        source: pendingSSC.source || null
+                        source: sourceObj
                     };
                     setSscsInSystem(prev => [...prev, newSSC]);
                     setShowAddSSCModal(false);
@@ -16719,8 +16778,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             // Handle confirmation of failure mode incorporation
             const handleIncorporateFMs = (selectedFMs) => {
                 if (pendingIncorporateTarget && selectedFMs.length > 0) {
-                    // Get source name from the component's source
-                    const sourceName = pendingIncorporateComponent?.source?.name || '';
+                    // Get source object from the component
+                    const sourceObj = pendingIncorporateComponent?.source || null;
                     
                     // Process failure modes - set FM2 for per-hour rates
                     const processedFMs = selectedFMs.map(fm => ({
@@ -16730,8 +16789,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         // For FM2, set lambda from mean and default mission time if not set
                         lambda: fm.data?.units === 'h' ? (fm.lambda || fm.data?.mean || '') : fm.lambda,
                         missionTime: fm.data?.units === 'h' ? (fm.missionTime || '24') : fm.missionTime,
-                        // Add source from the relDB source name
-                        source: fm.source || sourceName
+                        // Add source from the relDB source object
+                        source: fm.source || (sourceObj ? (sourceObj.name + (sourceObj.description ? ' — ' + sourceObj.description : '')) : '')
                     }));
                     
                     setSscsInSystem(prev => prev.map(ssc => {
