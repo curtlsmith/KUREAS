@@ -39,7 +39,7 @@
     <script>
         // Configure Babel to suppress the "deoptimised styling" warning for large files
         Babel.registerPreset('custom', {
-            presets: [[Babel.availablePresets['react']]],
+            presets: [[Babel.availablePresets['react'], { runtime: 'classic' }]],
             compact: false
         });
     </script>
@@ -9093,6 +9093,32 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     ctx.strokeStyle='#dc2626'; ctx.lineWidth=1.5; ctx.stroke();
                 }
             },
+            'valve-air-operated': {
+                label: 'Air Operated Valve', category: 'Valves',
+                w: 44, h: 50,
+                draw: (ctx, x, y, w, h) => {
+                    const cx=x+w/2, cy=y+h/2+4;
+                    // Bowtie valve body (lower half)
+                    ctx.beginPath(); ctx.moveTo(x,cy-6); ctx.lineTo(cx,cy+2); ctx.lineTo(x,cy+h/2-4); ctx.closePath();
+                    ctx.fillStyle='#e0f2fe'; ctx.fill(); ctx.strokeStyle='#0369a1'; ctx.lineWidth=2; ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x+w,cy-6); ctx.lineTo(cx,cy+2); ctx.lineTo(x+w,cy+h/2-4); ctx.closePath();
+                    ctx.fillStyle='#e0f2fe'; ctx.fill(); ctx.stroke();
+                    // Stem
+                    ctx.beginPath(); ctx.moveTo(cx,cy-4); ctx.lineTo(cx,y+10);
+                    ctx.strokeStyle='#0369a1'; ctx.lineWidth=2; ctx.stroke();
+                    // Pneumatic actuator dome (top)
+                    ctx.beginPath(); ctx.ellipse(cx,y+10,10,6,0,Math.PI,0,false);
+                    ctx.fillStyle='#bae6fd'; ctx.fill(); ctx.strokeStyle='#0369a1'; ctx.lineWidth=2; ctx.stroke();
+                    // Signal line (small dashed line into dome top)
+                    ctx.setLineDash([2,2]);
+                    ctx.beginPath(); ctx.moveTo(cx,y+4); ctx.lineTo(cx,y+1);
+                    ctx.strokeStyle='#0369a1'; ctx.lineWidth=1.5; ctx.stroke();
+                    ctx.setLineDash([]);
+                    // 'A' label on actuator dome
+                    ctx.font='bold 7px sans-serif'; ctx.fillStyle='#0c4a6e'; ctx.textAlign='center';
+                    ctx.fillText('A',cx,y+11);
+                }
+            },
             // ── NORMALLY OPEN / NORMALLY CLOSED VARIANTS ──────────────────
             // Normally Open (NO): valve interior is WHITE (hollow/unshaded)
             // Normally Closed (NC): valve interior is BLACK (filled/shaded)
@@ -11503,6 +11529,88 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     ctx.strokeStyle='#ca8a04'; ctx.lineWidth=1.5; ctx.stroke();
                     ctx.font='7px sans-serif'; ctx.fillStyle='#713f12'; ctx.textAlign='center';
                     ctx.fillText('LS', x+(w-14)/2+2, cy+2);
+                }
+            },
+
+            'switch-bistable': {
+                label: 'Bistable Switch', category: 'Electronics',
+                w: 44, h: 36,
+                draw: (ctx, x, y, w, h) => {
+                    const cy=y+h/2;
+                    // Outer rect
+                    ctx.beginPath(); ctx.rect(x+2,y+2,w-4,h-4);
+                    ctx.fillStyle='#faf5ff'; ctx.fill(); ctx.strokeStyle='#7c3aed'; ctx.lineWidth=2; ctx.stroke();
+                    // Two stable positions shown as filled dots connected by line
+                    ctx.beginPath(); ctx.moveTo(x+8,cy+4); ctx.lineTo(x+w-8,cy-4);
+                    ctx.strokeStyle='#7c3aed'; ctx.lineWidth=2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(x+8,cy+4,3,0,2*Math.PI); ctx.fillStyle='#7c3aed'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(x+w-8,cy-4,3,0,2*Math.PI); ctx.fillStyle='#7c3aed'; ctx.fill();
+                    // Double-arrow above to indicate bistable / latching
+                    ctx.font='bold 7px sans-serif'; ctx.fillStyle='#6d28d9'; ctx.textAlign='center';
+                    ctx.fillText('BS',x+w/2,y+10);
+                }
+            },
+            'switch-manual': {
+                label: 'Manual Switch', category: 'Electronics',
+                w: 44, h: 36,
+                draw: (ctx, x, y, w, h) => {
+                    const cy=y+h/2;
+                    // Body rect
+                    ctx.beginPath(); ctx.rect(x+2,y+4,w-4,h-8);
+                    ctx.fillStyle='#f0fdf4'; ctx.fill(); ctx.strokeStyle='#16a34a'; ctx.lineWidth=2; ctx.stroke();
+                    // Switch blade (angled, open position)
+                    ctx.beginPath(); ctx.moveTo(x+8,cy+4); ctx.lineTo(x+w-10,cy-6);
+                    ctx.strokeStyle='#16a34a'; ctx.lineWidth=2.5; ctx.stroke();
+                    // Contact dots
+                    ctx.beginPath(); ctx.arc(x+8,cy+4,3,0,2*Math.PI); ctx.fillStyle='#16a34a'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(x+w-8,cy,3,0,2*Math.PI); ctx.fillStyle='#16a34a'; ctx.fill();
+                    // Actuating handle (short line up from pivot)
+                    ctx.beginPath(); ctx.moveTo(x+8,cy+4); ctx.lineTo(x+8,y+6);
+                    ctx.strokeStyle='#16a34a'; ctx.lineWidth=2; ctx.stroke();
+                    ctx.font='bold 7px sans-serif'; ctx.fillStyle='#166534'; ctx.textAlign='center';
+                    ctx.fillText('MS',x+w/2,y+h-3);
+                }
+            },
+            'switch-level-elec': {
+                label: 'Level Switch (Electronic)', category: 'Electronics',
+                w: 44, h: 40,
+                draw: (ctx, x, y, w, h) => {
+                    const cx=x+w/2, cy=y+h/2, r=w/2-2;
+                    // ISA bubble
+                    ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI);
+                    ctx.fillStyle='#f0fdf4'; ctx.fill(); ctx.strokeStyle='#15803d'; ctx.lineWidth=2; ctx.stroke();
+                    // Switch bar inside bubble
+                    ctx.beginPath(); ctx.moveTo(cx-8,cy+4); ctx.lineTo(cx+4,cy-4);
+                    ctx.strokeStyle='#15803d'; ctx.lineWidth=2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(cx-8,cy+4,2.5,0,2*Math.PI); ctx.fillStyle='#15803d'; ctx.fill();
+                    // Tag
+                    ctx.font='bold 8px sans-serif'; ctx.fillStyle='#14532d'; ctx.textAlign='center';
+                    ctx.fillText('LS',cx,cy-6);
+                }
+            },
+            'switch-relay': {
+                label: 'Relay Switch', category: 'Electronics',
+                w: 44, h: 40,
+                draw: (ctx, x, y, w, h) => {
+                    const cx=x+w/2, cy=y+h/2;
+                    // Coil (bottom rectangle)
+                    ctx.beginPath(); ctx.rect(x+6,cy+4,w-12,h/2-6);
+                    ctx.fillStyle='#fef2f2'; ctx.fill(); ctx.strokeStyle='#dc2626'; ctx.lineWidth=2; ctx.stroke();
+                    // Coil windings
+                    ctx.beginPath();
+                    ctx.moveTo(x+8,cy+8);
+                    ctx.arc(x+14,cy+8,5,Math.PI,0); ctx.arc(x+22,cy+8,5,Math.PI,0); ctx.arc(x+30,cy+8,5,Math.PI,0);
+                    ctx.strokeStyle='#dc2626'; ctx.lineWidth=1.5; ctx.stroke();
+                    // Switch contact (top)
+                    ctx.beginPath(); ctx.moveTo(x+10,cy-4); ctx.lineTo(x+w-10,cy-4);
+                    ctx.strokeStyle='#374151'; ctx.lineWidth=1.5; ctx.stroke();
+                    // Movable blade
+                    ctx.beginPath(); ctx.moveTo(x+10,cy+4); ctx.lineTo(x+w-14,cy-2);
+                    ctx.strokeStyle='#dc2626'; ctx.lineWidth=2.5; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(x+10,cy+4,3,0,2*Math.PI); ctx.fillStyle='#dc2626'; ctx.fill();
+                    // Tag
+                    ctx.font='bold 7px sans-serif'; ctx.fillStyle='#991b1b'; ctx.textAlign='center';
+                    ctx.fillText('K',cx,y+9);
                 }
             },
 
@@ -16719,6 +16827,222 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 }
             };
 
+            // Auto-select the best P&ID symbol based on component name / sscType
+            const autoSelectPidSymbol = (compName, compLabel, sscType) => {
+                // Build a single search string from all three inputs, lower-cased
+                // compName  = user-typed SSC name (e.g. "RPS-BIS-001")
+                // compLabel = relDB component type label (e.g. "Bistable (BIS)")
+                // sscType   = relDB SSC type (e.g. "Switch (SWC)")
+                const n = ((compName || '') + ' ' + (compLabel || '') + ' ' + (sscType || '')).toLowerCase();
+                const has = (...pats) => pats.some(p => p.test(n));
+
+                // ── NUCLEAR-SPECIFIC (before generic equipment) ─────────────
+                if (has(/\b(rcp|reactor\s*coolant\s*pump)\b/)) return 'rx-coolant-pump';
+                if (has(/\b(pressuri[sz]er|pzr)\b/))             return 'pressurizer';
+                if (has(/\bsteam\s*gen(erator)?\b/, /\b(s\/g)\b/)) return 'steam-generator';
+                if (has(/\baccumulator\b/))                       return 'accumulator';
+                if (has(/\b(rwst|rwsp)\b/))                      return 'rwst';
+                if (has(/\b(bwst)\b/))                           return 'bwst';
+                if (has(/\bsump\b/))                             return 'sump';
+                if (has(/\b(crdm|control\s*rod\s*driv)\b/))   return 'crdm';
+                if (has(/\b(spent\s*fuel\s*pool|sfp)\b/))     return 'spent-fuel-pool';
+                if (has(/\b(containment)\b/))                    return 'containment';
+                if (has(/\b(moderator)\b/))                      return 'moderator';
+                if (has(/\b(nuclear\s*fuel|fuel\s*assembl)\b/)) return 'nuclear-fuel';
+                if (has(/\b(fuel\s*transport|fuel\s*flask)\b/)) return 'fuel-transport';
+                if (has(/\b(fuel\s*canister|fuel\s*can)\b/))  return 'fuel-canister';
+                if (has(/\b(fuel\s*handl)\b/))                 return 'fuel-handling';
+                if (has(/\breactor\b/, /\bcore\b/))            return 'reactor';
+
+                // ── CRANES ──────────────────────────────────────────────────
+                if (has(/\bgantry\b/, /\bportal\s*crane\b/))  return 'crane-gantry';
+                if (has(/\bjib\b/, /\bwall\s*crane\b/))       return 'crane-jib';
+                if (has(/\bcrane\b/, /\bhoist\b/))             return 'crane-overhead';
+
+                // ── PUMPS (specific subtypes before generic) ───────────────
+                if (has(/\bperistaltic\b/))                           return 'pump-peristaltic';
+                if (has(/\b(dosing|metering|chemical\s*inject)\b/)) return 'pump-dosing';
+                if (has(/\b(hand\s*pump|manual\s*pump)\b/))        return 'pump-hand';
+                if (has(/\b(vacuum\s*pump|evacuat)\b/))             return 'pump-vacuum';
+                if (has(/\b(jet\s*pump|ejector)\b/))               return 'pump-jet';
+                if (has(/\b(liquid\s*ring)\b/))                     return 'pump-liquid-ring';
+                if (has(/\b(progressing\s*cavity|pc\s*pump|moineau)\b/)) return 'pump-progressing-cavity';
+                if (has(/\b(gear\s*pump)\b/))                       return 'pump-gear';
+                if (has(/\b(lobe\s*pump)\b/))                       return 'pump-lobe';
+                if (has(/\b(vane\s*pump)\b/))                       return 'pump-vane';
+                if (has(/\b(screw\s*pump|twin\s*screw)\b/))       return 'pump-screw-twin';
+                if (has(/\b(single\s*screw|mono\s*screw)\b/))     return 'pump-screw-single';
+                if (has(/\b(plunger\s*pump)\b/))                   return 'pump-plunger';
+                if (has(/\b(piston\s*pump)\b/))                    return 'pump-piston';
+                if (has(/\b(double\s*diaphragm|aod[dp]?)\b/))      return 'pump-diaphragm-double';
+                if (has(/\b(diaphragm\s*pump)\b/))                 return 'pump-diaphragm';
+                if (has(/\b(sump\s*pump)\b/))                      return 'pump-sump';
+                if (has(/\b(submerged\s*pump|submersible)\b/))     return 'pump-submerged';
+                if (has(/\b(inline\s*pump)\b/))                    return 'pump-centrif-inline';
+                if (has(/\b(canned\s*pump|canned\s*motor)\b/))    return 'pump-centrif-canned';
+                if (has(/\b(vertical\s*(centrifugal|pump)|vtp|vcp)\b/)) return 'pump-centrif-vert';
+                if (has(/\b(horizontal\s*(centrifugal|pump)|hcp|htp)\b/)) return 'pump-centrif-horiz';
+                if (has(/\b(pos(itive)?\s*dis(p(lacement)?)?|reciproc)\b/)) return 'pump-pos';
+                if (has(/\b(rcp|reactor\s*coolant)\b/))            return 'rx-coolant-pump';
+                if (has(/\bpump\b/, /\bcentrifugal\b/))           return 'pump-centrif';
+
+                // ── COMPRESSORS ────────────────────────────────────────────
+                if (has(/\b(reciprocating\s*comp|recip\s*comp)\b/))   return 'comp-reciprocating';
+                if (has(/\b(centrifugal\s*comp|cent\s*comp)\b/))      return 'comp-centrifugal';
+                if (has(/\b(axial\s*comp)\b/))                          return 'comp-axial';
+                if (has(/\b(screw\s*comp)\b/))                          return 'comp-screw';
+                if (has(/\b(rotary\s*vane\s*comp)\b/))                 return 'comp-rotary-vane';
+                if (has(/\b(diaphragm\s*comp)\b/))                      return 'comp-diaphragm';
+                if (has(/\bcompressor\b/))                                return 'compressor';
+
+                // ── TURBINE / FAN ──────────────────────────────────────────
+                if (has(/\bturbine\b/))                             return 'turbine';
+                if (has(/\b(fan|blower)\b/))                       return 'fan';
+
+                // ── HEAT TRANSFER / VESSELS ────────────────────────────────
+                if (has(/\b(boiler)\b/))                           return 'boiler';
+                if (has(/\b(cooler|condenser)\b/))                 return 'cooler';
+                if (has(/\bheat\s*ex(changer)?\b/, /\bhex\b/)) return 'heat-exchanger';
+                if (has(/\b(column|distill)\b/))                   return 'column';
+                if (has(/\b(mixer|agitat|stirrer)\b/))             return 'mixer';
+                if (has(/\b(separator|cyclone)\b/))                return 'separator';
+                if (has(/\b(cooling\s*tower)\b/))                 return 'cooling-tower';
+                if (has(/\b(furnace|heater|fired\s*heat)\b/))    return 'furnace';
+                if (has(/\b(horizontal\s*vessel|horizontal\s*tank)\b/)) return 'vessel-horizontal';
+                if (has(/\b(vertical\s*vessel|vertical\s*tank|pressure\s*vessel)\b/)) return 'vessel-vertical';
+                if (has(/\b(tank|vessel|drum|reservoir)\b/))      return 'vessel-vertical';
+
+                // ── VALVES (specific → generic; NO/NC variant resolution) ──
+                const valveVariant = (base) => {
+                    if (has(/\b(normally\s*open|n\.?o\.?)\b/)) return base + '-no';
+                    if (has(/\b(normally\s*clos|n\.?c\.?)\b/)) return base + '-nc';
+                    return base;
+                };
+                if (has(/\b(air\s*operat|aov|pneumatic\s*operat)\b/)) return valveVariant('valve-air-operated');
+                if (has(/\b(solenoid|sol\.?\s*val|sov)\b/))           return valveVariant('valve-solenoid');
+                if (has(/\b(safety|relief|psv|prv|srv)\b/))             return valveVariant('valve-safety');
+                if (has(/\b(rupture\s*dis[ck]|burst\s*dis[ck]|\brd\b)\b/)) return 'valve-rupture';
+                if (has(/\b(control\s*val|\bcv\b)\b/))              return valveVariant('valve-control');
+                if (has(/\b(check|nrv|non.?ret)\b/))                   return valveVariant('valve-check');
+                if (has(/\bdiaphragm\b/))                               return valveVariant('valve-diaphragm');
+                if (has(/\bneedle\b/))                                   return valveVariant('valve-needle');
+                if (has(/\b(3.?way|three.?way|\b3w\b)\b/))           return valveVariant('valve-3way');
+                if (has(/\bbutterfly\b/))                               return valveVariant('valve-butterfly');
+                if (has(/\bball\b/))                                    return valveVariant('valve-ball');
+                if (has(/\bglobe\b/))                                   return valveVariant('valve-globe');
+                if (has(/\bgate\b/))                                    return valveVariant('valve-gate');
+                if (has(/\bvalve\b/))                                   return valveVariant('valve-gate');
+
+                // ── ACTUATORS ──────────────────────────────────────────────
+                if (has(/\b(pneumatic\s*act|air\s*act)\b/))          return 'actuator-pneumatic';
+                if (has(/\b(electric\s*act|motor\s*act|mov\b)\b/)) return 'actuator-electric';
+                if (has(/\b(hydraulic\s*act)\b/))                     return 'actuator-hydraulic';
+                if (has(/\b(handwheel|manual\s*act|hand\s*wheel)\b/)) return 'actuator-manual';
+
+                // ── PIPING / FLOW ELEMENTS ─────────────────────────────────
+                if (has(/\bventuri\b/))                                 return 'flow-element-venturi';
+                if (has(/\bflow\s*nozzle\b/))                         return 'flow-nozzle';
+                if (has(/\b(rotameter|variable\s*area)\b/))           return 'rotameter';
+                if (has(/\b(steam\s*trap)\b/))                        return 'steam-trap';
+                if (has(/\b(silencer|muffler)\b/))                     return 'silencer';
+                if (has(/\bcold\s*trap\b/))                           return 'cold-trap';
+                if (has(/\bsight\s*glass\b/))                         return 'sight-glass';
+                if (has(/\b(strainer|filter|basket)\b/))               return 'strainer';
+                if (has(/\borifice\b/))                                 return 'orifice-plate';
+                if (has(/\b(reducer|expander|transition)\b/))          return 'reducer';
+                if (has(/\btee\b/))                                     return 'tee';
+                if (has(/\b(flanged|flange\s*end|blind\s*flange)\b/)) return 'flanged-end';
+                if (has(/\b(flex(ible)?\s*hose|flex\s*pipe)\b/))    return 'flex-hose';
+                if (has(/\b(header|manifold)\b/))                      return 'header';
+                if (has(/\bdamper\b/))                                  return 'damper';
+
+                // ── SIGNAL LINES ───────────────────────────────────────────
+                if (has(/\b(electrical\s*signal|elect\s*sig)\b/))   return 'signal-electrical';
+                if (has(/\b(pneumatic\s*signal|air\s*sig)\b/))      return 'signal-pneumatic';
+                if (has(/\b(data\s*bus|fieldbus|profibus|modbus)\b/)) return 'signal-data';
+                if (has(/\b(hydraulic\s*signal)\b/))                  return 'signal-hydraulic';
+                if (has(/\b(wireless\s*sig)\b/))                      return 'signal-wireless';
+
+                // ── INSTRUMENTS / I&C (specific → generic) ────────────────
+                if (has(/\bradiation\s*mon(itor)?\b/))                return 'radiation-monitor';
+                if (has(/\b(anal[yz]er|analyser|at\b)\b/))           return 'analyzer';
+                if (has(/\b(thermowell)\b/))                           return 'thermowell';
+                if (has(/\b(level\s*glass|gauge\s*glass|sight\s*glass\s*level)\b/)) return 'level-glass';
+                if (has(/\b(rtd|thermocouple|temperature\s*element)\b/)) return 'rtd';
+                if (has(/\b(pressure\s*trans(mitter)?|\bpt\b)\b/)) return 'transmitter-pressure';
+                if (has(/\b(temp(erature)?\s*trans(mitter)?|\btt\b)\b/)) return 'transmitter-temp';
+                if (has(/\b(flow\s*trans(mitter)?|\bft\b)\b/))     return 'transmitter-flow';
+                if (has(/\b(level\s*trans(mitter)?|\blt\b)\b/))    return 'transmitter-level';
+                if (has(/\b(wireless\s*trans(mitter)?)\b/))          return 'transmitter-wireless';
+                if (has(/\b(pressure\s*switch|\bps[hl]\b)\b/))     return 'switch-pressure';
+                if (has(/\b(temp(erature)?\s*switch|\bts[hl]\b)\b/)) return 'switch-temp';
+                if (has(/\b(flow\s*switch|\bfs[hl]\b)\b/))         return 'switch-flow';
+                if (has(/\b(level\s*switch|\bls[hl]\b)\b/))        return 'switch-level';
+                if (has(/\b(i\/p\s*conv|current\s*to\s*pneum)\b/)) return 'converter-ip';
+                if (has(/\b(p\/i\s*conv|pneum\s*to\s*current)\b/)) return 'converter-pi';
+                if (has(/\b(alarm|annunciator)\b/))                    return 'alarm-general';
+                if (has(/\b(indicator|local\s*ind)\b/))              return 'indicator-local';
+                if (has(/\b(recorder|chart\s*rec)\b/))               return 'recorder';
+                if (has(/\b(pilot\s*light|status\s*light|lamp)\b/)) return 'pilot-light';
+                if (has(/\b(well\s*pressure|press(ure)?\s*well)\b/)) return 'well-pressure';
+                if (has(/\b(safety\s*(sys|inst|sensor)|sis\b|esfas)\b/)) return 'inst-safety';
+                if (has(/\b(plc\s*rack|controller\s*rack)\b/))      return 'plc-rack';
+                if (has(/\b(\bplc\b|logic\s*sol|rts\b|protection\s*sys)\b/)) return 'inst-plc';
+                if (has(/\b(dcs\b|distributed\s*control|shared\s*control)\b/)) return 'inst-dcs';
+                if (has(/\b(panel\s*inst|control\s*room|panel\s*mount)\b/)) return 'inst-panel';
+                if (has(/\b(field\s*inst|local\s*inst)\b/))        return 'inst-field';
+                if (has(/\b(instrument|sensor|transmitter|detector|gauge)\b/)) return 'inst-field';
+
+                // ── ELECTRONICS ────────────────────────────────────────────
+                if (has(/\b(bistable|latching\s*switch|flip.?flop)\b/)) return 'switch-bistable';
+                if (has(/\b(electronic\s*level\s*switch)\b/)) return 'switch-level-elec';
+                if (has(/\b(relay\s*switch)\b/))                     return 'switch-relay';
+                if (has(/\b(manual\s*switch|hand\s*switch|hs\b)\b/)) return 'switch-manual';
+                if (has(/\b(scada|hmi\b)\b/))                       return 'scada-hmi';
+                if (has(/\b(io\s*module|field\s*interface|i\/o)\b/)) return 'io-module';
+                if (has(/\b(plc\s*rack|controller\s*rack)\b/))     return 'plc-rack';
+                if (has(/\b(vfd|variable\s*freq|variable\s*speed\s*driv)\b/)) return 'vfd';
+                if (has(/\b(servo|stepper)\b/))                      return 'servo-motor';
+                if (has(/\b(junction\s*box|terminal\s*box|j.?box)\b/)) return 'junction-box';
+                if (has(/\b(wireless\s*trans)\b/))                  return 'transmitter-wireless';
+                if (has(/\b(solenoid\s*coil|electromagnet)\b/))     return 'solenoid-coil';
+                if (has(/\b(pos(ition)?\s*sensor|limit\s*switch)\b/)) return 'pos-sensor';
+                if (has(/\b(laptop|portable\s*comp)\b/))            return 'computer-laptop';
+                if (has(/\b(server|server\s*rack)\b/))              return 'computer-server';
+                if (has(/\b(control\s*panel\s*comp)\b/))           return 'computer-panel';
+                if (has(/\b(computer|workstation|desktop)\b/))       return 'computer-desktop';
+
+                // ── ELECTRICAL ─────────────────────────────────────────────
+                if (has(/\b(generator|edg\b|diesel\s*gen|emergency\s*gen)\b/)) return 'generator';
+                if (has(/\b(ups\b|battery\s*(bank|rack)|uninterrupt)\b/)) return 'ups';
+                if (has(/\b(bus\s*bar|busbar|electrical\s*bus)\b/)) return 'bus-bar';
+                if (has(/\b(transformer|xfmr)\b/))                   return 'transformer';
+                if (has(/\b(fuse)\b/))                                return 'fuse';
+                if (has(/\b(relay\b|contactor)\b/))                 return 'relay';
+                if (has(/\b(ground|earthing)\b/))                    return 'ground';
+                if (has(/\b(breaker|circuit\s*break|\bcb\b)\b/)) return 'breaker';
+                if (has(/\b(motor)\b/))                               return 'motor';
+
+                // ── HVAC ───────────────────────────────────────────────────
+                if (has(/\b(ahu|air\s*handl(ing)?\s*unit)\b/))    return 'ahu';
+                if (has(/\b(chiller)\b/))                             return 'chiller';
+
+                // ── SAFETY & FIRE ──────────────────────────────────────────
+                if (has(/\b(fire\s*det(ector)?|smoke\s*det|heat\s*det)\b/)) return 'fire-detector';
+                if (has(/\b(fire\s*supp(ression)?|sprinkler|deluge)\b/)) return 'fire-suppression';
+                if (has(/\b(emergency\s*shutdown|esd|trip\s*sys)\b/)) return 'emergency-shutdown';
+                if (has(/\b(pressure\s*relief|prv\b)\b/))          return 'pressure-relief';
+                if (has(/\b(eyewash|safety\s*shower)\b/))           return 'eyewash';
+
+                // ── GENERAL ────────────────────────────────────────────────
+                if (has(/\b(human|operator|person)\b/))              return 'human-operator';
+                if (has(/\b(maintenance|technician|mechanic)\b/))    return 'human-maintenance';
+                if (has(/\b(supervisor|engineer)\b/))                return 'human-supervisor';
+
+                // Fallback
+                return 'generic';
+            };
+
             // Handle SSC addition from modal
             const handleAddSSC = ({ name, description }) => {
                 if (pendingSSC) {
@@ -16747,7 +17071,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                         failureModes: failureModesWithApplicable,
                         sscType: pendingSSC.sscType,
                         system: pendingSSC.system,
-                        source: sourceObj
+                        source: sourceObj,
+                        pidSymbol: autoSelectPidSymbol(name || '', pendingSSC.label || '', pendingSSC.sscType || '')
                     };
                     setSscsInSystem(prev => [...prev, newSSC]);
                     setShowAddSSCModal(false);
