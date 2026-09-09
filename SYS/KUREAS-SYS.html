@@ -2757,12 +2757,15 @@
             const minHorizontalSpacing = 40;
             const circleRadius = 25;
             
+            // Probability labels: correctly-scoped local copy of formatProbability
+            // (this function is a top-level sibling, not nested inside KUREAS_SYS,
+            // so it can't reach the shared formatProbability by closure). Respects
+            // settings.showProbability as a decimal-digit count and always renders
+            // in scientific notation.
             const formatProbability = (prob, showProbSetting) => {
                 if (prob === null || prob === undefined) return '';
-                if (showProbSetting === '1') return prob.toExponential(2);
-                if (showProbSetting === '2') return (prob * 100).toFixed(4) + '%';
-                if (showProbSetting === '3') return prob.toFixed(6);
-                return prob.toExponential(2);
+                const digits = parseInt(showProbSetting) || 1;
+                return prob.toExponential(digits);
             };
             
             const calculateSubtreeWidth = (n) => {
@@ -3178,7 +3181,7 @@
         }
         
         // ==================== EXPORT MODAL ====================
-        function ExportModal({ onClose, sscsInSystem, systemName, systemDescription, systemLogic, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext }) {
+        function ExportModal({ onClose, sscsInSystem, systemName, systemDescription, systemLogic, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, buildImportanceEngine, formatProbability, settings, pidDiagram, applyCCFExpansion, buildCCFContext }) {
             const allSSCs = sscsInSystem || [];
             const [selectedSSCs, setSelectedSSCs] = React.useState(() => new Set(allSSCs.map((_, i) => i)));
             const [format, setFormat] = React.useState('knowRPT');
@@ -3782,6 +3785,7 @@
                 let failureLogicTree = null;
                 let cutSetRows = [];
                 let mcubValue = null;
+                let quantMethodUsed = 'mcub';
                 let ccfEvents = {};
                 let importanceMeasures = [];
                 const hasLogic = hasFailureInfo && systemLogic && systemLogic.length > 1;
@@ -3838,28 +3842,41 @@
                                 csWithProb.sort((a,b) => { if(a.hasLinked&&!b.hasLinked)return 1; if(!a.hasLinked&&b.hasLinked)return -1; if(a.probability!==null&&b.probability!==null)return b.probability-a.probability; if(a.probability===null)return 1; if(b.probability===null)return -1; return 0; });
 
                                 cutSetRows = csWithProb;
-                                const validProbs = csWithProb.filter(cs => !cs.hasLinked && cs.probability !== null).map(cs => cs.probability);
-                                if (validProbs.length > 0) mcubValue = calculateMCUB(validProbs);
+                                const validCutSetsForReport = csWithProb.filter(cs => !cs.hasLinked && cs.probability !== null);
+                                const validProbs = validCutSetsForReport.map(cs => cs.probability);
 
-                                // Importance measures
+                                // Calculate system failure probability based on the selected
+                                // quantification method — same pattern used by ReportModal and
+                                // FailureAnalysisModal, so the export matches what's shown
+                                // on screen for MCUB, Rare Event, and BDD alike (previously
+                                // this always used MCUB regardless of settings).
+                                quantMethodUsed = settings?.quantificationMethod || 'mcub';
+                                if (validProbs.length > 0) {
+                                    if (quantMethodUsed === 'rare') {
+                                        mcubValue = Math.min(1.0, validProbs.reduce((sum, p) => sum + p, 0));
+                                    } else if (quantMethodUsed === 'bdd') {
+                                        const cutSetEvents = validCutSetsForReport.map(cs => cs.events);
+                                        const bddResult = calculateBDD(cutSetEvents, combinedEventData, ccfBasicEvents);
+                                        mcubValue = bddResult.probability;
+                                        quantMethodUsed = bddResult.method;
+                                    } else {
+                                        mcubValue = calculateMCUB(validProbs);
+                                    }
+                                }
+
+                                // Importance measures — reuse the shared buildImportanceEngine
+                                // (same engine the on-screen Failure Analysis modal and Report
+                                // preview use) so RIR/RRR/PC/SWIM match exactly, including for
+                                // the BDD method, which needs an actual BDD re-evaluation per
+                                // event rather than the MCUB/rare patched-recombination formula.
                                 if (mcubValue !== null) {
+                                    const computeImportance = buildImportanceEngine(validCutSetsForReport, combinedEventData, mcubValue, settings);
                                     const allEventNames = new Set();
-                                    csWithProb.forEach(cs => cs.events.forEach(e => allEventNames.add(e)));
+                                    validCutSetsForReport.forEach(cs => cs.events.forEach(e => allEventNames.add(e)));
                                     allEventNames.forEach(evtName => {
-                                        const evtData = combinedEventData[evtName];
-                                        if (!evtData || evtData.probability === null || evtData.probability === undefined || evtData.isLinked) return;
-                                        const p = evtData.probability;
-                                        const csContaining = csWithProb.filter(cs => cs.events.includes(evtName) && !cs.hasLinked && cs.probability !== null);
-                                        if (csContaining.length === 0) return;
-                                        const csWithout = csWithProb.filter(cs => !cs.events.includes(evtName) && !cs.hasLinked && cs.probability !== null).map(cs => cs.probability);
-                                        const mcubWithout = csWithout.length > 0 ? calculateMCUB(csWithout) : 0;
-                                        const rrr = mcubWithout > 0 ? mcubValue / mcubWithout : Infinity;
-                                        const csWithEvent = csWithProb.filter(cs => cs.events.includes(evtName) && !cs.hasLinked && cs.probability !== null);
-                                        const pGivenEvent = csWithEvent.length > 0 ? calculateMCUB(csWithEvent.map(cs => { const prod = cs.events.filter(e=>e!==evtName).reduce((acc,e2) => { const d2 = combinedEventData[e2]; return acc*(d2&&d2.probability!==null?d2.probability:0); },1); return prod; })) : 0;
-                                        const rir = p > 0 ? pGivenEvent / mcubValue : 0;
-                                        const pc = pGivenEvent * p;
-                                        const swim = mcubValue > 0 ? pc / mcubValue : 0;
-                                        importanceMeasures.push({ event: evtName, description: evtData.description || '', probability: p, rir: isFinite(rir)?rir:0, rrr: isFinite(rrr)?rrr:999, pc, swim });
+                                        const m = computeImportance(evtName);
+                                        if (!m) return;
+                                        importanceMeasures.push({ event: evtName, description: m.description, probability: m.probability, rir: isFinite(m.rir) ? m.rir : 0, rrr: m.rrr, pc: m.pc, swim: m.swim });
                                     });
                                     importanceMeasures.sort((a,b) => b.swim - a.swim);
                                 }
@@ -3873,10 +3890,7 @@
                 // ── Format helpers ─────────────────────────────────────────────────
                 const fmtProb = (p) => {
                     if (p === null || p === undefined || isNaN(p)) return null;
-                    const mode = settings?.showProbability || '1';
-                    if (mode === '2') return (p*100).toFixed(4)+'%';
-                    if (mode === '3') return p.toFixed(6);
-                    return p.toExponential(2);
+                    return formatProbability(p, settings?.showProbability);
                 };
 
                 // ── Serialize system works expression to text ──────────────────────
@@ -4005,7 +4019,7 @@
                                 if(applied.length>0){let probStr=''; const fm=applied[0];
                                     if(fm.probabilityType==='screened')probStr='SCREENED';
                                     else if(fm.probabilityType==='qualitative')probStr=(fm.qualitativeLevel||'unknown').toUpperCase();
-                                    else if(fm.data&&fm.data.mean){const mv=parseFloat(fm.data.mean);probStr='P='+(isNaN(mv)?fm.data.mean:mv.toExponential(2));}
+                                    else if(fm.data&&fm.data.mean){const mv=parseFloat(fm.data.mean);probStr='P='+(isNaN(mv)?fm.data.mean:formatProbability(mv, settings?.showProbability));}
                                     if(probStr){ctx.font='9px monospace';ctx.textAlign='center';const pw=ctx.measureText(probStr).width;ctx.fillStyle='rgba(255,255,230,0.85)';ctx.fillRect(labelX-pw/2-2,labelCY-8,pw+4,10);ctx.fillStyle='#b45309';ctx.fillText(probStr,labelX,labelCY);}
                                 }
                             }
@@ -4038,7 +4052,7 @@
                         if (fm.probabilityType==='screened') probInfo='\\n[SCREENED]';
                         else if (fm.probabilityType==='qualitative') probInfo='\\n['+(fm.qualitativeLevel||'Unknown').toUpperCase()+']';
                         else if (fm.probabilityType==='linkedSystem') probInfo='\\n[LINKED: '+escM((fm.linkedSystemName||'System').substring(0,20))+']';
-                        else if (fm.data?.mean) { const mv=parseFloat(fm.data.mean); probInfo='\\nP='+(isNaN(mv)?fm.data.mean:mv.toExponential(2)); }
+                        else if (fm.data?.mean) { const mv=parseFloat(fm.data.mean); probInfo='\\nP='+(isNaN(mv)?fm.data.mean:formatProbability(mv, settings?.showProbability)); }
                         code += `        ${fmId}["${fmLabel}${probInfo}"]\n`;
                         const applicable = fm.applicable!==false;
                         const bgColor = !applicable?'#f3f4f6':fm.probabilityType==='screened'?'#f3f4f6':'#dbeafe';
@@ -4273,9 +4287,9 @@
                                         String(i+1),
                                         cs.events.join(' \u00D7 '),
                                         cs.description || '',
-                                        cs.probability !== null ? cs.probability.toExponential(2) : 'N/A'
+                                        cs.probability !== null ? formatProbability(cs.probability, settings?.showProbability) : 'N/A'
                                     ]),
-                                    footer: mcubValue !== null ? `MCUB (System Failure Probability): ${mcubValue.toExponential(2)}` : null
+                                    footer: mcubValue !== null ? `System Failure Probability${quantMethodUsed === 'rare' ? ' (Rare Event)' : quantMethodUsed === 'mcub' ? ' (MCUB)' : (quantMethodUsed === 'bdd' || quantMethodUsed === 'BDD' || quantMethodUsed === 'Inclusion-Exclusion') ? ' (BDD Exact)' : ''}: ${formatProbability(mcubValue, settings?.showProbability)}` : null
                                 }
                             ]
                         },
@@ -4464,7 +4478,7 @@
             );
         }
 
-        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, settings, pidDiagram, applyCCFExpansion, buildCCFContext, parseTruncationThreshold }) {
+        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, buildImportanceEngine, formatProbability, settings, pidDiagram, applyCCFExpansion, buildCCFContext, parseTruncationThreshold }) {
             const [fileFormat, setFileFormat] = useState(() => {
                 return localStorage.getItem('KUREAS_SYS_reportFormat') || 'word';
             });
@@ -4939,79 +4953,22 @@
                 const validCutSets = cutSets.filter(cs => !cs.hasLinked && cs.probability !== null);
                 if (validCutSets.length === 0) return [];
 
-                const method = settings?.quantificationMethod || 'mcub';
-
-                // ── Shared formula ────────────────────────────────────────────────
-                const calcMeasures = (origProb, prob1, prob0, systemProb, ed, eventName) => {
-                    const rir  = prob1 !== null ? prob1 / systemProb : null;
-                    const rrrRaw = prob0 === 0 ? Infinity : (prob0 !== null ? systemProb / prob0 : null);
-                    const pc   = rrrRaw === Infinity ? 1.0 : (rrrRaw !== null ? (1 - (1 / rrrRaw)) : null);
-                    const swim = (pc !== null && rir !== null) ? pc + Math.pow(1 - (1 / rir), 7.64) : null;
-                    return {
-                        event: eventName,
-                        name: eventName,
-                        description: ed.description || '',
-                        probability: origProb,
-                        rir,
-                        rrr: rrrRaw === Infinity ? 999 : rrrRaw,
-                        pc,
-                        swim,
-                        isCCF: ed.isCCF || false
-                    };
-                };
-
-                // ── MCUB / rare-event path (inline, no external dependency) ──────
-                const calcSystemProb = (probs) => {
-                    if (method === 'rare') return Math.min(1.0, probs.reduce((s, p) => s + p, 0));
-                    return 1 - probs.reduce((prod, p) => prod * (1 - p), 1.0); // MCUB
-                };
-
-                // Helper: get event probability, handling NOT- complement prefix.
-                // Cut sets that contain complement events (from NOT keywords in system
-                // logic) carry NOT-X labels; a direct lookup misses them and silently
-                // returns 0, zeroing out the product for those cut sets.
-                const getEventProb = (ev) => {
-                    const isComplement = ev.startsWith('NOT-');
-                    const base = isComplement ? ev.slice(4) : ev;
-                    const data = combinedEventData[base] || combinedEventData[ev];
-                    if (!data || data.probability === null || data.probability === undefined) return 0;
-                    return isComplement ? (1.0 - data.probability) : data.probability;
-                };
-
-                // Precompute per-cut-set products
-                const csProbs = validCutSets.map(cs =>
-                    cs.events.reduce((prod, ev) => prod * getEventProb(ev), 1.0)
-                );
-
-                // Map: event name → indices of cut sets containing it
-                const eventToCutSets = new Map();
-                validCutSets.forEach((cs, i) => {
-                    cs.events.forEach(ev => {
-                        if (!eventToCutSets.has(ev)) eventToCutSets.set(ev, []);
-                        eventToCutSets.get(ev).push(i);
-                    });
-                });
+                // Reuse the same engine as the on-screen Failure Analysis modal and
+                // the KNOW_RPT export, so RIR/RRR/PC/SWIM match exactly across all
+                // three surfaces — including for the BDD method, which needs an
+                // actual BDD re-evaluation per event rather than the MCUB/rare
+                // patched-recombination formula this function used to hand-roll.
+                const computeImportance = buildImportanceEngine(validCutSets, combinedEventData, mcubValue, settings);
 
                 const allEvents = new Set();
                 validCutSets.forEach(cs => cs.events.forEach(e => allEvents.add(e)));
 
-                const measures = Array.from(allEvents).map(eventName => {
-                    const ed = combinedEventData[eventName];
-                    if (!ed || ed.probability === null || ed.probability === undefined || ed.isLinked) return null;
-
-                    const origProb = ed.probability;
-                    const affectedIndices = eventToCutSets.get(eventName) || [];
-                    const ratio = origProb > 0 ? 1.0 / origProb : null;
-
-                    const patchedProbs = (overrideVal) => csProbs.map((p, i) => {
-                        if (!affectedIndices.includes(i)) return p;
-                        return origProb > 0 ? p * (overrideVal / origProb) : overrideVal;
-                    });
-
-                    const prob1 = calcSystemProb(patchedProbs(1.0));
-                    const prob0 = calcSystemProb(patchedProbs(0.0));
-                    return calcMeasures(origProb, prob1, prob0, mcubValue, ed, eventName);
-                }).filter(m => m !== null);
+                const measures = Array.from(allEvents)
+                    .map(eventName => {
+                        const m = computeImportance(eventName);
+                        return m ? { ...m, event: eventName } : null;
+                    })
+                    .filter(m => m !== null);
 
                 // Sort by SWIM descending
                 measures.sort((a, b) => (b.swim || 0) - (a.swim || 0));
@@ -5239,11 +5196,7 @@
                     if (prob === null || prob === undefined || prob === '') return '';
                     const probVal = parseFloat(prob);
                     if (isNaN(probVal)) return String(prob);
-                    const mode = settings.showProbability || '1';
-                    if (mode === '1') return probVal.toExponential(2);
-                    if (mode === '2') return (probVal * 100).toFixed(4) + '%';
-                    if (mode === '3') return probVal.toFixed(6);
-                    return probVal.toExponential(2);
+                    return formatProbability(probVal, settings.showProbability);
                 };
                 
                 sscsInSystem.forEach(ssc => {
@@ -5625,7 +5578,7 @@
                     displayCutSets.forEach((cs, idx) => {
                         const events = cs.events.join(' \u00D7 ');
                         const desc = (cs.description || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
-                        const prob = cs.probability !== null ? cs.probability.toExponential(2) : 'N/A';
+                        const prob = cs.probability !== null ? formatProbability(cs.probability, settings.showProbability) : 'N/A';
                         section += `| ${idx + 1} | ${events} | ${desc} | ${prob} |\n`;
                     });
                     
@@ -5633,7 +5586,7 @@
                     
                     // Show MCUB if available
                     if (mcubValue !== null) {
-                        section += `**Minimal Cut Set Upper Bound (MCUB):** ${mcubValue.toExponential(2)}\n\n`;
+                        section += `**Minimal Cut Set Upper Bound (MCUB):** ${formatProbability(mcubValue, settings.showProbability)}\n\n`;
                     }
                     
                 } catch (error) {
@@ -5656,11 +5609,7 @@
                     if (prob === null || prob === undefined || prob === '') return '';
                     const probVal = parseFloat(prob);
                     if (isNaN(probVal)) return String(prob);
-                    const mode = settings.showProbability || '1';
-                    if (mode === '1') return probVal.toExponential(2);
-                    if (mode === '2') return (probVal * 100).toFixed(4) + '%';
-                    if (mode === '3') return probVal.toFixed(6);
-                    return probVal.toExponential(2);
+                    return formatProbability(probVal, settings.showProbability);
                 };
                 
                 section += '| CCF Event Name | Description | Failure Probability | Beta Factor | Affected Components |\n';
@@ -5715,11 +5664,7 @@
                 // Helper to format probability according to settings
                 const formatProb = (prob) => {
                     if (prob === null || prob === undefined || isNaN(prob)) return '-';
-                    const mode = settings?.showProbability || '1';
-                    if (mode === '1') return prob.toExponential(2);
-                    if (mode === '2') return (prob * 100).toFixed(4) + '%';
-                    if (mode === '3') return prob.toFixed(6);
-                    return prob.toExponential(2);
+                    return formatProbability(prob, settings?.showProbability);
                 };
                 
                 try {
@@ -6015,11 +5960,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     if (prob === null || prob === undefined || prob === '') return '';
                     const probVal = parseFloat(prob);
                     if (isNaN(probVal)) return escapeHtml(String(prob));
-                    const mode = settings.showProbability || '1';
-                    if (mode === '1') return probVal.toExponential(2);
-                    if (mode === '2') return (probVal * 100).toFixed(4) + '%';
-                    if (mode === '3') return probVal.toFixed(6);
-                    return probVal.toExponential(2);
+                    return formatProbability(probVal, settings.showProbability);
                 };
                 
                 sscsInSystem.forEach(ssc => {
@@ -6241,17 +6182,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                                 else if (fm.probabilityType === 'qualitative') probStr = (fm.qualitativeLevel || 'unknown').toUpperCase();
                                 else if (fm.data && fm.data.mean) {
                                     // Format probability according to settings
-                                    const digits = parseInt(settings?.showProbability || '1');
                                     const meanVal = parseFloat(fm.data.mean);
-                                    if (digits === 1 || settings?.showProbability === '1') {
-                                        probStr = 'P=' + (isNaN(meanVal) ? fm.data.mean : meanVal.toExponential(2));
-                                    } else if (settings?.showProbability === '2') {
-                                        probStr = 'P=' + (isNaN(meanVal) ? fm.data.mean : (meanVal * 100).toFixed(4) + '%');
-                                    } else if (settings?.showProbability === '3') {
-                                        probStr = 'P=' + (isNaN(meanVal) ? fm.data.mean : meanVal.toFixed(6));
-                                    } else {
-                                        probStr = 'P=' + (isNaN(meanVal) ? fm.data.mean : meanVal.toExponential(2));
-                                    }
+                                    probStr = 'P=' + (isNaN(meanVal) ? fm.data.mean : formatProbability(meanVal, settings?.showProbability));
                                 }
                                 if (probStr) {
                                     ctx.font = '9px monospace';
@@ -6461,7 +6393,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 try {
                     // Show MCUB first
                     if (mcubValue !== null) {
-                        html += `<p class="mcub-title">Minimal Cut Set Upper Bound (MCUB): ${mcubValue.toExponential(2)}</p>\n`;
+                        html += `<p class="mcub-title">Minimal Cut Set Upper Bound (MCUB): ${formatProbability(mcubValue, settings.showProbability)}</p>\n`;
                     }
                     
                     const displayCutSets = cutSets.slice(0, limitCutSets);
@@ -6480,7 +6412,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     displayCutSets.forEach((cs, idx) => {
                         const events = cs.events.join(' \u00D7 ');
                         const desc = cs.description || '';
-                        const prob = cs.probability !== null ? cs.probability.toExponential(2) : 'N/A';
+                        const prob = cs.probability !== null ? formatProbability(cs.probability, settings.showProbability) : 'N/A';
                         html += `
 <tr>
 <td>${idx + 1}</td>
@@ -6514,13 +6446,8 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     if (prob === null || prob === undefined || prob === '') return '';
                     const probVal = parseFloat(prob);
                     if (isNaN(probVal)) return escapeHtml(String(prob));
-                    const mode = settings.showProbability || '1';
-                    if (mode === '1') return probVal.toExponential(2);
-                    if (mode === '2') return (probVal * 100).toFixed(4) + '%';
-                    if (mode === '3') return probVal.toFixed(6);
-                    return probVal.toExponential(2);
+                    return formatProbability(probVal, settings.showProbability);
                 };
-                
                 // Sort CCF events alphabetically by name
                 const sortedCCFEntries = Object.entries(ccfEvents).sort((a, b) => a[0].localeCompare(b[0]));
                 
@@ -6578,11 +6505,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                 // Helper to format probability according to settings
                 const formatProb = (prob) => {
                     if (prob === null || prob === undefined || isNaN(prob)) return '-';
-                    const mode = settings?.showProbability || '1';
-                    if (mode === '1') return prob.toExponential(2);
-                    if (mode === '2') return (prob * 100).toFixed(4) + '%';
-                    if (mode === '3') return prob.toFixed(6);
-                    return prob.toExponential(2);
+                    return formatProbability(prob, settings?.showProbability);
                 };
                 
                 try {
@@ -17362,7 +17285,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             // Compute a lightweight fingerprint of the inputs that drive "How the
             // System Fails". When the fingerprint matches the stored cache, we can
             // skip the progress animation and recomputation entirely.
-            const buildAnalysisFingerprint = React.useCallback((logic, sscs) => {
+            const buildAnalysisFingerprint = React.useCallback((logic, sscs, settingsObj) => {
                 // Stringify just the fields that affect analysis output
                 const logicKey = logic.map(t => t.type + ':' + t.value).join('|');
                 const sscsKey = sscs.map(s => {
@@ -17373,14 +17296,30 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
                     ).join(';');
                     return s.id + '~' + s.name + '~' + fms;
                 }).join('||');
-                return logicKey + '####' + sscsKey;
+                // CCF settings change the cut sets/results (beta-factor expansion) even
+                // though they don't touch systemLogic or sscsInSystem, so they must be
+                // part of the fingerprint or a stale cache hit will show CCF results
+                // after the model has been switched off (or vice versa).
+                const ccfKey = [
+                    settingsObj?.ccfModel,
+                    settingsObj?.ccfBetaFactor,
+                    settingsObj?.ccfBetaDistribution,
+                    settingsObj?.ccfBetaEF,
+                    settingsObj?.ccfBetaDistAlpha,
+                    settingsObj?.ccfBetaDistBeta,
+                    settingsObj?.ccfBetaDistLow,
+                    settingsObj?.ccfBetaDistHigh,
+                ].join(',');
+                return logicKey + '####' + sscsKey + '####' + ccfKey;
             }, []);
 
-            // Invalidate the cache whenever systemLogic or sscsInSystem changes
+            // Invalidate the cache whenever systemLogic, sscsInSystem, or settings changes
+            // (settings matters because CCF model/beta-factor parameters live there and
+            // directly affect the cut sets shown in "How the System Fails").
             React.useEffect(() => {
                 failureAnalysisCacheRef.current = null;
                 setCachedAnalysisResults(null);
-            }, [systemLogic, sscsInSystem]);
+            }, [systemLogic, sscsInSystem, settings]);
 
             // Run the 4-stage progress sequence then open the failure analysis modal
             const runFailureAnalysisWithProgress = async (onReadyToOpen) => {
@@ -17448,7 +17387,7 @@ hr { border: none; border-top: 1px solid #000; margin: 12pt 0; }
             // Handle opening failure analysis - check cache first, then linked systems
             const handleOpenFailureAnalysis = async () => {
                 // ── Cache check ──────────────────────────────────────────────────
-                const fingerprint = buildAnalysisFingerprint(systemLogic, sscsInSystem);
+                const fingerprint = buildAnalysisFingerprint(systemLogic, sscsInSystem, settings);
                 const cached = failureAnalysisCacheRef.current;
                 if (cached && cached.fingerprint === fingerprint) {
                     // Cache hit — show a brief "Preparing Results" overlay first so the
@@ -26434,6 +26373,8 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             calculateCutSetProbability={calculateCutSetProbability}
                             calculateMCUB={calculateMCUB}
                             calculateBDD={calculateBDD}
+                            buildImportanceEngine={buildImportanceEngine}
+                            formatProbability={formatProbability}
                             settings={settings}
                             pidDiagram={pidDiagram}
                             applyCCFExpansion={applyCCFExpansion}
@@ -26455,6 +26396,8 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             calculateCutSetProbability={calculateCutSetProbability}
                             calculateMCUB={calculateMCUB}
                             calculateBDD={calculateBDD}
+                            buildImportanceEngine={buildImportanceEngine}
+                            formatProbability={formatProbability}
                             settings={settings}
                             pidDiagram={pidDiagram}
                             applyCCFExpansion={applyCCFExpansion}
@@ -26522,7 +26465,7 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                                 setShowPreparingResults(false);
                                 // Populate cache if we just ran a fresh analysis
                                 if (results && !cachedAnalysisResults) {
-                                    const fingerprint = buildAnalysisFingerprint(systemLogic, sscsInSystem);
+                                    const fingerprint = buildAnalysisFingerprint(systemLogic, sscsInSystem, settings);
                                     failureAnalysisCacheRef.current = { fingerprint, ...results };
                                 }
                             }}
