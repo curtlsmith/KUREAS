@@ -25,6 +25,7 @@ The suite includes full [SAPHIRE](https://saphire.inl.gov) file format interoper
 - [KUREAS-ETL — Event Tree Logic](#kureas-etl--event-tree-logic)
 - [KUREAS-SYS — System Evaluation](#kureas-sys--system-evaluation)
 - [KUREAS-SEQ — Process Operational Logic (coming soon)](#kureas-seq--process-operational-logic)
+- [KUREAS-BAYES — Bayesian Evaluation Module](#kureas-bayes)
 - [KUREAS-REPORT — Report Generator](#kureas-report--report-generator)
 - [KUREAS-KNOW — Knowledge Base Editor (coming soon)](#kureas-know--knowledge-base-editor)
 - [Data Flow](#data-flow)
@@ -53,6 +54,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.3 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.6 | System modeling, P&ID, FMEA, failure analysis, CCF, Reliability Designer™, importance measures, and comparison function |
+| **KUREAS-BAYES** | `KUREAS-BAYES.html` | v1.0 | Manage knowledge of component operational behavior and experience to support Bayesian analysis of how components fail. |
 | **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | vX.0 | Process Operational Logic (POL) diagrams and event tree generation |
 | **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
 | **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | vX.0 | General-purpose `.KNOW` file viewer and editor |
@@ -181,6 +183,25 @@ Define accident sequences using Process Operational Logic (POL) diagrams — flo
 
 ---
 
+## KUREAS-BAYES — Bayesian Evaluation Module
+
+Management of component knowledge for operational behavior and experience to support Bayesian analysis of how components fail.
+
+### Features
+
+- **Create or import** — start a blank project from scratch or import generic failure information files (.relDB, .xlsx)
+- **Full editing** — add, delete, rename, and edit tracked items for Bayesian analysis
+- **Change tracking** — ability to verify and lock tracked items with an internal change tracking database
+- **Export** — SAPHIRE MAR-D (.BEI), KUREAS native (.relDB), and OpenPSA Model Exchange Format (.xml)
+- **Report generation** — Word (.doc) and Markdown with selectable report elements and in-browser preview
+- **Settings** — GUI font size, font family, project settings
+- **Failure mode models:**
+  - **Demand (Binomial)** — demand failure probability
+  - **Fails While Operating (Poisson)** — failure rate
+  - **Fails in Standby** — failure rate
+
+---
+
 ## KUREAS-REPORT — Report Generator
 
 Central integration hub that assembles data from all other KUREAS modules into cohesive safety analysis reports.
@@ -217,6 +238,12 @@ General-purpose viewer and editor for the `.KNOW` file format used across all KU
 ## Data Flow
 
 ```
+                             ┌────────────────┐
+                             │  KUREAS-BAYES  │
+                             │  (components)  │
+                             └──────┬─────────┘
+                                    │ .KNOW_BAYES
+                                    ▼
   ┌──────────────┐           ┌──────────────┐
   │  KUREAS-HA   │           │  KUREAS-SYS  │
   │  (Hazards)   │           │  (Systems)   │
@@ -257,6 +284,7 @@ Modules are not strictly sequential — you can start with any module, work in p
 | `SEQ_*.KNOW` | KUREAS-SEQ | POL diagrams, boundary conditions, operating state data |
 | `*.KNOW_REPORT` | KUREAS-REPORT | Report structure, assembled elements, references, source data |
 | `*.ELEMENTS` | KUREAS-REPORT | Reusable insertable report elements |
+| `*.KNOW_BAYES` | KUREAS-BAYES | Project file tracking component failure modes |
 | `*.relDB` | KUREAS-SYS | CSV-format reliability database (system, SSC type, component type, failure modes, distributions) |
 | `*.fmeaDB` | KUREAS-SYS | JSON-format FMEA database (full round-trip with severity, detection, mitigation) |
 
