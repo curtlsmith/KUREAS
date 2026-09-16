@@ -56,6 +56,9 @@
 <!-- docx: native Word (.docx) report generation -->
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 
+<!-- JSZip: reads/merges user-selected Word templates (.docx/.dotx) for the report -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
 <!-- SheetJS: native Excel (.xlsx) export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -4067,30 +4070,107 @@ function stripHtml(html) {
    ============================================================================ */
 // Builds the canonical, format-independent content for every possible report section.
 // Each report renderer (docx / markdown / preview) consumes this same data.
-function buildReportSectionsData(project, fsceors, hierarchy, plotRange) {
-    const summaryHeaders = ['Hierarchy', 'Failure Mode', 'Posterior Mean', '5th', '95th', 'Locked', 'Verified'];
-    const summaryRows = fsceors.map(f => {
+// Failure Mode label without the model suffix, e.g. 'Fails while Operating (Poisson)' -> 'Fails while Operating'
+function failureModeReportLabel(fm) {
+    return getFailureModeInfo(fm).label.replace(/\s*\((binomial|poisson)\)\s*$/i, '');
+}
+// Phrase used in the detail paragraph: "It has a failure mode given as <phrase> ..."
+const FAILURE_MODE_REPORT_PHRASES = { '2': 'fails on demand', '3': 'fails while operating', '4': 'fails while in standby' };
+
+// Citation key for a Source of Information in the report: its ID (docId) if given, otherwise its name.
+function sourceReportKey(src) {
+    return ((src && src.docId) || '').trim() || ((src && src.name) || '').trim() || '(unnamed source)';
+}
+
+function posteriorDistributionLabel(posterior) {
+    if (!posterior) return null;
+    return posterior.kind === 'beta'
+        ? `Beta(${formatValue(posterior.alpha)}, ${formatValue(posterior.beta)})`
+        : `Gamma(${formatValue(posterior.shape)}, ${isFinite(posterior.scale) ? formatValue(posterior.scale) : '\u221E'})`;
+}
+
+// Descriptive paragraph for one event occurrence rate in the Event Occurrence Rate Detail section.
+// `cite(sourceId)` returns the "[KEY]" citation text and records the source for the References section.
+function buildItemDetailParagraph(f, hierarchy, posterior, cite) {
+    const fmInfo = getFailureModeInfo(f.failureMode);
+    const out = [];
+    out.push(`This item is represented by the hierarchy: ${hierarchyPathLabel(hierarchy, f.hierarchy || {})}.`);
+    out.push(`It has a failure mode given as ${FAILURE_MODE_REPORT_PHRASES[String(f.failureMode)] || failureModeReportLabel(f.failureMode).toLowerCase()} and is represented by a ${fmInfo.model === 'binomial' ? 'Binomial' : 'Poisson'} occurrence model.`);
+
+    const prior = f.prior || {};
+    const srcId = prior.paperTrail?.sourceId;
+    const hasSource = srcId && srcId !== SELF_SPECIFIED_SOURCE;
+    if (prior.sourceType === 'noninformative') {
+        out.push('The prior distribution is a non-informative (Jeffreys) prior.');
+    } else if (prior.sourceType === 'cni') {
+        out.push(hasSource ? `The prior distribution is a constrained non-informative (CNI) prior with its mean taken from the source ${cite(srcId)}.`
+                           : 'The prior distribution is a constrained non-informative (CNI) prior with a mean specified by the user.');
+    } else if (hasSource) {
+        out.push(`The prior distribution comes from the source ${cite(srcId)}.`);
+    } else if (srcId === SELF_SPECIFIED_SOURCE || prior.sourceType === 'userSpecified') {
+        out.push('The prior distribution was specified directly by the user.');
+    } else {
+        out.push('The prior distribution has no source identified.');
+    }
+
+    const data = f.operationalData || [];
+    if (!data.length) {
+        out.push('Currently, there are no operational data sources provided for this item.');
+    } else {
+        const num = v => { const n = parseFloat(v); return isNaN(n) ? '0' : n.toLocaleString(undefined, { maximumSignificantDigits: 6 }); };
+        const parts = data.map(e => {
+            const failures = num(e.failures);
+            const amount = e.opDataType === 'demandsAndFailures' ? `${num(e.demands)} demands` : `${num(e.opTime)} ${e.timeUnits || 'hours'}`;
+            const from = e.sourceId && e.sourceId !== SELF_SPECIFIED_SOURCE ? ` from the source ${cite(e.sourceId)}` : ' with no source identified';
+            return `${failures} failure${failures === '1' ? '' : 's'} in ${amount}${from}`;
+        });
+        out.push(`The operational data used to update the prior consist of ${parts.join('; ')}.`);
+    }
+
+    out.push(posterior
+        ? `The posterior distribution is calculated as a ${posteriorDistributionLabel(posterior)} which has a mean=${formatValue(posterior.mean)}, a 5th=${formatValue(posterior.p05)}, and a 95th=${formatValue(posterior.p95)}.`
+        : 'A posterior distribution could not be calculated for this item.');
+
+    const verified = f.verification?.verified
+        ? `was verified${f.verification.verifiedBy ? ' by ' + f.verification.verifiedBy : ''}${f.verification.verifiedDate ? ' on ' + new Date(f.verification.verifiedDate).toLocaleDateString() : ''}`
+        : 'has not been verified';
+    out.push(`This item ${verified} and is ${f.locked ? 'locked' : 'not locked'}.`);
+    return out.join(' ');
+}
+
+function buildReportSectionsData(project, fsceors, hierarchy, plotRange, sources) {
+    const sourceById = new Map((sources || []).map(src => [src.id, src]));
+    const cited = new Map(); // key -> source
+    const cite = (id) => {
+        const src = sourceById.get(id);
+        if (!src) return '[unknown source]';
+        const key = sourceReportKey(src);
+        if (!cited.has(key)) cited.set(key, src);
+        return `[${key}]`;
+    };
+
+    const rowsInfo = fsceors.map(f => {
         const fmInfo = getFailureModeInfo(f.failureMode);
-        const posterior = computePosterior(f.prior, fmInfo.model, f.operationalData, f.units);
-        return [hierarchyPathLabel(hierarchy, f.hierarchy || {}), fmInfo.label,
-                posterior ? formatValue(posterior.mean) : '-', posterior ? formatValue(posterior.p05) : '-',
-                posterior ? formatValue(posterior.p95) : '-', f.locked ? 'Yes' : 'No', f.verification?.verified ? 'Yes' : 'No'];
+        return { f, fmInfo, posterior: computePosterior(f.prior, fmInfo.model, f.operationalData, f.units),
+                 hierarchyLabel: hierarchyPathLabel(hierarchy, f.hierarchy || {}), fmLabel: failureModeReportLabel(f.failureMode) };
     });
 
-    const items = fsceors.map(f => {
-        const fmInfo = getFailureModeInfo(f.failureMode);
-        const posterior = computePosterior(f.prior, fmInfo.model, f.operationalData, f.units);
-        const distStr = posterior ? (posterior.kind === 'beta' ? `Beta(${formatValue(posterior.alpha)}, ${formatValue(posterior.beta)})` : `Gamma(${formatValue(posterior.shape)}, ${isFinite(posterior.scale) ? formatValue(posterior.scale) : '\u221E'})`) : null;
-        return {
-            heading: hierarchyPathLabel(hierarchy, f.hierarchy || {}),
-            description: f.description || '(none)',
-            failureModeLabel: fmInfo.label + ' (' + fmInfo.model + ')',
-            priorSourceLabel: (PRIOR_SOURCE_TYPES.find(t => t.value === f.prior?.sourceType) || {}).label || '',
-            posteriorLine: posterior ? `${distStr} \u2014 mean=${formatValue(posterior.mean)}, 5th=${formatValue(posterior.p05)}, 95th=${formatValue(posterior.p95)}` : 'Not available',
-            notes: f.notes ? stripHtml(f.notes) : '',
-            verificationLine: f.verification?.verified ? `Verified by ${f.verification.verifiedBy} on ${new Date(f.verification.verifiedDate).toLocaleDateString()}` : 'Not verified'
-        };
-    });
+    const summaryHeaders = ['Hierarchy', 'Name', 'Failure Mode', 'Mean Value', 'Posterior Distribution'];
+    const summaryRows = rowsInfo.map(({ f, posterior, hierarchyLabel, fmLabel }) => [
+        hierarchyLabel, f.eventName || '-', fmLabel,
+        posterior ? formatValue(posterior.mean) : '-', posteriorDistributionLabel(posterior) || '-'
+    ]);
+
+    const assuranceHeaders = ['Hierarchy', 'Name', 'Locked', 'Verified'];
+    const assuranceRows = rowsInfo.map(({ f, hierarchyLabel }) => [
+        hierarchyLabel, f.eventName || '-', f.locked ? 'Yes' : 'No', f.verification?.verified ? 'Yes' : 'No'
+    ]);
+
+    const items = rowsInfo.map(({ f, posterior, hierarchyLabel }) => ({
+        heading: (f.description || '').trim() || (f.eventName || '').trim() || hierarchyLabel,
+        paragraph: buildItemDetailParagraph(f, hierarchy, posterior, cite),
+        notes: f.notes ? stripHtml(f.notes) : ''
+    }));
 
     const integrityHeaders = ['Hierarchy', 'Locked', 'Integrity', 'Verified'];
     const integrityRows = fsceors.map(f => {
@@ -4099,16 +4179,61 @@ function buildReportSectionsData(project, fsceors, hierarchy, plotRange) {
                 integrity.ok ? 'OK' : 'DISCREPANCY', f.verification?.verified ? 'Yes' : 'No'];
     });
 
+    // References: every source cited by the detail paragraphs (built above), sorted by key.
+    const references = Array.from(cited.entries()).sort((x, y) => x[0].localeCompare(y[0], undefined, { numeric: true, sensitivity: 'base' })).map(([key, src]) => {
+        const typeLabel = SOURCE_TYPES.find(t => t.value === src.type)?.label || src.type || '';
+        const parts = [];
+        if ((src.name || '').trim() && src.name.trim() !== key) parts.push(src.name.trim().replace(/\.$/, '') + '.');
+        if ((src.description || '').trim()) parts.push(src.description.trim().replace(/\.$/, '') + '.');
+        if (typeLabel) parts.push(`(${typeLabel})`);
+        return { key, text: parts.join(' ') };
+    });
+
     return {
         description: { key: 'description', label: 'Project Description', kind: 'richtext', html: project.description },
         notes: { key: 'notes', label: 'Project Notes', kind: 'richtext', html: project.notes },
         requirements: { key: 'requirements', label: 'Project Requirements', kind: 'richtext', html: project.requirements },
-        summaryTable: { key: 'summaryTable', label: 'Event Occurrence Rate Summary', kind: 'table', headers: summaryHeaders, rows: summaryRows },
+        summaryTable: { key: 'summaryTable', label: 'Event Occurrence Rate Summary', kind: 'table', tableTitle: 'Summary of the posterior event occurrence rates', headers: summaryHeaders, rows: summaryRows, colWidths: [38, 17, 14, 11, 20] },
         visualization: { key: 'visualization', label: 'Occurrence Rate Visualization', kind: 'chart', images: renderVisualizeChartImages(buildVisualizeRows(fsceors, hierarchy), 25, plotRange),
-                         caption: 'The horizontal line for each event occurrence rate spans its posterior 5th-95th percentile range; the marker is the mean (\u25C6 demand-based, \u25CF time-based).' },
+                         figureTitle: 'Posterior event occurrence rates',
+                         caption: 'The line for each event occurrence rate spans its posterior 5th-95th percentile range (mean \u25C6 demand-based, mean \u25CF time-based).' },
         itemDetails: { key: 'itemDetails', label: 'Event Occurrence Rate Detail', kind: 'itemBlocks', items },
-        dataIntegrity: { key: 'dataIntegrity', label: 'Data Integrity & Verification', kind: 'table', headers: integrityHeaders, rows: integrityRows }
+        dataAssurance: { key: 'dataAssurance', label: 'Data Assurance', kind: 'table', tableTitle: 'Lock and verification status of the event occurrence rates', headers: assuranceHeaders, rows: assuranceRows, colWidths: [52, 24, 11, 13] },
+        dataIntegrity: { key: 'dataIntegrity', label: 'Data Integrity & Verification', kind: 'table', tableTitle: 'Data integrity and verification status of the event occurrence rates', headers: integrityHeaders, rows: integrityRows },
+        references: { key: 'references', label: 'References', kind: 'references', entries: references }
     };
+}
+
+// Intro sentence for the visualization section as parts: strings, or { ref: 'table'|'figure', num } for
+// cross-references (Word renders these as REF fields to the caption bookmarks; Preview/Markdown as plain text).
+function visualizationIntroParts(imageCount, summaryTableNum, firstFigureNum) {
+    if (!imageCount) return [];
+    const parts = summaryTableNum ? ['All of the occurrence rates listed in ', { ref: 'table', num: summaryTableNum }, ' are shown graphically in ']
+                                  : ['All of the event occurrence rates are shown graphically in '];
+    parts.push({ ref: 'figure', num: firstFigureNum });
+    if (imageCount > 1) parts.push(' to ', { ref: 'figure', num: firstFigureNum + imageCount - 1 });
+    parts.push('.');
+    return parts;
+}
+function visualizationIntroText(parts) {
+    return parts.map(p => typeof p === 'string' ? p : (p.ref === 'table' ? 'Table ' : 'Figure ') + p.num).join('');
+}
+const REPORT_TABLE_BOOKMARK = (num) => '_RefKbTable' + num;
+const REPORT_FIGURE_BOOKMARK = (num) => '_RefKbFigure' + num;
+
+// Caption text for figure `num` (1-based) of a chart section with `count` images.
+function reportFigureCaption(data, i, num) {
+    const part = data.images.length > 1 ? ` (part ${i + 1} of ${data.images.length})` : '';
+    return { label: `Figure ${num}`, text: `. ${data.figureTitle}${part}. ${data.caption}` };
+}
+
+// Table numbers (1-based) for the enabled table sections, in report order -- shared by Preview, Markdown, and Word
+// so "Table N" is identical in every output (Word also carries it in a SEQ Table field).
+function reportTableNumbers(sections, sectionsData) {
+    const nums = {};
+    let n = 0;
+    sections.filter(s => s.enabled).forEach(s => { if (sectionsData[s.key] && sectionsData[s.key].kind === 'table') nums[s.key] = ++n; });
+    return nums;
 }
 
 function defaultReportSections() {
@@ -4119,13 +4244,16 @@ function defaultReportSections() {
         { key: 'summaryTable', label: 'Event Occurrence Rate Summary', enabled: true },
         { key: 'visualization', label: 'Occurrence Rate Visualization', enabled: true },
         { key: 'itemDetails', label: 'Event Occurrence Rate Detail', enabled: true },
-        { key: 'dataIntegrity', label: 'Data Integrity & Verification', enabled: false }
+        { key: 'dataAssurance', label: 'Data Assurance', enabled: true },
+        { key: 'dataIntegrity', label: 'Data Integrity & Verification', enabled: false },
+        { key: 'references', label: 'References', enabled: true }
     ];
 }
 
 function buildReportMarkdown(project, sections, sectionsData) {
     let md = `# ${project.name || 'Bayesian Evaluation Report'}\n\n`;
     md += `*KUREAS-BAYES v${APP_VERSION} \u2014 Generated ${new Date().toLocaleString()}*\n\n`;
+    const tableNums = reportTableNumbers(sections, sectionsData);
     sections.filter(s => s.enabled).forEach(s => {
         const data = sectionsData[s.key];
         if (!data) return;
@@ -4133,33 +4261,34 @@ function buildReportMarkdown(project, sections, sectionsData) {
         if (data.kind === 'richtext') {
             md += (data.html ? stripHtml(data.html) : '(none)') + '\n\n';
         } else if (data.kind === 'table') {
+            md += `*Table ${tableNums[s.key]}. ${data.tableTitle}.*\n\n`;
             md += '| ' + data.headers.join(' | ') + ' |\n';
             md += '|' + data.headers.map(() => ' --- ').join('|') + '|\n';
             data.rows.forEach(r => { md += '| ' + r.join(' | ') + ' |\n'; });
             md += '\n';
         } else if (data.kind === 'chart') {
             if (!data.images.length) { md += '(no event occurrence rates with a computable posterior)\n\n'; return; }
-            md += data.caption + '\n\n';
+            md += visualizationIntroText(visualizationIntroParts(data.images.length, tableNums.summaryTable, 1)) + '\n\n';
             data.images.forEach((img, i) => {
-                const part = data.images.length > 1 ? ` (part ${i + 1} of ${data.images.length})` : '';
-                md += `![${s.label}${part}](${img.dataUrl})\n\n`;
+                const cap = reportFigureCaption(data, i, i + 1);
+                md += `![${cap.label}](${img.dataUrl})\n\n*${cap.label}${cap.text}*\n\n`;
             });
         } else if (data.kind === 'itemBlocks') {
             data.items.forEach(item => {
                 md += `### ${item.heading}\n\n`;
-                md += `**Description:** ${item.description}\n\n`;
-                md += `**Failure Mode:** ${item.failureModeLabel}\n\n`;
-                md += `**Prior Source:** ${item.priorSourceLabel}\n\n`;
-                md += `**Posterior:** ${item.posteriorLine}\n\n`;
+                md += `${item.paragraph}\n\n`;
                 if (item.notes) md += `**Notes:** ${item.notes}\n\n`;
-                md += `**Verification:** ${item.verificationLine}\n\n`;
             });
+        } else if (data.kind === 'references') {
+            if (!data.entries.length) { md += '(no sources cited)\n\n'; return; }
+            data.entries.forEach(r => { md += `**[${r.key}]** ${r.text}\n\n`; });
         }
     });
     return md;
 }
 
 function ReportPreview({ project, sections, sectionsData }) {
+    const tableNums = reportTableNumbers(sections, sectionsData);
     return (
         <div className="prose-sm">
             <h1 className="text-2xl font-bold mb-1">{project.name || 'Bayesian Evaluation Report'}</h1>
@@ -4174,36 +4303,44 @@ function ReportPreview({ project, sections, sectionsData }) {
                             data.html ? <div className="text-sm rt-display" dangerouslySetInnerHTML={{ __html: data.html }} /> : <p className="text-sm text-gray-400 italic">(none)</p>
                         )}
                         {data.kind === 'table' && (
+                            <p className="text-xs text-gray-600 italic mb-1"><span className="font-semibold">Table {tableNums[s.key]}</span>. {data.tableTitle}.</p>
+                        )}
+                        {data.kind === 'table' && (
                             <table className="w-full text-xs border">
-                                <thead className="bg-gray-100"><tr>{data.headers.map((h, i) => <th key={i} className="p-1.5 text-left border-b">{h}</th>)}</tr></thead>
+                                <thead className="bg-gray-100"><tr>{data.headers.map((h, i) => <th key={i} className="p-1.5 text-left border-b" style={data.colWidths ? { width: data.colWidths[i] + '%' } : undefined}>{h}</th>)}</tr></thead>
                                 <tbody>{data.rows.map((r, ri) => <tr key={ri} className="border-b">{r.map((c, ci) => <td key={ci} className="p-1.5">{c}</td>)}</tr>)}</tbody>
                             </table>
                         )}
                         {data.kind === 'chart' && (data.images.length === 0
                             ? <p className="text-sm text-gray-400 italic">(no event occurrence rates with a computable posterior)</p>
                             : <div>
-                                <p className="text-xs text-gray-500 mb-2">{data.caption}</p>
-                                {data.images.map((img, ii) => (
-                                    <div key={ii} className="mb-3">
-                                        <img src={img.dataUrl} alt={s.label} style={{ width: '100%', height: 'auto' }} className="border" />
-                                        {data.images.length > 1 && <p className="text-xs text-gray-500 text-center mt-1">Part {ii + 1} of {data.images.length}</p>}
-                                    </div>
-                                ))}
+                                <p className="text-sm mb-2">{visualizationIntroText(visualizationIntroParts(data.images.length, tableNums.summaryTable, 1))}</p>
+                                {data.images.map((img, ii) => {
+                                    const cap = reportFigureCaption(data, ii, ii + 1);
+                                    return (
+                                        <div key={ii} className="mb-3">
+                                            <img src={img.dataUrl} alt={cap.label} style={{ width: '100%', height: 'auto' }} className="border" />
+                                            <p className="text-xs text-gray-600 italic mt-1"><span className="font-semibold">{cap.label}</span>{cap.text}</p>
+                                        </div>
+                                    );
+                                })}
                               </div>
                         )}
                         {data.kind === 'itemBlocks' && data.items.map((item, ii) => (
                             <div key={ii} className="mb-4">
                                 <h3 className="font-bold text-sm mt-3 mb-1">{item.heading}</h3>
-                                <div className="text-xs text-gray-700 space-y-0.5">
-                                    <div><span className="font-semibold">Description:</span> {item.description}</div>
-                                    <div><span className="font-semibold">Failure Mode:</span> {item.failureModeLabel}</div>
-                                    <div><span className="font-semibold">Prior Source:</span> {item.priorSourceLabel}</div>
-                                    <div><span className="font-semibold">Posterior:</span> {item.posteriorLine}</div>
-                                    {item.notes && <div><span className="font-semibold">Notes:</span> {item.notes}</div>}
-                                    <div><span className="font-semibold">Verification:</span> {item.verificationLine}</div>
+                                <div className="text-xs text-gray-700 space-y-1">
+                                    <p>{item.paragraph}</p>
+                                    {item.notes && <p><span className="font-semibold">Notes:</span> {item.notes}</p>}
                                 </div>
                             </div>
                         ))}
+                        {data.kind === 'references' && (data.entries.length === 0
+                            ? <p className="text-sm text-gray-400 italic">(no sources cited)</p>
+                            : <div className="text-xs text-gray-700 space-y-1">
+                                {data.entries.map((r, ri) => <p key={ri} style={{ paddingLeft: '1.5em', textIndent: '-1.5em' }}><span className="font-semibold">[{r.key}]</span> {r.text}</p>)}
+                              </div>
+                        )}
                     </div>
                 );
             })}
@@ -4211,15 +4348,406 @@ function ReportPreview({ project, sections, sectionsData }) {
     );
 }
 
-async function generateReportDocx(project, sections, sectionsData, filename) {
+/* ============================================================================
+   WORD TEMPLATE SUPPORT (JSZip + DOMParser post-processing of the docx.js output)
+   Two modes, selected in the Report dialog:
+   - 'format' (Import Format): the generated report takes the template's styles, theme,
+     heading numbering, and page size/margins. Nothing else from the template is copied.
+   - 'merge' (Merge into Template): the template package is kept as-is (cover page,
+     headers/footers, logos, TOC, boilerplate) and the generated report body is inserted at
+     the {{REPORT_BODY}} placeholder paragraph (or appended at the end if absent). Text
+     placeholders {{PROJECT_NAME}}, {{REPORT_DATE}}, {{GENERATED_BY}} are filled in the
+     body, headers, and footers.
+   ============================================================================ */
+const OOXML_NS = {
+    w: 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+    r: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+    rel: 'http://schemas.openxmlformats.org/package/2006/relationships',
+    ct: 'http://schemas.openxmlformats.org/package/2006/content-types',
+    wp: 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing',
+    xml: 'http://www.w3.org/XML/1998/namespace'
+};
+const OOXML_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const REPORT_TEMPLATE_TOKENS = ['{{REPORT_BODY}}', '{{PROJECT_NAME}}', '{{REPORT_DATE}}', '{{GENERATED_BY}}'];
+const TPL_IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp' };
+
+// Word-like definitions used only when the template does not define a style the report uses
+// (Word omits unused built-in styles from styles.xml). Theme fonts/colors follow the template's theme.
+const TPL_FALLBACK_STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:styles xmlns:w="' + OOXML_NS.w + '">' +
+    '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="10"/><w:qFormat/>' +
+    '<w:pPr><w:spacing w:after="80" w:line="240" w:lineRule="auto"/><w:contextualSpacing/></w:pPr>' +
+    '<w:rPr><w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/><w:kern w:val="28"/><w:sz w:val="56"/><w:szCs w:val="56"/></w:rPr></w:style>' +
+    '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/>' +
+    '<w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="360" w:after="80"/><w:outlineLvl w:val="0"/></w:pPr>' +
+    '<w:rPr><w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/><w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style>' +
+    '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:unhideWhenUsed/><w:qFormat/>' +
+    '<w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="160" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr>' +
+    '<w:rPr><w:rFonts w:asciiTheme="majorHAnsi" w:eastAsiaTheme="majorEastAsia" w:hAnsiTheme="majorHAnsi" w:cstheme="majorBidi"/><w:color w:val="2F5496" w:themeColor="accent1" w:themeShade="BF"/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr></w:style>' +
+    '</w:styles>';
+
+function tplParseXml(str) {
+    const doc = new DOMParser().parseFromString(str, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('The Word file contains an unreadable XML part.');
+    return doc;
+}
+function tplSerializeXml(doc) {
+    const s = new XMLSerializer().serializeToString(doc);
+    return /^<\?xml/.test(s) ? s : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + s;
+}
+function tplEls(node, local, ns) { return Array.from(node.getElementsByTagNameNS(ns || OOXML_NS.w, local)); }
+function tplIsW(node, local) { return !!node && node.nodeType === 1 && node.namespaceURI === OOXML_NS.w && node.localName === local; }
+function tplChildEls(node) { return Array.from(node.childNodes).filter(n => n.nodeType === 1); }
+function tplOwnParagraph(node) { let n = node.parentNode; while (n && !tplIsW(n, 'p')) n = n.parentNode; return n; }
+// w:t nodes belonging to this paragraph (excludes paragraphs nested in text boxes)
+function tplParagraphTexts(p) { return tplEls(p, 't').filter(t => tplOwnParagraph(t) === p); }
+function tplParagraphText(p) { return tplParagraphTexts(p).map(t => t.textContent).join(''); }
+async function tplReadXml(zip, path) { const f = zip.file(path); return f ? tplParseXml(await f.async('string')) : null; }
+function tplHeaderFooterPaths(zip) { return Object.keys(zip.files).filter(p => /^word\/(header|footer)\d*\.xml$/.test(p)); }
+
+/* ---- package relationships / content types ---- */
+function tplRelsPath(partPath) { const i = partPath.lastIndexOf('/'); return partPath.slice(0, i + 1) + '_rels/' + partPath.slice(i + 1) + '.rels'; }
+function tplResolveTarget(partPath, target) {
+    if (target.charAt(0) === '/') return target.slice(1);
+    const parts = partPath.split('/').slice(0, -1);
+    target.split('/').forEach(seg => { if (seg === '..') parts.pop(); else if (seg && seg !== '.') parts.push(seg); });
+    return parts.join('/');
+}
+async function tplReadRels(zip, partPath) {
+    return (await tplReadXml(zip, tplRelsPath(partPath))) || tplParseXml('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="' + OOXML_NS.rel + '"/>');
+}
+function tplRelList(relsDoc) { return tplEls(relsDoc, 'Relationship', OOXML_NS.rel); }
+function tplRelsByType(relsDoc, type) { return tplRelList(relsDoc).filter(r => r.getAttribute('Type') === OOXML_REL + type); }
+function tplAddRel(relsDoc, type, target, external) {
+    const ids = new Set(tplRelList(relsDoc).map(r => r.getAttribute('Id')));
+    let n = 1; while (ids.has('rIdKb' + n)) n++;
+    const el = relsDoc.createElementNS(OOXML_NS.rel, 'Relationship');
+    el.setAttribute('Id', 'rIdKb' + n); el.setAttribute('Type', OOXML_REL + type); el.setAttribute('Target', target);
+    if (external) el.setAttribute('TargetMode', 'External');
+    relsDoc.documentElement.appendChild(el);
+    return 'rIdKb' + n;
+}
+// kind 'Default' (key = file extension) or 'Override' (key = /part/name)
+function tplEnsureContentType(ctDoc, kind, key, contentType) {
+    const attr = kind === 'Default' ? 'Extension' : 'PartName';
+    const existing = tplEls(ctDoc, kind, OOXML_NS.ct).find(e => (e.getAttribute(attr) || '').toLowerCase() === key.toLowerCase());
+    if (existing) { if (kind === 'Override') existing.setAttribute('ContentType', contentType); return; }
+    const el = ctDoc.createElementNS(OOXML_NS.ct, kind);
+    el.setAttribute(attr, key); el.setAttribute('ContentType', contentType);
+    ctDoc.documentElement.appendChild(el);
+}
+// Copies a document-level part (theme, numbering) from the template into the report package.
+async function tplCopyPartByRelType(src, out, outCt, outDocRels, type, defaultPath, contentType) {
+    const srcRel = tplRelsByType(await tplReadRels(src, 'word/document.xml'), type)[0];
+    if (!srcRel) return false;
+    const srcPath = tplResolveTarget('word/document.xml', srcRel.getAttribute('Target'));
+    if (!src.file(srcPath) || src.file(tplRelsPath(srcPath))) return false; // missing, or has its own dependencies (e.g. picture bullets)
+    const outRel = tplRelsByType(outDocRels, type)[0];
+    const outPath = outRel ? tplResolveTarget('word/document.xml', outRel.getAttribute('Target')) : defaultPath;
+    out.file(outPath, await src.file(srcPath).async('uint8array'));
+    if (!outRel) tplAddRel(outDocRels, type, outPath.replace(/^word\//, ''));
+    tplEnsureContentType(outCt, 'Override', '/' + outPath, contentType);
+    return true;
+}
+
+/* ---- styles ---- */
+function tplCollectStyleIds(nodes) {
+    const ids = new Set();
+    nodes.forEach(n => ['pStyle', 'rStyle', 'tblStyle'].forEach(tag => tplEls(n, tag).forEach(e => ids.add(e.getAttributeNS(OOXML_NS.w, 'val')))));
+    return Array.from(ids).filter(Boolean);
+}
+function tplApplyStyleRemap(nodes, remap) {
+    if (!Object.keys(remap).length) return;
+    nodes.forEach(n => ['pStyle', 'rStyle', 'tblStyle'].forEach(tag => tplEls(n, tag).forEach(e => {
+        const v = e.getAttributeNS(OOXML_NS.w, 'val');
+        if (remap[v]) e.setAttributeNS(OOXML_NS.w, 'w:val', remap[v]);
+    })));
+}
+// Makes every style ID the report uses resolvable in the template's styles.xml: matched by ID,
+// then by style name (templates with renamed/localized IDs), else a definition is copied from the
+// first source that has one (fallbacks, then docx.js defaults) along with its basedOn/next/link chain.
+// Returns { reportStyleId: templateStyleId } for IDs that must be rewritten in the report body.
+function tplReconcileStyles(targetDoc, sourceDocs, usedIds) {
+    const index = d => { const m = {}; tplEls(d, 'style').forEach(s => { m[s.getAttributeNS(OOXML_NS.w, 'styleId')] = s; }); return m; };
+    const nameOf = s => { const n = tplEls(s, 'name')[0]; return n ? (n.getAttributeNS(OOXML_NS.w, 'val') || '').toLowerCase() : ''; };
+    const target = index(targetDoc);
+    const targetByName = {};
+    Object.keys(target).forEach(id => { const nm = nameOf(target[id]); if (nm && !(nm in targetByName)) targetByName[nm] = id; });
+    const sources = sourceDocs.filter(Boolean).map(index);
+    const root = tplEls(targetDoc, 'styles')[0];
+    const remap = {}, copied = [];
+    const ensure = (id) => {
+        if (!id || target[id] || remap[id]) return;
+        const src = sources.map(s => s[id]).find(Boolean);
+        if (!src) return;
+        const nm = nameOf(src);
+        if (nm && targetByName[nm]) { remap[id] = targetByName[nm]; return; }
+        const copy = targetDoc.importNode(src, true);
+        root.appendChild(copy);
+        target[id] = copy;
+        copied.push(copy);
+        ['basedOn', 'next', 'link'].forEach(tag => tplEls(copy, tag).forEach(e => ensure(e.getAttributeNS(OOXML_NS.w, 'val'))));
+    };
+    usedIds.forEach(ensure);
+    copied.forEach(copy => ['basedOn', 'next', 'link'].forEach(tag => tplEls(copy, tag).forEach(e => {
+        const v = e.getAttributeNS(OOXML_NS.w, 'val');
+        if (remap[v]) e.setAttributeNS(OOXML_NS.w, 'w:val', remap[v]);
+    })));
+    return remap;
+}
+
+/* ---- text placeholders (tokens may be split across runs; run formatting is kept) ---- */
+function tplReplaceTokens(xmlDoc, values) {
+    let changed = false;
+    tplEls(xmlDoc, 'p').forEach(p => {
+        const ts = tplParagraphTexts(p);
+        if (!ts.length || tplParagraphText(p).indexOf('{{') < 0) return;
+        Object.keys(values).forEach(token => {
+            const value = String(values[token]);
+            for (let guard = 0; guard < 50; guard++) {
+                const texts = ts.map(t => t.textContent);
+                const start = texts.join('').indexOf(token);
+                if (start < 0) break;
+                const end = start + token.length;
+                let pos = 0;
+                ts.forEach((t, i) => {
+                    const s = pos, e = pos + texts[i].length; pos = e;
+                    if (e <= start || s >= end) return;
+                    const a = Math.max(start, s) - s, b = Math.min(end, e) - s;
+                    t.textContent = texts[i].slice(0, a) + (start >= s && start < e ? value : '') + texts[i].slice(b);
+                    t.setAttributeNS(OOXML_NS.xml, 'xml:space', 'preserve');
+                });
+                changed = true;
+                if (value.indexOf(token) >= 0) break;
+            }
+        });
+    });
+    return changed;
+}
+
+// Adds <w:updateFields w:val="true"/> (so Word refreshes the TOC on open) in schema order.
+function tplEnsureUpdateFields(settingsDoc) {
+    const root = settingsDoc.documentElement;
+    if (tplEls(settingsDoc, 'updateFields').length) return;
+    const after = ['hdrShapeDefaults', 'footnotePr', 'endnotePr', 'compat', 'docVars', 'rsids', 'mathPr', 'attachedSchema', 'themeFontLang', 'clrSchemeMapping',
+                   'doNotIncludeSubdocsInStats', 'doNotAutoCompressPictures', 'forceUpgrade', 'captions', 'readModeInkLockDown', 'smartTagType', 'schemaLibrary',
+                   'shapeDefaults', 'doNotEmbedSmartTags', 'decimalSymbol', 'listSeparator'];
+    const before = tplChildEls(root).find(n => after.indexOf(n.localName) >= 0) || null;
+    const el = settingsDoc.createElementNS(OOXML_NS.w, 'w:updateFields');
+    el.setAttributeNS(OOXML_NS.w, 'w:val', 'true');
+    root.insertBefore(el, before);
+}
+
+// Gives every bookmark in `roots` a unique w:id (document order, starting after `startAfter`), pairing each
+// bookmarkEnd with the most recent open bookmarkStart of the same original id. docx.js 8.5 writes id="1" for
+// every Bookmark, which breaks REF cross-references.
+function tplRenumberBookmarks(roots, startAfter) {
+    let next = startAfter || 0;
+    const open = {};
+    roots.forEach(root => [root].concat(Array.from(root.getElementsByTagName('*'))).forEach(e => {
+        if (e.namespaceURI !== OOXML_NS.w || (e.localName !== 'bookmarkStart' && e.localName !== 'bookmarkEnd')) return;
+        const old = e.getAttributeNS(OOXML_NS.w, 'id');
+        if (e.localName === 'bookmarkStart') {
+            const id = String(++next);
+            (open[old] = open[old] || []).push(id);
+            e.setAttributeNS(OOXML_NS.w, 'w:id', id);
+        } else if (open[old] && open[old].length) {
+            e.setAttributeNS(OOXML_NS.w, 'w:id', open[old].pop());
+        }
+    }));
+    return next;
+}
+
+// No-template output: fix docx.js id quirks (duplicate drawing ids and bookmark ids).
+async function finalizeReportDocx(reportBlob) {
+    const out = await JSZip.loadAsync(reportBlob);
+    const doc = await tplReadXml(out, 'word/document.xml');
+    tplEls(doc, 'docPr', OOXML_NS.wp).forEach((e, i) => e.setAttribute('id', String(i + 1)));
+    tplRenumberBookmarks([doc.documentElement], 0);
+    out.file('word/document.xml', tplSerializeXml(doc));
+    return out.generateAsync({ type: 'blob', mimeType: DOCX_MIME });
+}
+
+/* ---- public API ---- */
+// Reads a user-selected Word document/template. Returns what both modes need; the file bytes are kept
+// so each report generation starts from an unmodified copy.
+async function loadWordTemplate(file) {
+    if (!window.JSZip) throw new Error('Template library failed to load. Check your network connection.');
+    if (!/\.(docx|dotx)$/i.test(file.name)) throw new Error('Select a Word document (.docx) or template (.dotx). Macro-enabled files are not supported.');
+    const buffer = await file.arrayBuffer();
+    let zip;
+    try { zip = await JSZip.loadAsync(buffer); } catch (e) { throw new Error('"' + file.name + '" could not be opened as a Word file.'); }
+    const doc = await tplReadXml(zip, 'word/document.xml');
+    if (!doc || !zip.file('word/styles.xml')) throw new Error('"' + file.name + '" is not a valid Word document or template.');
+
+    let page = null;
+    const sects = tplEls(doc, 'sectPr');
+    const sect = sects[sects.length - 1]; // body-level section = last sectPr
+    if (sect) {
+        const num = (el, a) => { const v = el && el.getAttributeNS(OOXML_NS.w, a); return v ? parseInt(v, 10) : undefined; };
+        const sz = tplEls(sect, 'pgSz')[0], mar = tplEls(sect, 'pgMar')[0];
+        page = {
+            size: { width: num(sz, 'w'), height: num(sz, 'h') },
+            margin: { top: num(mar, 'top'), right: num(mar, 'right'), bottom: num(mar, 'bottom'), left: num(mar, 'left'), header: num(mar, 'header'), footer: num(mar, 'footer') }
+        };
+    }
+
+    const tokens = new Set();
+    const scan = (xmlDoc) => tplEls(xmlDoc, 'p').forEach(p => { const txt = tplParagraphText(p); REPORT_TEMPLATE_TOKENS.forEach(t => { if (txt.indexOf(t) >= 0) tokens.add(t); }); });
+    scan(doc);
+    const hasBodyToken = tokens.has('{{REPORT_BODY}}');
+    for (const path of tplHeaderFooterPaths(zip)) scan(await tplReadXml(zip, path));
+    return { name: file.name, buffer, page, tokens: Array.from(tokens), hasBodyToken };
+}
+
+// Import Format: apply the template's styles, theme, numbering to the docx.js report.
+async function applyTemplateFormat(reportBlob, tpl) {
+    const out = await JSZip.loadAsync(reportBlob), src = await JSZip.loadAsync(tpl.buffer);
+    const doc = await tplReadXml(out, 'word/document.xml');
+    const styles = await tplReadXml(src, 'word/styles.xml');
+    const remap = tplReconcileStyles(styles, [tplParseXml(TPL_FALLBACK_STYLES_XML), await tplReadXml(out, 'word/styles.xml')], tplCollectStyleIds([doc.documentElement]));
+    tplApplyStyleRemap([doc.documentElement], remap);
+    tplEls(doc, 'docPr', OOXML_NS.wp).forEach((e, i) => e.setAttribute('id', String(i + 1))); // docx.js repeats id="1" for every image
+    tplRenumberBookmarks([doc.documentElement], 0);
+    out.file('word/styles.xml', tplSerializeXml(styles));
+    out.file('word/document.xml', tplSerializeXml(doc));
+
+    const ct = await tplReadXml(out, '[Content_Types].xml'), rels = await tplReadRels(out, 'word/document.xml');
+    await tplCopyPartByRelType(src, out, ct, rels, 'theme', 'word/theme/theme1.xml', 'application/vnd.openxmlformats-officedocument.theme+xml');
+    await tplCopyPartByRelType(src, out, ct, rels, 'numbering', 'word/numbering.xml', 'application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml');
+    out.file('[Content_Types].xml', tplSerializeXml(ct));
+    out.file(tplRelsPath('word/document.xml'), tplSerializeXml(rels));
+    return out.generateAsync({ type: 'blob', mimeType: DOCX_MIME });
+}
+
+// Merge into Template: insert the docx.js report body into the template package.
+async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
+    const gen = await JSZip.loadAsync(reportBlob), out = await JSZip.loadAsync(tpl.buffer);
+    const genDoc = await tplReadXml(gen, 'word/document.xml'), doc = await tplReadXml(out, 'word/document.xml');
+    const body = tplEls(doc, 'body')[0];
+    const nodes = tplChildEls(tplEls(genDoc, 'body')[0]).filter(n => !tplIsW(n, 'sectPr'));
+
+    // 1. Fill text placeholders in the template body, headers, footers; note the largest drawing id in use.
+    let maxDrawingId = 0;
+    const trackIds = (xmlDoc) => tplEls(xmlDoc, 'docPr', OOXML_NS.wp).forEach(e => { maxDrawingId = Math.max(maxDrawingId, parseInt(e.getAttribute('id'), 10) || 0); });
+    tplReplaceTokens(doc, tokenValues);
+    trackIds(doc);
+    for (const path of tplHeaderFooterPaths(out)) {
+        const part = await tplReadXml(out, path);
+        trackIds(part);
+        if (tplReplaceTokens(part, tokenValues)) out.file(path, tplSerializeXml(part));
+    }
+
+    // 2. Styles used by the report body.
+    const styles = await tplReadXml(out, 'word/styles.xml');
+    const remap = tplReconcileStyles(styles, [tplParseXml(TPL_FALLBACK_STYLES_XML), await tplReadXml(gen, 'word/styles.xml')], tplCollectStyleIds(nodes));
+    tplApplyStyleRemap(nodes, remap);
+    out.file('word/styles.xml', tplSerializeXml(styles));
+
+    // 3. Relationships referenced by the report body (chart images): copy media, re-key rIds.
+    const genRels = tplRelList(await tplReadRels(gen, 'word/document.xml'));
+    const rels = await tplReadRels(out, 'word/document.xml');
+    const ct = await tplReadXml(out, '[Content_Types].xml');
+    const relIdMap = {};
+    let mediaN = 0;
+    for (const el of nodes.flatMap(n => [n].concat(Array.from(n.getElementsByTagName('*'))))) {
+        for (const attr of Array.from(el.attributes)) {
+            if (attr.namespaceURI !== OOXML_NS.r) continue;
+            const oldId = attr.value;
+            if (!(oldId in relIdMap)) {
+                relIdMap[oldId] = null;
+                const gRel = genRels.find(r => r.getAttribute('Id') === oldId);
+                if (gRel) {
+                    const type = gRel.getAttribute('Type').replace(OOXML_REL, '');
+                    const target = gRel.getAttribute('Target');
+                    if (gRel.getAttribute('TargetMode') === 'External') {
+                        relIdMap[oldId] = tplAddRel(rels, type, target, true);
+                    } else {
+                        const srcPath = tplResolveTarget('word/document.xml', target);
+                        const ext = (srcPath.split('.').pop() || 'bin').toLowerCase();
+                        let dest;
+                        do { mediaN++; dest = 'word/media/kureas_report_' + mediaN + '.' + ext; } while (out.file(dest));
+                        out.file(dest, await gen.file(srcPath).async('uint8array'));
+                        tplEnsureContentType(ct, 'Default', ext, TPL_IMAGE_TYPES[ext] || 'application/octet-stream');
+                        relIdMap[oldId] = tplAddRel(rels, type, dest.replace(/^word\//, ''));
+                    }
+                }
+            }
+            if (relIdMap[oldId]) el.setAttributeNS(attr.namespaceURI, attr.name, relIdMap[oldId]);
+        }
+    }
+    out.file(tplRelsPath('word/document.xml'), tplSerializeXml(rels));
+
+    // 4. Unique drawing ids (duplicates make Word report unreadable content).
+    nodes.forEach(n => tplEls(n, 'docPr', OOXML_NS.wp).forEach(e => e.setAttribute('id', String(++maxDrawingId))));
+    // Unique bookmark ids (report caption bookmarks must not collide with template bookmarks).
+    let maxBookmarkId = 0;
+    tplEls(doc, 'bookmarkStart').forEach(e => { maxBookmarkId = Math.max(maxBookmarkId, parseInt(e.getAttributeNS(OOXML_NS.w, 'id'), 10) || 0); });
+    tplRenumberBookmarks(nodes, maxBookmarkId);
+
+    // 5. Insert the report body.
+    const imported = nodes.map(n => doc.importNode(n, true));
+    const placeholder = tplEls(doc, 'p').find(p => tplParagraphText(p).indexOf('{{REPORT_BODY}}') >= 0);
+    if (placeholder) {
+        const parent = placeholder.parentNode;
+        const pPr = tplChildEls(placeholder).find(n => tplIsW(n, 'pPr'));
+        if (pPr && tplChildEls(pPr).some(n => tplIsW(n, 'sectPr'))) {
+            // Placeholder paragraph carries a section break: keep it (without its text) and insert after it.
+            tplChildEls(placeholder).filter(n => n !== pPr).forEach(n => placeholder.removeChild(n));
+            const next = placeholder.nextSibling;
+            imported.forEach(n => parent.insertBefore(n, next));
+        } else {
+            imported.forEach(n => parent.insertBefore(n, placeholder));
+            parent.removeChild(placeholder);
+            const last = tplChildEls(parent).pop();
+            if (tplIsW(parent, 'tc') && !tplIsW(last, 'p')) parent.appendChild(doc.createElementNS(OOXML_NS.w, 'w:p')); // a table cell must end with a paragraph
+        }
+    } else {
+        const sect = tplChildEls(body).filter(n => tplIsW(n, 'sectPr')).pop() || null;
+        imported.forEach(n => body.insertBefore(n, sect));
+    }
+    out.file('word/document.xml', tplSerializeXml(doc));
+
+    // 6. Refresh a table of contents on open.
+    const hasToc = tplEls(doc, 'instrText').some(e => /\bTOC\b/.test(e.textContent)) ||
+                   tplEls(doc, 'fldSimple').some(e => /\bTOC\b/.test(e.getAttributeNS(OOXML_NS.w, 'instr') || ''));
+    const settingsRel = tplRelsByType(rels, 'settings')[0];
+    if (hasToc && settingsRel) {
+        const settingsPath = tplResolveTarget('word/document.xml', settingsRel.getAttribute('Target'));
+        const settings = await tplReadXml(out, settingsPath);
+        if (settings) { tplEnsureUpdateFields(settings); out.file(settingsPath, tplSerializeXml(settings)); }
+    }
+
+    // 7. A .dotx main part must be retyped for a .docx output.
+    tplEls(ct, 'Override', OOXML_NS.ct).forEach(o => {
+        if (/wordprocessingml\.template\.main\+xml$/.test(o.getAttribute('ContentType') || ''))
+            o.setAttribute('ContentType', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml');
+    });
+    out.file('[Content_Types].xml', tplSerializeXml(ct));
+    return out.generateAsync({ type: 'blob', mimeType: DOCX_MIME });
+}
+
+// templateOpts: { mode: 'none' | 'format' | 'merge', template } -- template from loadWordTemplate().
+async function generateReportDocx(project, sections, sectionsData, filename, templateOpts) {
     const d = window.docx;
     if (!d) return { ok: false, message: 'Report library failed to load. Check your network connection.' };
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, AlignmentType } = d;
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, AlignmentType, SimpleField, TableLayoutType, Bookmark } = d;
+
+    const tpl = templateOpts && templateOpts.mode !== 'none' ? templateOpts.template : null;
+    const tplMode = tpl ? templateOpts.mode : 'none';
+    if (tpl && !window.JSZip) return { ok: false, message: 'Template library failed to load. Check your network connection.' };
+    const pg = tpl && tpl.page;
 
     const children = [];
-    children.push(new Paragraph({ text: project.name || 'Bayesian Evaluation Report', heading: HeadingLevel.TITLE }));
-    children.push(new Paragraph({ text: 'KUREAS-BAYES v' + APP_VERSION + ' \u2014 Generated ' + new Date().toLocaleString(), spacing: { after: 300 } }));
+    // In merge mode a template that places {{PROJECT_NAME}} supplies its own title block.
+    if (!(tplMode === 'merge' && tpl.tokens.indexOf('{{PROJECT_NAME}}') >= 0)) {
+        children.push(new Paragraph({ text: project.name || 'Bayesian Evaluation Report', heading: HeadingLevel.TITLE }));
+        children.push(new Paragraph({ text: 'KUREAS-BAYES v' + APP_VERSION + ' \u2014 Generated ' + new Date().toLocaleString(), spacing: { after: 300 } }));
+    }
 
+    let figureNum = 0; // running figure number for captions (matches the SEQ Figure field)
+    const tableNums = reportTableNumbers(sections, sectionsData);
     sections.filter(s => s.enabled).forEach(s => {
         const data = sectionsData[s.key];
         if (!data) return;
@@ -4227,38 +4755,71 @@ async function generateReportDocx(project, sections, sectionsData, filename) {
         if (data.kind === 'richtext') {
             children.push(new Paragraph({ text: data.html ? stripHtml(data.html) : '(none)' }));
         } else if (data.kind === 'table') {
-            const headerRow = new TableRow({ children: data.headers.map(h => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
-            const bodyRows = data.rows.map(r => new TableRow({ children: r.map(c => new TableCell({ children: [new Paragraph({ text: String(c) })] })) }));
-            children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...bodyRows] }));
+            // Optional data.colWidths (percent per column): fixed column widths in twips across the usable page width
+            const usableW = (pg && pg.size.width && pg.margin.left != null && pg.margin.right != null) ? pg.size.width - pg.margin.left - pg.margin.right : 9026; // docx.js default A4, 1 in margins
+            const colW = data.colWidths ? data.colWidths.map(pct => Math.round(usableW * pct / 100)) : null;
+            // Word table caption above the table: Caption style + SEQ Table field, kept with the table
+            children.push(new Paragraph({ style: 'Caption', keepNext: true, spacing: { before: 120, after: 60 }, children: [
+                new Bookmark({ id: REPORT_TABLE_BOOKMARK(tableNums[s.key]), children: [new TextRun('Table '), new SimpleField('SEQ Table \\* ARABIC', String(tableNums[s.key]))] }),
+                new TextRun(`. ${data.tableTitle}.`)] }));
+            const cellOpts = (i) => colW ? { width: { size: colW[i], type: WidthType.DXA } } : {};
+            const headerRow = new TableRow({ tableHeader: true, children: data.headers.map((h, i) => new TableCell({ ...cellOpts(i), children: [new Paragraph({ style: 'Small_Table', children: [new TextRun({ text: h, bold: true })] })] })) });
+            const bodyRows = data.rows.map(r => new TableRow({ children: r.map((c, i) => new TableCell({ ...cellOpts(i), children: [new Paragraph({ style: 'Small_Table', text: String(c) })] })) }));
+            children.push(new Table(colW
+                ? { width: { size: usableW, type: WidthType.DXA }, columnWidths: colW, layout: TableLayoutType.FIXED, rows: [headerRow, ...bodyRows] }
+                : { width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...bodyRows] }));
         } else if (data.kind === 'chart') {
             if (!data.images.length) { children.push(new Paragraph({ text: '(no event occurrence rates with a computable posterior)' })); return; }
-            children.push(new Paragraph({ text: data.caption, spacing: { after: 120 } }));
-            const maxW = 624; // 6.5 in usable width at 96 dpi (Letter, 1 in margins)
+            const maxW = (pg && pg.size.width && pg.margin.left != null && pg.margin.right != null)
+                ? Math.round((pg.size.width - pg.margin.left - pg.margin.right) / 15) // template usable width, twips -> px at 96 dpi
+                : 624; // 6.5 in usable width at 96 dpi (Letter, 1 in margins)
+            children.push(new Paragraph({ spacing: { after: 120 }, children: visualizationIntroParts(data.images.length, tableNums.summaryTable, figureNum + 1).map(part =>
+                typeof part === 'string' ? new TextRun(part)
+                    : part.ref === 'table' ? new SimpleField(`REF ${REPORT_TABLE_BOOKMARK(part.num)} \\h`, 'Table ' + part.num)
+                    : new SimpleField(`REF ${REPORT_FIGURE_BOOKMARK(part.num)} \\h`, 'Figure ' + part.num)) }));
             data.images.forEach((img, i) => {
                 const b64 = img.dataUrl.split(',')[1];
                 const bin = atob(b64);
                 const bytes = new Uint8Array(bin.length);
                 for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
                 const scale = maxW / img.width;
-                children.push(new Paragraph({ alignment: AlignmentType.CENTER, pageBreakBefore: i > 0,
+                children.push(new Paragraph({ alignment: AlignmentType.CENTER, pageBreakBefore: i > 0, keepNext: true,
                     children: [new ImageRun({ data: bytes, transformation: { width: Math.round(img.width * scale), height: Math.round(img.height * scale) } })] }));
-                if (data.images.length > 1) children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Part ${i + 1} of ${data.images.length}`, italics: true, size: 18 })] }));
+                // Word caption: Caption style + SEQ Figure field (works with Insert Table of Figures / cross-references)
+                const cap = reportFigureCaption(data, i, ++figureNum);
+                children.push(new Paragraph({ style: 'Caption', children: [
+                    new Bookmark({ id: REPORT_FIGURE_BOOKMARK(figureNum), children: [new TextRun('Figure '), new SimpleField('SEQ Figure \\* ARABIC', String(figureNum))] }),
+                    new TextRun(cap.text)] }));
             });
         } else if (data.kind === 'itemBlocks') {
             data.items.forEach(item => {
                 children.push(new Paragraph({ text: item.heading, heading: HeadingLevel.HEADING_2, spacing: { before: 200 } }));
-                children.push(new Paragraph({ children: [new TextRun({ text: 'Description: ', bold: true }), new TextRun(item.description)] }));
-                children.push(new Paragraph({ children: [new TextRun({ text: 'Failure Mode: ', bold: true }), new TextRun(item.failureModeLabel)] }));
-                children.push(new Paragraph({ children: [new TextRun({ text: 'Prior Source: ', bold: true }), new TextRun(item.priorSourceLabel)] }));
-                children.push(new Paragraph({ children: [new TextRun({ text: 'Posterior: ', bold: true }), new TextRun(item.posteriorLine)] }));
+                children.push(new Paragraph({ text: item.paragraph, spacing: { after: 120 } }));
                 if (item.notes) children.push(new Paragraph({ children: [new TextRun({ text: 'Notes: ', bold: true }), new TextRun(item.notes)] }));
-                children.push(new Paragraph({ text: 'Verification: ' + item.verificationLine }));
             });
+        } else if (data.kind === 'references') {
+            if (!data.entries.length) { children.push(new Paragraph({ text: '(no sources cited)' })); return; }
+            data.entries.forEach(r => children.push(new Paragraph({ indent: { left: 720, hanging: 720 }, spacing: { after: 120 },
+                children: [new TextRun({ text: `[${r.key}]`, bold: true }), new TextRun(' ' + r.text)] })));
         }
     });
 
-    const doc = new Document({ sections: [{ children }] });
-    const blob = await Packer.toBlob(doc);
+    const doc = new Document({
+        styles: { paragraphStyles: [
+            { id: 'Caption', name: 'caption', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+              run: { italics: true, size: 18, color: '44546A' }, paragraph: { spacing: { before: 60, after: 240 } } },
+            // Text inside all report tables (10 pt, no paragraph spacing)
+            { id: 'Small_Table', name: 'Small_Table', basedOn: 'Normal', next: 'Small_Table', quickFormat: true,
+              run: { size: 20 }, paragraph: { spacing: { before: 0, after: 0, line: 240 } } }] },
+        sections: [{ ...(tplMode === 'format' && pg ? { properties: { page: pg } } : {}), children }] });
+    let blob = await Packer.toBlob(doc);
+    if (tplMode === 'none' && window.JSZip) blob = await finalizeReportDocx(blob);
+    else if (tplMode === 'format') blob = await applyTemplateFormat(blob, tpl);
+    else if (tplMode === 'merge') blob = await mergeReportIntoTemplate(blob, tpl, {
+        '{{PROJECT_NAME}}': project.name || 'Bayesian Evaluation Report',
+        '{{REPORT_DATE}}': new Date().toLocaleDateString(),
+        '{{GENERATED_BY}}': 'KUREAS-BAYES v' + APP_VERSION
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = (filename || 'KUREAS-BAYES_Report') + '.docx'; a.click();
@@ -4266,15 +4827,30 @@ async function generateReportDocx(project, sections, sectionsData, filename) {
     return { ok: true };
 }
 
-function ReportModal({ project, fsceors, hierarchy, plotRange, onClose }) {
+function ReportModal({ project, fsceors, hierarchy, plotRange, sources, onClose }) {
     const [sections, setSections] = useState(defaultReportSections());
     const [outputMode, setOutputMode] = useState('preview'); // 'preview' | 'word' | 'markdown'
     const [fileName, setFileName] = useState(() => (project.name || 'KUREAS-BAYES_Report').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_') || 'KUREAS-BAYES_Report');
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState('');
     const [showingPreview, setShowingPreview] = useState(false);
+    const [templateMode, setTemplateMode] = useState('none'); // 'none' | 'format' | 'merge'
+    const [template, setTemplate] = useState(null);
 
-    const sectionsData = useMemo(() => buildReportSectionsData(project, fsceors, hierarchy, plotRange), [project, fsceors, hierarchy, plotRange?.xMin, plotRange?.xMax]);
+    const handleTemplatePick = async (e) => {
+        const file = e.target.files[0];
+        e.target.value = ''; // allow re-selecting the same file
+        if (!file) return;
+        try { setTemplate(await loadWordTemplate(file)); setError(''); }
+        catch (err) { setTemplate(null); setError('Template error: ' + err.message); }
+    };
+
+    const downloadWord = async () => {
+        if (templateMode !== 'none' && !template) return { ok: false, message: 'Choose a Word template file, or set Word Template to None.' };
+        return generateReportDocx(project, sections, sectionsData, fileName, { mode: templateMode, template });
+    };
+
+    const sectionsData = useMemo(() => buildReportSectionsData(project, fsceors, hierarchy, plotRange, sources), [project, fsceors, hierarchy, sources, plotRange?.xMin, plotRange?.xMax]);
 
     const toggleSection = (idx) => setSections(prev => prev.map((s, i) => i === idx ? { ...s, enabled: !s.enabled } : s));
     const moveSection = (idx, dir) => setSections(prev => {
@@ -4296,7 +4872,7 @@ function ReportModal({ project, fsceors, hierarchy, plotRange, onClose }) {
         setGenerating(true);
         try {
             if (outputMode === 'word') {
-                const result = await generateReportDocx(project, sections, sectionsData, fileName);
+                const result = await downloadWord();
                 if (!result.ok) { setError(result.message); setGenerating(false); return; }
             } else if (outputMode === 'markdown') {
                 downloadMarkdown();
@@ -4322,7 +4898,7 @@ function ReportModal({ project, fsceors, hierarchy, plotRange, onClose }) {
                     <div className="p-4 border-t flex justify-end gap-2 flex-shrink-0">
                         <button onClick={() => setShowingPreview(false)} className="px-4 py-2 border rounded hover:bg-gray-100">Back to Options</button>
                         <button onClick={downloadMarkdown} className="px-4 py-2 border rounded hover:bg-gray-100">Download Markdown</button>
-                        <button onClick={async () => { setGenerating(true); const r = await generateReportDocx(project, sections, sectionsData, fileName); setGenerating(false); if (!r.ok) setError(r.message); else onClose(); }}
+                        <button onClick={async () => { setGenerating(true); setError(''); let r; try { r = await downloadWord(); } catch (err) { r = { ok: false, message: 'Error generating report: ' + err.message }; } setGenerating(false); if (!r.ok) setError(r.message); else onClose(); }}
                                 disabled={generating} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
                             {generating ? 'Generating\u2026' : 'Download Word'}
                         </button>
@@ -4374,6 +4950,43 @@ function ReportModal({ project, fsceors, hierarchy, plotRange, onClose }) {
                                 <input className="w-full px-3 py-2 border rounded text-sm" value={fileName} onChange={e => setFileName(e.target.value)} />
                                 <span className="text-sm text-gray-500 flex-shrink-0">.{outputMode === 'word' ? 'docx' : 'md'}</span>
                             </div>
+                        </div>
+                    )}
+
+                    {outputMode !== 'markdown' && (
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium mb-2">Word Template</label>
+                            <div className="flex gap-2 mb-2">
+                                {[['none', 'None'], ['format', 'Import Format'], ['merge', 'Merge into Template']].map(([key, label]) => (
+                                    <button key={key} type="button" onClick={() => setTemplateMode(key)}
+                                            className={`flex-1 px-2 py-1.5 rounded text-sm ${templateMode === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {templateMode !== 'none' && (
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <label className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200 cursor-pointer flex-shrink-0">
+                                            Choose File&hellip;
+                                            <input type="file" accept=".docx,.dotx" className="hidden" onChange={handleTemplatePick} />
+                                        </label>
+                                        <span className="text-sm text-gray-600 truncate flex-1" title={template ? template.name : ''}>{template ? template.name : 'No file selected'}</span>
+                                        {template && <button type="button" onClick={() => setTemplate(null)} className="text-sm text-gray-500 hover:text-gray-800 flex-shrink-0">Clear</button>}
+                                    </div>
+                                    {templateMode === 'format' && (
+                                        <p className="text-xs text-gray-500 mt-1">Applies the file's styles (Title, Heading 1/2, Normal), theme fonts and colors, heading numbering, and page size/margins to the generated report. Headers, footers, and content are not copied.</p>
+                                    )}
+                                    {templateMode === 'merge' && (
+                                        <p className="text-xs text-gray-500 mt-1">Keeps the file's cover page, headers/footers, and content, and inserts the report where a paragraph contains {'{{REPORT_BODY}}'}. Also fills {'{{PROJECT_NAME}}'}, {'{{REPORT_DATE}}'}, and {'{{GENERATED_BY}}'} anywhere in the body, headers, or footers. A table of contents is refreshed when the file is opened.</p>
+                                    )}
+                                    {templateMode === 'merge' && template && (
+                                        <p className={`text-xs mt-1 ${template.hasBodyToken ? 'text-green-700' : 'text-amber-700'}`}>
+                                            {template.hasBodyToken ? 'Placeholder ' + '{{REPORT_BODY}}' + ' found.' : 'No ' + '{{REPORT_BODY}}' + ' placeholder found; the report will be appended at the end of the document.'}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -4695,7 +5308,7 @@ function App() {
             {showSourcesMgr && <SourcesManagerModal sources={data.sources} fsceors={data.fsceors} priorLibrary={data.priorLibrary}
                                                      onUpdateLibraryAndFsceors={updateLibraryAndFsceors} onSave={updateSources} onClose={() => setShowSourcesMgr(false)} />}
             {showSettings && <SettingsModal settings={settings} onSave={(s) => { setSettings(s); SettingsManager.save(s); }} onClose={() => setShowSettings(false)} />}
-            {showReport && <ReportModal project={data.project} fsceors={data.fsceors} hierarchy={data.hierarchy} plotRange={visualizePlotRange(settings.project)} onClose={() => setShowReport(false)} />}
+            {showReport && <ReportModal project={data.project} fsceors={data.fsceors} hierarchy={data.hierarchy} plotRange={visualizePlotRange(settings.project)} sources={data.sources} onClose={() => setShowReport(false)} />}
             {showVisualize && <VisualizeModal fsceors={data.fsceors} hierarchy={data.hierarchy} plotRange={visualizePlotRange(settings.project)} onClose={() => setShowVisualize(false)} />}
             {showViewChanges && <ViewChangesModal projectName={data.project.name} fsceors={data.fsceors} hierarchy={data.hierarchy} deletionLog={data.deletionLog} onClose={() => setShowViewChanges(false)} />}
             {showImport && <ImportModal hierarchy={data.hierarchy} onImport={handleImport} onClose={() => setShowImport(false)} />}
