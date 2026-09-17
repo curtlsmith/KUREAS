@@ -9,90 +9,90 @@ source name: NRC-INL 2020 Parameter Estimation
 source description: Industry Average Parameter Estimates, 2020 Update, URL https://nrcoe.inl.gov/avgperf/
 * Define the EGG-SSRE-8875 data first
 *System,SSC Type  ,Component Type,Failure Mode,Description,Units (per demand or per hour),Distribution Type,Mean,Distribution Shape Parameter (α),Distribution Scale Parameter (β)
-Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Fails to Open (FTO), Manual Valve (XVM) Fails to Open (FTO),d,Lognormal,3.0E-04,3.0E-04,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Fails to Close (FTC), Manual Valve (XVM) Fails to Close (FTC),d,Lognormal,3.0E-04,3.0E-04,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Plugging (PLUG), Manual Valve (XVM) Plugging (PLUG),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Internal Leakage (INLEAK), Manual Valve (XVM) Internal Leakage (INLEAK),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Internal Rupture (INRUPT), Manual Valve (XVM) Internal Rupture (INRUPT),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),External Leakage (EXLEAK), Manual Valve (XVM) External Leakage (EXLEAK),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),External Rupture (EXRUPT), Manual Valve (XVM) External Rupture (EXRUPT),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Fails to Open (FTO), Motor-Operated Valve (MOV) Fails to Open (FTO),d,Lognormal,1.0E-03,1.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Fails to Close (FTC), Motor-Operated Valve (MOV) Fails to Close (FTC),d,Lognormal,1.0E-03,1.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Spurious Operation (SPUR), Motor-Operated Valve (MOV) Spurious Operation (SPUR),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Plugging (PLUG), Motor-Operated Valve (MOV) Plugging (PLUG),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Internal Leakage (INLEAK), Motor-Operated Valve (MOV) Internal Leakage (INLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Internal Rupture (INRUPT), Motor-Operated Valve (MOV) Internal Rupture (INRUPT),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),External Leakage (EXLEAK), Motor-Operated Valve (MOV) External Leakage (EXLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),External Rupture (EXRUPT), Motor-Operated Valve (MOV) External Rupture (EXRUPT),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Fails to Open (FTO), Hydraulic-Operated Valve (HOV) Fails to Open (FTO),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Fails to Close (FTC), Hydraulic-Operated Valve (HOV) Fails to Close (FTC),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Spurious Operation (SPUR), Hydraulic-Operated Valve (HOV) Spurious Operation (SPUR),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Plugging (PLUG), Hydraulic-Operated Valve (HOV) Plugging (PLUG),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Internal Leakage (INLEAK), Hydraulic-Operated Valve (HOV) Internal Leakage (INLEAK),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Internal Rupture (INRUPT), Hydraulic-Operated Valve (HOV) Internal Rupture (INRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),External Leakage (EXLEAK), Hydraulic-Operated Valve (HOV) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),External Rupture (EXRUPT), Hydraulic-Operated Valve (HOV) External Rupture (EXRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Fails to Open (FTO), Air-Operated Valve (AOV) Fails to Open (FTO),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Fails to Close (FTC), Air-Operated Valve (AOV) Fails to Close (FTC),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Spurious Operation (SPUR), Air-Operated Valve (AOV) Spurious Operation (SPUR),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Plugging (PLUG), Air-Operated Valve (AOV) Plugging (PLUG),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Internal Leakage (INLEAK), Air-Operated Valve (AOV) Internal Leakage (INLEAK),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Internal Rupture (INRUPT), Air-Operated Valve (AOV) Internal Rupture (INRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),External Leakage (EXLEAK), Air-Operated Valve (AOV) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),External Rupture (EXRUPT), Air-Operated Valve (AOV) External Rupture (EXRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Fails to Open (FTO), Solenoid-Operated Valve (SOV) Fails to Open (FTO),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Fails to Close (FTC), Solenoid-Operated Valve (SOV) Fails to Close (FTC),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Spurious Operation (SPUR), Solenoid-Operated Valve (SOV) Spurious Operation (SPUR),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Plugging (PLUG), Solenoid-Operated Valve (SOV) Plugging (PLUG),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Internal Leakage (INLEAK), Solenoid-Operated Valve (SOV) Internal Leakage (INLEAK),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Internal Rupture (INRUPT), Solenoid-Operated Valve (SOV) Internal Rupture (INRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),External Leakage (EXLEAK), Solenoid-Operated Valve (SOV) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),External Rupture (EXRUPT), Solenoid-Operated Valve (SOV) External Rupture (EXRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Fails to Open (FTO), Check Valve (CKV) Fails to Open (FTO),d,Lognormal,1.0E-04,1.0E-04,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Plugging (PLUG), Check Valve (CKV) Plugging (PLUG),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Fails to Close (FTC), Check Valve (CKV) Fails to Close (FTC),d,Lognormal,1.0E-04,1.0E-04,5, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Internal Leakage (INLEAK), Check Valve (CKV) Internal Leakage (INLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Internal Rupture (INRUPT), Check Valve (CKV) Internal Rupture (INRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),External Leakage (EXLEAK), Check Valve (CKV) External Leakage (EXLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),External Rupture (EXRUPT), Check Valve (CKV) External Rupture (EXRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Rupture Disc (RDISC),Fails to Open (FTO), Rupture Disc (RDISC) Fails to Open (FTO),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Valve (VALVE),Rupture Disc (RDISC),Premature Opening (PRE), Rupture Disc (RDISC) Premature Opening (PRE),h,Lognormal,1.0E-05,1.0E-05,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Start while in Standby (FTS), Motor-Driven Pump (MDP) Fails to Start while in Standby (FTS),d,Lognormal,5.0E-03,5.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Run (FTR), Motor-Driven Pump (MDP) Fails to Run (FTR),h,Lognormal,5.0E-05,5.0E-05,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),External Leakage (EXLEAK), Motor-Driven Pump (MDP) External Leakage (EXLEAK),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),External Rupture (EXRUPT), Motor-Driven Pump (MDP) External Rupture (EXRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),Fails to Start while in Standby (FTS), Electromagnetic Pump (EMP) Fails to Start while in Standby (FTS),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),Fails to Run (FTR), Electromagnetic Pump (EMP) Fails to Run (FTR),h,Lognormal,1.0E-05,1.0E-05,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),External Leakage (EXLEAK), Electromagnetic Pump (EMP) External Leakage (EXLEAK),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),External Rupture (EXRUPT), Electromagnetic Pump (EMP) External Rupture (EXRUPT),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Shell (IHTXS),External Leakage (EXLEAK), Intermediate Heat Exchanger Shell (IHTXS) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Shell (IHTXS),External Rupture (EXRUPT), Intermediate Heat Exchanger Shell (IHTXS) External Rupture (EXRUPT),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Tube (IHTXT),External Leakage (EXLEAK), Intermediate Heat Exchanger Tube (IHTXT) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Tube (IHTXT),External Rupture (EXRUPT), Intermediate Heat Exchanger Tube (IHTXT) External Rupture (EXRUPT),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Tube (IHTXT),Plugging (PLUG), Intermediate Heat Exchanger Tube (IHTXT) Plugging (PLUG),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Shell (SGHTXS),External Leakage (EXLEAK), Heat Exchanger Shell (HTXS) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Tube (SGHTXT),Internal Leakage Small (INLEAK-S), Heat Exchanger Tube (HTXT) Internal Leakage Small (INLEAK-S),h,Lognormal,5.0E-06,5.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Tube (SGHTXT),Internal Leakage Medium (INLEAK-M), Heat Exchanger Tube (HTXT) Internal Leakage Medium (INLEAK-M),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Tube (SGHTXT),Internal Leakage Large (INLEAK-L), Heat Exchanger Tube (HTXT) Internal Leakage Large (INLEAK-L),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Vessel (VES), Tank (TANK),External Leakage (EXLEAK), Tank (TANK) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Vessel (VES), Tank (TANK),External Rupture (EXRUPT), Tank (TANK) External Rupture (EXRUPT),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Vessel (VES), Reactor Vessel (RV),External Leakage (EXLEAK), Reactor Vessel (RV) External Leakage (EXLEAK),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Vessel (VES), Reactor Vessel (RV),External Rupture (EXRUPT), Reactor Vessel (RV) External Rupture (EXRUPT),h,Lognormal,1.0E-10,1.0E-10,10, EGG-SSRE-8875
-Sodium Fluid (NA),Vessel (VES), Guard Vessel (GV),External Leakage (EXLEAK), Guard Vessel (GV) External Leakage (EXLEAK),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875
-Sodium Fluid (NA),Vessel (VES), Guard Vessel (GV),External Rupture (EXRUPT), Guard Vessel (GV) External Rupture (EXRUPT),h,Lognormal,1.0E-10,1.0E-10,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),External Leakage per foot (EXLEAK), Small 1-4 inch (PIPE-S) External Leakage per foot (EXLEAK),hft,Lognormal,3.0E-09,3.0E-09,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),External Rupture per foot (EXRUPT), Small 1-4 inch (PIPE-S) External Rupture per foot (EXRUPT),hft,Lognormal,3.0E-10,3.0E-10,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),Plugging (PLUG), Small 1-4 inch (PIPE-S) Plugging (PLUG),hft,Lognormal,1.0E-09,1.0E-09,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Large >4 inch (PIPE-L),External Leakage per foot (EXLEAK), Large >4 inch (PIPE-L) External Leakage per foot (EXLEAK),hft,Lognormal,3.0E-09,3.0E-09,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Large >4 inch (PIPE-S),External Rupture per foot (EXRUPT), Large >4 inch (PIPE-S) External Rupture per foot (EXRUPT),hft,Lognormal,3.0E-10,3.0E-10,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Filter (FILT),Plugging (PLUG), Filter (FILT) Plugging (PLUG),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Filter (FILT),Fail Open (FO), Filter (FILT) Fail Open (FO),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Strainer (STRA),Plugging (PLUG), Strainer (STRA) Plugging (PLUG),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Strainer (STRA),Fail Open (FO), Strainer (STRA) Fail Open (FO),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),Fails to Operate (FTOP), Cold Trap (CTRAP) Fails to Operate (FTOP),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),External Leakage (EXLEAK), Cold Trap (CTRAP) External Leakage (EXLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),External Rupture (EXRUPT), Cold Trap (CTRAP) External Rupture (EXRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875
-Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),Plugging (PLUG), Cold Trap (CTRAP) Plugging (PLUG),h,Lognormal,1.0E-05,1.0E-05,10, EGG-SSRE-8875
+Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Fails to Open (FTO), Manual Valve (XVM) Fails to Open (FTO),d,Lognormal,3.0E-04,3.0E-04,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Fails to Close (FTC), Manual Valve (XVM) Fails to Close (FTC),d,Lognormal,3.0E-04,3.0E-04,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Plugging (PLUG), Manual Valve (XVM) Plugging (PLUG),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Internal Leakage (INLEAK), Manual Valve (XVM) Internal Leakage (INLEAK),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),Internal Rupture (INRUPT), Manual Valve (XVM) Internal Rupture (INRUPT),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),External Leakage (EXLEAK), Manual Valve (XVM) External Leakage (EXLEAK),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Manual Valve (XVM),External Rupture (EXRUPT), Manual Valve (XVM) External Rupture (EXRUPT),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Fails to Open (FTO), Motor-Operated Valve (MOV) Fails to Open (FTO),d,Lognormal,1.0E-03,1.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Fails to Close (FTC), Motor-Operated Valve (MOV) Fails to Close (FTC),d,Lognormal,1.0E-03,1.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Spurious Operation (SPUR), Motor-Operated Valve (MOV) Spurious Operation (SPUR),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Plugging (PLUG), Motor-Operated Valve (MOV) Plugging (PLUG),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Internal Leakage (INLEAK), Motor-Operated Valve (MOV) Internal Leakage (INLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),Internal Rupture (INRUPT), Motor-Operated Valve (MOV) Internal Rupture (INRUPT),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),External Leakage (EXLEAK), Motor-Operated Valve (MOV) External Leakage (EXLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Motor-Operated Valve (MOV),External Rupture (EXRUPT), Motor-Operated Valve (MOV) External Rupture (EXRUPT),h,Lognormal,5.0E-08,5.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Fails to Open (FTO), Hydraulic-Operated Valve (HOV) Fails to Open (FTO),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Fails to Close (FTC), Hydraulic-Operated Valve (HOV) Fails to Close (FTC),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Spurious Operation (SPUR), Hydraulic-Operated Valve (HOV) Spurious Operation (SPUR),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Plugging (PLUG), Hydraulic-Operated Valve (HOV) Plugging (PLUG),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Internal Leakage (INLEAK), Hydraulic-Operated Valve (HOV) Internal Leakage (INLEAK),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),Internal Rupture (INRUPT), Hydraulic-Operated Valve (HOV) Internal Rupture (INRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),External Leakage (EXLEAK), Hydraulic-Operated Valve (HOV) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Hydraulic-Operated Valve (HOV),External Rupture (EXRUPT), Hydraulic-Operated Valve (HOV) External Rupture (EXRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Fails to Open (FTO), Air-Operated Valve (AOV) Fails to Open (FTO),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Fails to Close (FTC), Air-Operated Valve (AOV) Fails to Close (FTC),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Spurious Operation (SPUR), Air-Operated Valve (AOV) Spurious Operation (SPUR),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Plugging (PLUG), Air-Operated Valve (AOV) Plugging (PLUG),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Internal Leakage (INLEAK), Air-Operated Valve (AOV) Internal Leakage (INLEAK),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),Internal Rupture (INRUPT), Air-Operated Valve (AOV) Internal Rupture (INRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),External Leakage (EXLEAK), Air-Operated Valve (AOV) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Air-Operated Valve (AOV),External Rupture (EXRUPT), Air-Operated Valve (AOV) External Rupture (EXRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Fails to Open (FTO), Solenoid-Operated Valve (SOV) Fails to Open (FTO),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Fails to Close (FTC), Solenoid-Operated Valve (SOV) Fails to Close (FTC),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Spurious Operation (SPUR), Solenoid-Operated Valve (SOV) Spurious Operation (SPUR),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Plugging (PLUG), Solenoid-Operated Valve (SOV) Plugging (PLUG),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Internal Leakage (INLEAK), Solenoid-Operated Valve (SOV) Internal Leakage (INLEAK),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),Internal Rupture (INRUPT), Solenoid-Operated Valve (SOV) Internal Rupture (INRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),External Leakage (EXLEAK), Solenoid-Operated Valve (SOV) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Solenoid-Operated Valve (SOV),External Rupture (EXRUPT), Solenoid-Operated Valve (SOV) External Rupture (EXRUPT),h,Lognormal,3.0E-08,3.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Fails to Open (FTO), Check Valve (CKV) Fails to Open (FTO),d,Lognormal,1.0E-04,1.0E-04,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Plugging (PLUG), Check Valve (CKV) Plugging (PLUG),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Fails to Close (FTC), Check Valve (CKV) Fails to Close (FTC),d,Lognormal,1.0E-04,1.0E-04,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Internal Leakage (INLEAK), Check Valve (CKV) Internal Leakage (INLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),Internal Rupture (INRUPT), Check Valve (CKV) Internal Rupture (INRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),External Leakage (EXLEAK), Check Valve (CKV) External Leakage (EXLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Check Valve (CKV),External Rupture (EXRUPT), Check Valve (CKV) External Rupture (EXRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Rupture Disc (RDISC),Fails to Open (FTO), Rupture Disc (RDISC) Fails to Open (FTO),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Valve (VALVE),Rupture Disc (RDISC),Premature Opening (PRE), Rupture Disc (RDISC) Premature Opening (PRE),h,Lognormal,1.0E-05,1.0E-05,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Start while in Standby (FTS), Motor-Driven Pump (MDP) Fails to Start while in Standby (FTS),d,Lognormal,5.0E-03,5.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),Fails to Run (FTR), Motor-Driven Pump (MDP) Fails to Run (FTR),h,Lognormal,5.0E-05,5.0E-05,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),External Leakage (EXLEAK), Motor-Driven Pump (MDP) External Leakage (EXLEAK),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Motor-Driven Pump (MDP),External Rupture (EXRUPT), Motor-Driven Pump (MDP) External Rupture (EXRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),Fails to Start while in Standby (FTS), Electromagnetic Pump (EMP) Fails to Start while in Standby (FTS),d,Lognormal,3.0E-03,3.0E-03,5, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),Fails to Run (FTR), Electromagnetic Pump (EMP) Fails to Run (FTR),h,Lognormal,1.0E-05,1.0E-05,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),External Leakage (EXLEAK), Electromagnetic Pump (EMP) External Leakage (EXLEAK),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pump (PUMP),Electromagnetic Pump (EMP),External Rupture (EXRUPT), Electromagnetic Pump (EMP) External Rupture (EXRUPT),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Shell (IHTXS),External Leakage (EXLEAK), Intermediate Heat Exchanger Shell (IHTXS) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Shell (IHTXS),External Rupture (EXRUPT), Intermediate Heat Exchanger Shell (IHTXS) External Rupture (EXRUPT),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Tube (IHTXT),External Leakage (EXLEAK), Intermediate Heat Exchanger Tube (IHTXT) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Tube (IHTXT),External Rupture (EXRUPT), Intermediate Heat Exchanger Tube (IHTXT) External Rupture (EXRUPT),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Intermediate Heat Exchanger Tube (IHTXT),Plugging (PLUG), Intermediate Heat Exchanger Tube (IHTXT) Plugging (PLUG),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Shell (SGHTXS),External Leakage (EXLEAK), Heat Exchanger Shell (HTXS) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Tube (SGHTXT),Internal Leakage Small (INLEAK-S), Heat Exchanger Tube (HTXT) Internal Leakage Small (INLEAK-S),h,Lognormal,5.0E-06,5.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Tube (SGHTXT),Internal Leakage Medium (INLEAK-M), Heat Exchanger Tube (HTXT) Internal Leakage Medium (INLEAK-M),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Heat Exchanger (HTX),Steam Generator Heat Exchanger Tube (SGHTXT),Internal Leakage Large (INLEAK-L), Heat Exchanger Tube (HTXT) Internal Leakage Large (INLEAK-L),h,Lognormal,3.0E-07,3.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Vessel (VES), Tank (TANK),External Leakage (EXLEAK), Tank (TANK) External Leakage (EXLEAK),h,Lognormal,1.0E-06,1.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Vessel (VES), Tank (TANK),External Rupture (EXRUPT), Tank (TANK) External Rupture (EXRUPT),h,Lognormal,1.0E-07,1.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Vessel (VES), Reactor Vessel (RV),External Leakage (EXLEAK), Reactor Vessel (RV) External Leakage (EXLEAK),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Vessel (VES), Reactor Vessel (RV),External Rupture (EXRUPT), Reactor Vessel (RV) External Rupture (EXRUPT),h,Lognormal,1.0E-10,1.0E-10,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Vessel (VES), Guard Vessel (GV),External Leakage (EXLEAK), Guard Vessel (GV) External Leakage (EXLEAK),h,Lognormal,1.0E-08,1.0E-08,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Vessel (VES), Guard Vessel (GV),External Rupture (EXRUPT), Guard Vessel (GV) External Rupture (EXRUPT),h,Lognormal,1.0E-10,1.0E-10,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),External Leakage per foot (EXLEAK), Small 1-4 inch (PIPE-S) External Leakage per foot (EXLEAK),hft,Lognormal,3.0E-09,3.0E-09,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),External Rupture per foot (EXRUPT), Small 1-4 inch (PIPE-S) External Rupture per foot (EXRUPT),hft,Lognormal,3.0E-10,3.0E-10,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),Plugging (PLUG), Small 1-4 inch (PIPE-S) Plugging (PLUG),hft,Lognormal,1.0E-09,1.0E-09,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Large >4 inch (PIPE-L),External Leakage per foot (EXLEAK), Large >4 inch (PIPE-L) External Leakage per foot (EXLEAK),hft,Lognormal,3.0E-09,3.0E-09,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Large >4 inch (PIPE-S),External Rupture per foot (EXRUPT), Large >4 inch (PIPE-S) External Rupture per foot (EXRUPT),hft,Lognormal,3.0E-10,3.0E-10,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Filter (FILT),Plugging (PLUG), Filter (FILT) Plugging (PLUG),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Filter (FILT),Fail Open (FO), Filter (FILT) Fail Open (FO),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Strainer (STRA),Plugging (PLUG), Strainer (STRA) Plugging (PLUG),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Strainer (STRA),Fail Open (FO), Strainer (STRA) Fail Open (FO),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),Fails to Operate (FTOP), Cold Trap (CTRAP) Fails to Operate (FTOP),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),External Leakage (EXLEAK), Cold Trap (CTRAP) External Leakage (EXLEAK),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),External Rupture (EXRUPT), Cold Trap (CTRAP) External Rupture (EXRUPT),h,Lognormal,5.0E-07,5.0E-07,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Cold Trap (CTRAP),Plugging (PLUG), Cold Trap (CTRAP) Plugging (PLUG),h,Lognormal,1.0E-05,1.0E-05,10, EGG-SSRE-8875-Na
 * Define the data from NUREG-CR-5500 Vol 3 GE RPS
 *System                        ,SSC Type           ,Component Type ,Failure Mode,Description,Units (per demand or per hour),Distribution Type,Mean,Distribution Shape Parameter (α),Distribution Scale Parameter (β)
 Reactor Protection System (RPS),Control Unit (CTRL),Hydraulic (HYD),Fails to Operate (FTOP),Reactor Protection System (RPS) Hydraulic (HYD) Fails to Operate (FTOP),d,Lognormal,2.20E-05,2.20E-05,4.47, NUREG-CR-5500
