@@ -25,7 +25,7 @@ The suite includes full [SAPHIRE](https://saphire.inl.gov) file format interoper
 - [KUREAS-ETL — Event Tree Logic](#kureas-etl--event-tree-logic)
 - [KUREAS-SYS — System Evaluation](#kureas-sys--system-evaluation)
 - [KUREAS-SEQ — Process Operational Logic (coming soon)](#kureas-seq--process-operational-logic)
-- [KUREAS-BAYES — Bayesian Evaluation Module](#kureas-bayes)
+- [KUREAS-BAYES — Bayesian Evaluation Module](#kureas-bayes--bayesian-evaluation-module)
 - [KUREAS-REPORT — Report Generator](#kureas-report--report-generator)
 - [KUREAS-KNOW — Knowledge Base Editor (coming soon)](#kureas-know--knowledge-base-editor)
 - [Data Flow](#data-flow)
@@ -50,7 +50,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 
 | Module | File | Version | Purpose |
 |--------|------|---------|---------|
-| **KUREAS-HA** | `KUREAS-HA.html` | v1.1 | Hazard analysis, initiating event frequency quantification, and screening |
+| **KUREAS-HA** | `KUREAS-HA.html` | v1.2 | Hazard analysis, initiating event frequency quantification, and screening |
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.3 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.6 | System modeling, P&ID, FMEA, failure analysis, CCF, Reliability Designer™, importance measures, and comparison function |
