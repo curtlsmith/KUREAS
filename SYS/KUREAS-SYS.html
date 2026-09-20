@@ -201,7 +201,7 @@
             qualitativeProbLow: '1E-5',
             qualitativeProbMedium: '1E-3',
             qualitativeProbHigh: '1E-1',
-            quantificationMethod: 'mcub', // 'mcub', 'bdd', or 'rare'
+            quantificationMethod: 'bdd', // 'mcub', 'bdd', or 'rare' -- BDD (exact) is the default for a new project
             // CCF Model settings
             ccfModel: 'none',
             ccfBetaFactor: '0.02',
@@ -265,6 +265,106 @@
         }
 
         // Helper functions
+        // ══ SAPHIRE BEI field mapping ═══════════════════════════════════════════
+        //
+        // A basic event exported to .KNOW_FTL (and to SAPHIRE .BEI) carries the
+        // SAPHIRE basic event record. These helpers derive that record from a KUREAS
+        // failure mode instead of hardcoding it, so the uncertainty distribution, the
+        // failure calculation type and the rate terms in the file describe the model.
+        //
+        // KUREAS-SEQ reads the same fields back; saphireUdtText is duplicated there and
+        // the two must agree.
+
+        const SAPHIRE_UDT_NAMES = {
+            L: 'Lognormal', N: 'Normal', B: 'Beta', D: 'Dirichlet', G: 'Gamma',
+            C: 'Chi-squared', E: 'Exponential', U: 'Uniform', H: 'Histogram',
+            M: 'Maximum entropy', S: 'Seismic lognormal', O: 'Constrained non-informative',
+            T: 'Triangular'
+        };
+
+        /** Human-readable uncertainty description from the SAPHIRE UdT fields. */
+        function saphireUdtText(udT, udValue, udValue2) {
+            const code = String(udT || '').trim().toUpperCase();
+            const has = (v) => v !== '' && v !== null && v !== undefined && !(typeof v === 'number' && v === 0);
+            if (!code) return 'Point estimate';
+            const name = SAPHIRE_UDT_NAMES[code] || ('UdT ' + code);
+            switch (code) {
+                case 'L': return name + (has(udValue2) ? ' (EF=' + udValue2 + ')' : '');
+                case 'N': return name + (has(udValue2) ? ' (SD=' + udValue2 + ')' : '');
+                case 'B': return name + ((has(udValue2) || has(udValue))
+                    ? ' (' + [has(udValue2) ? 'alpha=' + udValue2 : '', has(udValue) ? 'beta=' + udValue : '']
+                        .filter(Boolean).join(', ') + ')' : '');
+                case 'G': return name + (has(udValue) ? ' (alpha=' + udValue + ')' : '');
+                case 'C': return name + (has(udValue) ? ' (dof=' + udValue + ')' : '');
+                case 'U': return name + (has(udValue) ? ' (upper=' + udValue + ')' : '');
+                case 'T': return name + ((has(udValue) || has(udValue2))
+                    ? ' (' + [has(udValue) ? 'mode=' + udValue : '', has(udValue2) ? 'upper=' + udValue2 : '']
+                        .filter(Boolean).join(', ') + ')' : '');
+                // O (constrained non-informative) and E (exponential) take no parameter.
+                default: return name;
+            }
+        }
+
+        /**
+         * UdT / UdValue / UdValue2 for a failure mode.
+         *
+         * Per the BEI schema a constrained non-informative distribution takes no
+         * parameter, so a second value entered against it is dropped rather than
+         * rendered as "CNI(mean, something)". Beta puts its beta parameter in UdValue.
+         */
+        function saphireUncertainty(fm) {
+            const d = (fm && fm.data) || {};
+            const type = String(d.distribution_type || d.distributionType || '').trim().toLowerCase();
+            const p1 = d.distribution_shape_parameter !== undefined ? d.distribution_shape_parameter : (d.shape_parameter || '');
+            const p2 = d.distribution_scale_parameter !== undefined ? d.distribution_scale_parameter : (d.scale_parameter || '');
+            const v = (x) => (x === null || x === undefined) ? '' : String(x).trim();
+            switch (type) {
+                case 'lognormal': return { UdT: 'L', UdValue: v(p1), UdValue2: v(p2) };
+                case 'normal':    return { UdT: 'N', UdValue: v(p1), UdValue2: v(p2) };
+                // Schema: "B Beta, UdValue = beta of Beta(alpha, beta)".
+                case 'beta':      return { UdT: 'B', UdValue: v(p2), UdValue2: v(p1) };
+                // Schema: "G Gamma, UdValue = alpha which is the shape parameter".
+                case 'gamma':     return { UdT: 'G', UdValue: v(p1), UdValue2: '' };
+                // Schema: "O Constrained non-informative, UdValue = ''". CNI is defined
+                // by its mean, which is already the calculated probability, so it carries
+                // no UdValue of its own and any unused parameter values are dropped.
+                case 'cni':       return { UdT: 'O', UdValue: '', UdValue2: '' };
+                case 'point':
+                case '':          return { UdT: '', UdValue: '', UdValue2: '' };
+                default:          return { UdT: '', UdValue: v(p1), UdValue2: v(p2) };
+            }
+        }
+
+        /** FdT (failure calculation type) for a failure mode. */
+        function saphireFdT(fm) {
+            if (!fm) return '1';
+            if (fm.probabilityType === 'screened') return '1';
+            const model = String(fm.failureModel || '0');
+            if (model === '5') return ({ T: 'T', F: 'F', I: 'I' })[fm.logicFlag || 'T'] || 'T';
+            if (model === '2') return '3';   // 1 - exp(-lambda * mission)
+            if (model === '3') return '7';   // standby: 1 + (exp(-lambda*tau) - 1)/(lambda*tau)
+            if (model === '4') return '5';   // operating component with full repair
+            const units = (fm.data && fm.data.units) || '';
+            // Legacy rate-based entries are still a 1 - exp(-lambda * time) event.
+            if (model === '0' && (units === 'h' || units === 'y' || units === 'hft')) return '3';
+            return '1';
+        }
+
+        /** Lambda / Tau / Mission for a failure mode, in SAPHIRE's per-hour terms. */
+        function saphireRateFields(fm) {
+            const n = (x) => { const p = parseFloat(x); return isNaN(p) ? 0 : p; };
+            const d = (fm && fm.data) || {};
+            const units = d.units || '';
+            const model = String((fm && fm.failureModel) || '0');
+            if (model === '2') return { Lambda: n(fm.lambda), Tau: 0, Mission: n(fm.missionTime) };
+            if (model === '3') return { Lambda: n(fm.lambda), Tau: n(fm.inspInterval), Mission: 0 };
+            if (model === '4') return { Lambda: n(fm.lambda), Tau: n(fm.tauRepair), Mission: n(fm.missionTime) };
+            if (units === 'h')   return { Lambda: n(d.mean), Tau: 0, Mission: n(fm.timeToOperate) || 24 };
+            if (units === 'y')   return { Lambda: n(d.mean) / 8760, Tau: 0, Mission: n(fm.timeToOperate) || 24 };
+            if (units === 'hft') return { Lambda: n(d.mean) * n(fm.pipeLength), Tau: 0, Mission: n(fm.timeToOperate) || 24 };
+            return { Lambda: 0, Tau: 0, Mission: 0 };
+        }
+
         function getFontSizeClass(setting) {
             switch(setting) {
                 case 'small': return 'text-xs';
@@ -1568,6 +1668,7 @@
         function RichTextEditor({ value, onChange, onClose, backgroundStyle }) {
             const editorRef = useRef(null);
             const savedRangeRef = useRef(null);
+            const imageInputRef = useRef(null);
             const [showTableModal, setShowTableModal] = useState(false);
 
             useEffect(() => { if (editorRef.current) editorRef.current.innerHTML = value || ''; }, []);
@@ -1593,17 +1694,11 @@
             };
 
             // The Insert Table dialog takes focus, so remember the caret position in the editor and restore it before inserting.
-            const openTableModal = () => {
-                const sel = window.getSelection();
-                savedRangeRef.current = (sel && sel.rangeCount && editorRef.current && editorRef.current.contains(sel.getRangeAt(0).commonAncestorContainer))
-                    ? sel.getRangeAt(0).cloneRange() : null;
-                setShowTableModal(true);
-            };
-            const insertTable = (rows, cols) => {
-                if (!(rows > 0 && cols > 0) || !editorRef.current) return;
-                let html = '<table>';
-                for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td>&nbsp;</td>'; html += '</tr>'; }
-                html += '</table><p></p>';
+            const openTableModal = () => { rememberCaret(); setShowTableModal(true); };
+            // Inserts HTML at the caret position remembered before a dialog or file picker took focus,
+            // falling back to the end of the description.
+            const insertHtmlAtCaret = (html) => {
+                if (!editorRef.current) return;
                 editorRef.current.focus();
                 const sel = window.getSelection();
                 let range = savedRangeRef.current;
@@ -1611,6 +1706,43 @@
                 sel.removeAllRanges();
                 sel.addRange(range);
                 document.execCommand('insertHTML', false, html);
+                savedRangeRef.current = null;
+            };
+            const rememberCaret = () => {
+                const sel = window.getSelection();
+                savedRangeRef.current = (sel && sel.rangeCount && editorRef.current && editorRef.current.contains(sel.getRangeAt(0).commonAncestorContainer))
+                    ? sel.getRangeAt(0).cloneRange() : null;
+            };
+
+            const insertTable = (rows, cols) => {
+                if (!(rows > 0 && cols > 0) || !editorRef.current) return;
+                let html = '<table>';
+                for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td>&nbsp;</td>'; html += '</tr>'; }
+                html += '</table><p></p>';
+                insertHtmlAtCaret(html);
+            };
+
+            // A figure must be stored as a data URL, not as a link to a file or a web page: the description is
+            // saved inside the .KNOW_SYS, and the Word report needs the image bytes themselves. Reading the
+            // chosen file here is the only way to get them -- a pasted file:/// or https:// image cannot be
+            // read back by the page, which is why such an image shows on screen but not in the Word report.
+            const imageHtml = (dataUrl) => '<p><img src="' + dataUrl + '" style="max-width: 100%;"></p><p></p>';
+            const openImagePicker = () => { rememberCaret(); imageInputRef.current && imageInputRef.current.click(); };
+            const insertImageFile = (file) => {
+                if (!file || !/^image\//.test(file.type || '')) return;
+                const reader = new FileReader();
+                reader.onload = () => insertHtmlAtCaret(imageHtml(reader.result));
+                reader.readAsDataURL(file);
+            };
+            // Pasting a screenshot or an image file: take the bytes from the clipboard rather than letting the
+            // browser drop in a link to a temporary file.
+            const handlePaste = (e) => {
+                const files = Array.from((e.clipboardData && e.clipboardData.files) || []);
+                const file = files.find(f => /^image\//.test(f.type || ''));
+                if (!file) return;
+                e.preventDefault();
+                rememberCaret();
+                insertImageFile(file);
             };
 
             const tb = (label, onClick, title) => (
@@ -1637,9 +1769,13 @@
                                 {tb('H2', () => exec('formatBlock', 'h2'), 'Heading 2')}
                                 {tb('P', () => exec('formatBlock', 'p'), 'Paragraph')}
                                 {tb('Table', openTableModal, 'Insert Table')}
+                                {tb('Image', openImagePicker, 'Insert Image (stored in the project and included in the Word report)')}
                                 {tb('Clear', clearFormatting, 'Clear Formatting')}
                             </div>
-                            <div ref={editorRef} className="rich-text-editor" contentEditable={true} suppressContentEditableWarning={true}></div>
+                            <input ref={imageInputRef} type="file" accept="image/*" className="hidden" style={{ display: 'none' }}
+                                   onChange={e => { const f = e.target.files[0]; e.target.value = ''; insertImageFile(f); }} />
+                            <div ref={editorRef} className="rich-text-editor" contentEditable={true} suppressContentEditableWarning={true}
+                                 onPaste={handlePaste}></div>
                             <div className="flex justify-end gap-2 mt-4">
                                 <button onClick={onClose} className="px-4 py-2 border rounded hover:bg-gray-100" style={{ borderColor: backgroundStyle.borderColor }}>Cancel</button>
                                 <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
@@ -1889,7 +2025,7 @@
                                                     key={option.value}
                                                     onClick={() => handleChange('quantificationMethod', option.value)}
                                                     className={`flex-1 px-4 py-2 rounded ${
-                                                        (localSettings.quantificationMethod || 'mcub') === option.value
+                                                        (localSettings.quantificationMethod || 'bdd') === option.value
                                                             ? 'bg-blue-600 text-white'
                                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                     }`}
@@ -3406,18 +3542,83 @@
                         return sscPart || fmPart || '';
                     };
                     
+                    // Parent information carried with every basic event. A cut set only ever
+                    // holds the failure mode event (e.g. Main_Coolant_Pump_A__FTR), so without
+                    // this a downstream tool cannot recover which SSC the event belongs to or
+                    // which of its failure modes it represents. KUREAS-SEQ uses it to describe
+                    // IE-specific failure modes added by NewFM().
+                    const parentOf = (fm) => ({
+                        parentSSC: ssc.name || '',
+                        sscLabel: ssc.label || '',
+                        sscDescription: ssc.description || '',
+                        sscType: ssc.sscType || '',
+                        failureMode: (fm && fm.mode) || '',
+                        failureModeDescription: (fm && fm.data && fm.data.description) || ''
+                    });
+
+                    // The quantification detail behind each basic event, in the same shape
+                    // the report's Detailed Failure Mode Information table uses, so a
+                    // downstream tool (KUREAS-SEQ) can reproduce that table from the file
+                    // alone. Mirrors ReportModal.buildFailureModeRows -- keep them in step.
+                    const detailOf = (fm) => {
+                        if (!fm) return {};
+                        const units = fm.data?.units || '';
+
+                        let probKind = 'value', probText = '';
+                        if (fm.probabilityType === 'screened') { probKind = 'screened'; probText = 'SCREENED'; }
+                        else if (fm.probabilityType === 'qualitative') {
+                            probKind = 'qualitative';
+                            probText = (fm.qualitativeLevel || 'unknown').toUpperCase();
+                        }
+
+                        let failRate = '';
+                        if (fm.lambda) failRate = fm.lambda + ' /hr';
+                        else if (fm.data?.mean && (units === 'h' || units === 'y' || units === 'hft'))
+                            failRate = fm.data.mean + ' ' + (units === 'h' ? '/hr' : units === 'y' ? '/yr' : '/hr/ft');
+                        else if (units === 'd' && fm.data?.mean) failRate = fm.data.mean + ' /demand';
+
+                        let runTime = '';
+                        if (fm.timeToOperate) runTime = fm.timeToOperate + ' hrs';
+                        else if (fm.missionTime) runTime = fm.missionTime + ' hrs';
+
+                        // The uncertainty distribution is carried in the SAPHIRE UdT /
+                        // UdValue fields below, not as prose in the notes.
+                        const notes = [];
+                        if (units === 'hft' && fm.pipeLength) notes.push('Pipe: ' + fm.pipeLength + ' ft');
+                        if (fm.failureModel && fm.failureModel !== '0' && fm.failureModel !== '2') notes.push('FM' + fm.failureModel);
+                        if (fm.inspInterval) notes.push('Insp: ' + fm.inspInterval + ' hrs');
+                        if (fm.tauRepair) notes.push('Tau: ' + fm.tauRepair + ' hrs');
+
+                        const unc = saphireUncertainty(fm);
+                        const rates = saphireRateFields(fm);
+
+                        return {
+                            fdT: saphireFdT(fm),
+                            udT: unc.UdT, udValue: unc.UdValue, udValue2: unc.UdValue2,
+                            lambda: rates.Lambda, tau: rates.Tau, mission: rates.Mission,
+                            fmGroupHeader: (ssc.name || '') + ': ' + (fm.mode || '')
+                                + (fm.data?.description ? ' - ' + fm.data.description : ''),
+                            fmProbKind: probKind,
+                            fmProbText: probText,
+                            fmFailureRate: failRate,
+                            fmRunTime: runTime,
+                            fmSource: fm.source || '',
+                            fmNotes: notes.join('; ')
+                        };
+                    };
+
                     if (fms.length > 1) {
-                        basicEventData[ssc.name] = { probability: null, description: ssc.description || '', hasMultipleModes: true, failureModeNames: fms.map((fm, i) => `${ssc.name}__${(fm.mode||`FM${i+1}`).replace(/\s+/g,'_')}`) };
+                        basicEventData[ssc.name] = Object.assign({ probability: null, description: ssc.description || '', hasMultipleModes: true, failureModeNames: fms.map((fm, i) => `${ssc.name}__${(fm.mode||`FM${i+1}`).replace(/\s+/g,'_')}`) }, parentOf(null));
                         fms.forEach((fm, i) => {
                             const key = `${ssc.name}__${(fm.mode||`FM${i+1}`).replace(/\s+/g,'_')}`;
                             // Only use ssc.description (not label/name) and fm.data.description (not mode name)
                             const combinedDesc = buildFMDescription(ssc.description, fm.data?.description);
-                            basicEventData[key] = { probability: getProb(fm), description: combinedDesc, parentSSC: ssc.name };
+                            basicEventData[key] = Object.assign({ probability: getProb(fm), description: combinedDesc }, parentOf(fm), detailOf(fm));
                         });
                     } else {
                         // Use same combined format: SSC description + FM description
                         const combinedDesc = buildFMDescription(ssc.description, fms[0].data?.description);
-                        basicEventData[ssc.name] = { probability: getProb(fms[0]), description: combinedDesc };
+                        basicEventData[ssc.name] = Object.assign({ probability: getProb(fms[0]), description: combinedDesc }, parentOf(fms[0]), detailOf(fms[0]));
                     }
                 }
 
@@ -3496,13 +3697,38 @@
                         const prob = ed.probability ?? 0;
                         eventInfo[node.name] = {
                             Name: node.name,
-                            FdT: '1', UdC: 'L', UdT: 'B',
-                            UdValue: prob, Prob: prob,
-                            Lambda: 0, Tau: 0, Mission: 0,
+                            // FdT and the uncertainty fields come from the failure mode.
+                            // UdC is the uncertainty CORRELATION CLASS, which KUREAS does
+                            // not model, so it is left blank rather than defaulted to 'L'.
+                            FdT: ed.fdT || '1',
+                            UdC: '',
+                            UdT: ed.udT !== undefined ? ed.udT : '',
+                            UdValue: ed.udValue !== undefined ? ed.udValue : '',
+                            UdValue2: ed.udValue2 !== undefined ? ed.udValue2 : '',
+                            Prob: prob,
+                            Lambda: ed.lambda || 0, Tau: ed.tau || 0, Mission: ed.mission || 0,
                             Init: false, PF: ' ',
-                            UdValue2: prob, Calc_Prob: prob,
+                            Calc_Prob: prob,
                             Freq: ' ', Model_Type: '', Phase_Type: '',
-                            Project: systemName || ''
+                            Project: systemName || '',
+                            // Parent SSC / failure mode provenance (KUREAS extension).
+                            // Omitted keys stay undefined rather than empty so older readers
+                            // and the SAPHIRE-shaped fields above are unaffected.
+                            ParentSSC: ed.parentSSC || undefined,
+                            ParentSSCLabel: ed.sscLabel || undefined,
+                            ParentSSCDescription: ed.sscDescription || undefined,
+                            ParentSSCType: ed.sscType || undefined,
+                            FailureMode: ed.failureMode || undefined,
+                            FailureModeDescription: ed.failureModeDescription || undefined,
+                            // Quantification detail, so the Detailed Failure Mode
+                            // Information table can be rebuilt from this file.
+                            FMGroupHeader: ed.fmGroupHeader || undefined,
+                            FMProbKind: ed.fmProbKind || undefined,
+                            FMProbText: ed.fmProbText || undefined,
+                            FMFailureRate: ed.fmFailureRate || undefined,
+                            FMRunTime: ed.fmRunTime || undefined,
+                            FMSource: ed.fmSource || undefined,
+                            FMNotes: ed.fmNotes || undefined
                         };
                         const desc = ed.description || '';
                         if (desc) eventDescriptions[node.name] = desc;
@@ -3544,7 +3770,22 @@
                     // Add CCF events to eventInfo for export
                     for (const [ccfName, ccfData] of Object.entries(ccfBasicEvents)) {
                         const ftlName = toFTLName(ccfName);
+                        // A CCF event carries the SAPHIRE record too: FdT 'R' is the
+                        // common-cause failure type, and its uncertainty follows the
+                        // distribution the group was built with.
+                        const ccfUnc = saphireUncertainty({ data: {
+                            distribution_type: ccfData.distributionType || 'cni',
+                            distribution_shape_parameter: ccfData.errorFactor || ccfData.data?.distribution_shape_parameter || ''
+                        } });
                         eventInfo[ftlName] = {
+                            Name: ftlName,
+                            FdT: 'R',
+                            UdC: '',
+                            UdT: ccfUnc.UdT,
+                            UdValue: ccfUnc.UdValue,
+                            UdValue2: ccfUnc.UdValue2,
+                            Prob: ccfData.probability,
+                            Lambda: 0, Tau: 0, Mission: 0,
                             Calc_Prob: ccfData.probability,
                             Description: ccfData.description,
                             IsCCF: true,
@@ -3552,7 +3793,9 @@
                             FailureModel: '0',
                             Distribution: (ccfData.distributionType || 'cni').toLowerCase(),
                             DistEF: ccfData.errorFactor || ccfData.data?.distribution_shape_parameter || 3,
-                            ccfBeta: ccfData.ccfBeta
+                            ccfBeta: ccfData.ccfBeta,
+                            // No FMNotes prose: a reader derives the CCF note from ccfBeta.
+                            FMGroupHeader: (ccfData.ccfGroup ? ccfData.ccfGroup + ': ' : '') + 'Common-cause failure'
                         };
                         eventDescriptions[ftlName] = ccfData.description;
                     }
@@ -3612,7 +3855,7 @@
 
                 const projectData = {
                     format: 'KUREAS-FTL',
-                    version: '1.4',
+                    version: '1.7',   // 1.6 added the FM* detail; 1.7 derives FdT/UdC/UdT/UdValue/Lambda/Tau/Mission
                     savedAt: new Date().toISOString(),
                     projectName: systemName || 'System',
                     projectDescription: `Fault tree exported from KUREAS-SYS for system: ${systemName||'System'}`,
@@ -3766,7 +4009,7 @@
                                 // FailureAnalysisModal, so the export matches what's shown
                                 // on screen for MCUB, Rare Event, and BDD alike (previously
                                 // this always used MCUB regardless of settings).
-                                quantMethodUsed = settings?.quantificationMethod || 'mcub';
+                                quantMethodUsed = settings?.quantificationMethod || 'bdd';
                                 if (validProbs.length > 0) {
                                     if (quantMethodUsed === 'rare') {
                                         mcubValue = Math.min(1.0, validProbs.reduce((sum, p) => sum + p, 0));
@@ -4615,6 +4858,35 @@
             return out.generateAsync({ type: 'blob', mimeType: DOCX_MIME });
         }
 
+        // A Word template can be kept inside the .KNOW_SYS so the project carries its own
+        // house style. The cap keeps a project file from being dominated by a template that
+        // was never meant to travel with it -- a template is styles, not content.
+        const TEMPLATE_MAX_BYTES = 1000 * 1024;   // 1,000 KB
+
+        /** ArrayBuffer -> base64, chunked so a large buffer cannot blow the call stack. */
+        function templateBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let bin = '';
+            const CHUNK = 0x8000;
+            for (let i = 0; i < bytes.length; i += CHUNK) {
+                bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+            }
+            return btoa(bin);
+        }
+
+        function templateBase64ToBuffer(b64) {
+            const bin = atob(b64 || '');
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        /** Human-readable size for the template notices. */
+        function templateSizeLabel(bytes) {
+            const kb = (bytes || 0) / 1024;
+            return kb >= 1024 ? (kb / 1024).toFixed(1) + ' MB' : Math.round(kb) + ' KB';
+        }
+
         /* ---- public API ---- */
         // Reads a user-selected Word document/template. Returns what both modes need; the file bytes are kept
         // so each report generation starts from an unmodified copy.
@@ -4776,7 +5048,7 @@
 
         /* ============================================================================
            KUREAS-SYS WORD REPORT (docx.js)
-           The Report dialog builds format-independent section data (buildWordReportSections)
+           The Report dialog builds format-independent section data (buildReportSections, numbered by numberReportSections)
            and generateSysReportDocx renders it with docx.js, then applies the Word template step.
            ============================================================================ */
         const APP_VERSION = '1.6';
@@ -4844,10 +5116,14 @@
         // Headings are demoted one level (H1 -> Heading 2, H2 -> Heading 3) so they nest under the section heading.
         // Lists use literal bullet/number text with a hanging indent rather than Word list numbering, because
         // Import Format replaces the report's numbering.xml and Merge does not copy it.
-        function reportHtmlToDocx(html, d, usableW) {
-            const { Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType } = d;
+        // headingNum(level) (optional) returns the outline-numbering props for a heading at level 1 (Heading 2), 2, 3.
+        function reportHtmlToDocx(html, d, usableW, headingNum) {
+            const { Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, TableLayoutType, ImageRun, AlignmentType } = d;
             const out = [];
             if (!html) return out;
+            // H1 -> Heading 2 (outline level 1), H2 -> Heading 3 (level 2); Heading 4 stays unnumbered.
+            const HEADING_LEVEL = { H1: 1, H2: 2 };
+            const numProps = (tag) => (headingNum && HEADING_LEVEL[tag] ? headingNum(HEADING_LEVEL[tag]) : {});
             const body = new DOMParser().parseFromString('<!DOCTYPE html><html><body>' + html + '</body></html>', 'text/html').body;
             const HEADINGS = { H1: HeadingLevel.HEADING_2, H2: HeadingLevel.HEADING_3, H3: HeadingLevel.HEADING_4, H4: HeadingLevel.HEADING_4, H5: HeadingLevel.HEADING_4, H6: HeadingLevel.HEADING_4 };
             const isBlock = (n) => n.nodeType === 1 && /^(P|DIV|H[1-6]|UL|OL|LI|TABLE|THEAD|TBODY|TFOOT|TR|TD|TH|PRE|BLOCKQUOTE|HR|SECTION|ARTICLE|HEADER|FOOTER)$/.test(n.tagName);
@@ -4860,7 +5136,7 @@
                     if (n.nodeType !== 1) return;
                     const tag = n.tagName;
                     if (tag === 'BR') { acc.push({ br: true }); return; }
-                    if (tag === 'SCRIPT' || tag === 'STYLE' || (skipLists && isList(n))) return;
+                    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'IMG' || (skipLists && isList(n))) return;
                     const f = { ...fmt };
                     if (tag === 'B' || tag === 'STRONG') f.bold = true;
                     if (tag === 'I' || tag === 'EM') f.italics = true;
@@ -4909,6 +5185,33 @@
                     Array.from(li.children).forEach(c => { if (isList(c)) addList(c, depth + 1); });
                 });
             };
+            // <img> in the rich text: embedded as a centered picture. The source must already be a PNG data
+            // URL -- inlineHtmlImages() in the Report dialog converts every image to one before this runs, so
+            // pasted blob: sources and JPEG/GIF files arrive here as PNG with their natural pixel size known.
+            const maxImgPx = Math.round(usableW / 15); // twips -> px at 96 dpi
+            const addImage = (el) => {
+                const src = el.getAttribute('src') || '';
+                const png = reportPngFromDataUrl(src);
+                if (!png || !png.width || !png.height) {
+                    // The image is linked rather than stored (a pasted file:/// or web address), so its bytes
+                    // are out of reach. Re-inserting it with the Image button in the Extended Description
+                    // editor stores it in the project and puts it in the report.
+                    const where = (String(src).match(/^[a-z]+:/i) || ['a linked file'])[0];
+                    out.push(new Paragraph({ spacing: { after: 120 }, children: [new TextRun({
+                        text: '(An image in the Extended Description is linked (' + where + ') rather than stored, so it could not be '
+                            + 'included here. Re-insert it with the Image button in the Extended Description editor.)',
+                        italics: true })] }));
+                    return;
+                }
+                // An explicit width on the element wins over the natural size, as long as it fits the page.
+                const styleW = parseFloat(((el.getAttribute('style') || '').match(/width\s*:\s*([\d.]+)px/i) || [])[1]);
+                const attrW = parseFloat(el.getAttribute('width'));
+                let w = [styleW, attrW, png.width].find(v => v > 0) || png.width;
+                if (w > maxImgPx) w = maxImgPx;
+                const h = Math.max(1, Math.round(png.height * (w / png.width)));
+                out.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 },
+                    children: [new ImageRun({ data: png.bytes, transformation: { width: Math.max(1, Math.round(w)), height: h } })] }));
+            };
             const addTable = (tableEl) => {
                 const rows = Array.from(tableEl.rows || []);
                 if (!rows.length) return;
@@ -4939,13 +5242,16 @@
                     if (runs.length) out.push(new Paragraph({ spacing: { after: 120 }, children: runs }));
                 };
                 Array.from(container.childNodes).forEach(n => {
+                    // An image ends the paragraph being built and becomes a picture of its own, whether it sits
+                    // between blocks or inline inside one.
+                    if (n.nodeType === 1 && n.tagName === 'IMG') { flush(); addImage(n); return; }
                     if (n.nodeType === 3 || (n.nodeType === 1 && !isBlock(n))) { collect({ childNodes: [n] }, {}, pending); return; }
                     if (n.nodeType !== 1) return;
                     flush();
                     const tag = n.tagName;
                     if (HEADINGS[tag]) {
                         const runs = makeRuns(collect(n, {}, []));
-                        if (runs.length) out.push(new Paragraph({ heading: HEADINGS[tag], children: runs }));
+                        if (runs.length) out.push(new Paragraph({ heading: HEADINGS[tag], children: runs, ...numProps(tag) }));
                     } else if (isList(n)) {
                         addList(n, 0);
                     } else if (tag === 'TABLE') {
@@ -4973,15 +5279,39 @@
         //                                                              each group: one shaded full-width row, then a row of cells
         //   { kind: 'references', entries: [{ key, text }] }
         //   { kind: 'image', id, dataUrl, title, widthPct? }           PNG data URL; widthPct of the usable width
-        // templateOpts: { mode: 'none' | 'format' | 'merge', template } -- template from loadWordTemplate().
+        // Tables and images carry num / uid / label / sec assigned by numberReportSections (ReportModal).
+        // templateOpts: { mode: 'none' | 'format' | 'merge', template, bySection, numberHeadings, firstSection }
+        //   -- template from loadWordTemplate(); the numbering options mirror the Report dialog.
         async function generateSysReportDocx(reportTitle, showDateTime, sections, filename, templateOpts) {
             const d = window.docx;
             if (!d) return { ok: false, message: 'Report library failed to load. Check your network connection.' };
-            const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, AlignmentType, SimpleField, TableLayoutType, Bookmark, ShadingType } = d;
+            const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, AlignmentType, SimpleField, TableLayoutType, Bookmark, ShadingType, LevelFormat } = d;
 
             const tpl = templateOpts && templateOpts.mode !== 'none' ? templateOpts.template : null;
             const tplMode = tpl ? templateOpts.mode : 'none';
             if (tpl && !window.JSZip) return { ok: false, message: 'Template library failed to load. Check your network connection.' };
+
+            // Caption numbering. With bySection on, a caption is written the way Word's
+            // own chapter-numbered captions are:
+            //     Table { STYLEREF 1 \s }-{ SEQ Table \* ARABIC \s 1 }
+            // STYLEREF picks up the number of the enclosing Heading 1 and the \s switch
+            // restarts the SEQ counter there, so inserting a section renumbers both parts.
+            const bySection = !!(templateOpts && templateOpts.bySection);
+            const firstSection = Math.max(1, parseInt(templateOpts && templateOpts.firstSection, 10) || 1);
+            // STYLEREF only yields a number when the headings are numbered. In 'format'
+            // and 'merge' modes the template's numbering.xml wins, so the template must
+            // supply that; we only number the headings ourselves in the standalone case.
+            const HEADING_NUM_REF = 'kb-report-headings';
+            const numberHeadings = !!(templateOpts && templateOpts.numberHeadings) && tplMode === 'none';
+            const headingNum = (level) => numberHeadings
+                ? { numbering: { reference: HEADING_NUM_REF, level } } : {};
+            const captionField = (word, b) => bySection
+                ? [new TextRun(word + ' '),
+                   new SimpleField('STYLEREF 1 \\s', String(b.sec !== undefined ? b.sec : '')),
+                   new TextRun('-'),
+                   new SimpleField('SEQ ' + word + ' \\* ARABIC \\s 1', String(b.num))]
+                : [new TextRun(word + ' '),
+                   new SimpleField('SEQ ' + word + ' \\* ARABIC', String(b.num))];
             const pg = tpl && tpl.page;
             const pgOk = !!(pg && pg.size && pg.size.width && pg.size.height && pg.margin && [pg.margin.top, pg.margin.right, pg.margin.bottom, pg.margin.left].every(v => v != null));
             const layoutPage = pgOk ? pg : REPORT_DEFAULT_PAGE;
@@ -4990,32 +5320,33 @@
             const maxWpx = Math.round(usableW / 15);          // twips -> px at 96 dpi
             const maxHpx = Math.round(usableH / 15 * 0.85);   // leave room for the caption
 
-            // Table and figure numbers in report order (cached SEQ/REF results must match Word's own count)
-            const numOf = new Map(), pngOf = new Map(), refs = {};
-            let tableCount = 0, figureCount = 0;
+            // Table and figure numbers come from the section builder (numberReportSections), so the
+            // cached SEQ/REF results match the Preview and Word's own count. The bookmark uses the
+            // never-restarting uid: with numbering by section, two captions could otherwise share a
+            // bookmark name and send every cross-reference to the first of them.
+            const pngOf = new Map(), refs = {};
             sections.forEach(s => s.blocks.forEach(b => {
                 if (b.kind === 'table' || b.kind === 'groupedTable') {
-                    numOf.set(b, ++tableCount);
-                    if (b.id) refs[b.id] = { type: 'table', num: tableCount };
+                    if (b.id) refs[b.id] = { type: 'table', uid: b.uid, label: b.label };
                 } else if (b.kind === 'image') {
                     const png = reportPngFromDataUrl(b.dataUrl);
-                    if (!png || !png.width || !png.height) return;
-                    pngOf.set(b, png);
-                    numOf.set(b, ++figureCount);
-                    if (b.id) refs[b.id] = { type: 'figure', num: figureCount };
+                    if (png && png.width && png.height) pngOf.set(b, png);
+                    if (b.id) refs[b.id] = { type: 'figure', uid: b.uid, label: b.label };
                 }
             }));
+            // In-text cross reference: a REF field to the caption's bookmark, so the number in the
+            // sentence tracks the caption when sections are added or moved.
             const refField = (id) => {
                 const r = refs[id];
                 if (!r) return null;
-                return r.type === 'table' ? new SimpleField(`REF ${REPORT_TABLE_BOOKMARK(r.num)} \\h`, 'Table ' + r.num)
-                                          : new SimpleField(`REF ${REPORT_FIGURE_BOOKMARK(r.num)} \\h`, 'Figure ' + r.num);
+                return r.type === 'table' ? new SimpleField(`REF ${REPORT_TABLE_BOOKMARK(r.uid)} \\h`, 'Table ' + r.label)
+                                          : new SimpleField(`REF ${REPORT_FIGURE_BOOKMARK(r.uid)} \\h`, 'Figure ' + r.label);
             };
 
-            // Word table caption above the table: Caption style + SEQ Table field, kept with the table
-            const tableCaption = (num, title) => new Paragraph({ style: 'Caption', keepNext: true, spacing: { before: 120, after: 60 }, children: [
-                new Bookmark({ id: REPORT_TABLE_BOOKMARK(num), children: [new TextRun('Table '), new SimpleField('SEQ Table \\* ARABIC', String(num))] }),
-                new TextRun(`. ${title}.`)] });
+            // Word table caption above the table: Caption style + (STYLEREF-)SEQ Table field, kept with the table
+            const tableCaption = (b) => new Paragraph({ style: 'Caption', keepNext: true, spacing: { before: 120, after: 60 }, children: [
+                new Bookmark({ id: REPORT_TABLE_BOOKMARK(b.uid), children: captionField('Table', b) }),
+                new TextRun(`. ${b.title}.`)] });
 
             const children = [];
             // In merge mode a template that places {{PROJECT_NAME}} supplies its own title block.
@@ -5025,23 +5356,22 @@
             }
 
             sections.forEach(s => {
-                children.push(new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_1, spacing: { before: 300 } }));
+                children.push(new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_1, spacing: { before: 300 }, ...headingNum(0) }));
                 s.blocks.forEach(b => {
                     if (b.kind === 'para') {
                         children.push(new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: String(b.text), bold: b.bold || undefined, italics: b.italics || undefined })] }));
                     } else if (b.kind === 'refPara') {
-                        const parts = b.parts.map(part => typeof part === 'string' ? new TextRun(part) : refField(part.ref));
+                        const parts = b.parts.filter(part => part !== '').map(part => typeof part === 'string' ? new TextRun(part) : refField(part.ref));
                         if (parts.every(Boolean)) children.push(new Paragraph({ spacing: { after: 120 }, children: parts }));
                     } else if (b.kind === 'heading2') {
-                        children.push(new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_2, spacing: { before: 200 } }));
+                        children.push(new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_2, spacing: { before: 200 }, ...headingNum(1) }));
                     } else if (b.kind === 'html') {
-                        reportHtmlToDocx(b.html, d, usableW).forEach(c => children.push(c));
+                        reportHtmlToDocx(b.html, d, usableW, headingNum).forEach(c => children.push(c));
                     } else if (b.kind === 'code') {
                         String(b.text || '').replace(/\r/g, '').split('\n').forEach(line => children.push(new Paragraph({ style: 'KureasCode', children: [new TextRun(line)] })));
                     } else if (b.kind === 'table') {
-                        const num = numOf.get(b);
                         const colW = b.colWidths ? b.colWidths.map(pct => Math.round(usableW * pct / 100)) : null;
-                        children.push(tableCaption(num, b.title));
+                        children.push(tableCaption(b));
                         const cellOpts = (i) => colW ? { width: { size: colW[i], type: WidthType.DXA } } : {};
                         const headerRow = new TableRow({ tableHeader: true, children: b.headers.map((h, i) => new TableCell({ ...cellOpts(i), children: [new Paragraph({ style: 'Small_Table', children: [new TextRun({ text: h, bold: true })] })] })) });
                         const bodyRows = b.rows.map(r => new TableRow({ children: r.map((c, i) => new TableCell({ ...cellOpts(i), children: [new Paragraph({ style: 'Small_Table', text: c == null ? '' : String(c) })] })) }));
@@ -5052,7 +5382,7 @@
                     } else if (b.kind === 'groupedTable') {
                         const colW = b.colWidths.map(pct => Math.round(usableW * pct / 100));
                         const totalW = colW.reduce((x, y) => x + y, 0);
-                        children.push(tableCaption(numOf.get(b), b.title));
+                        children.push(tableCaption(b));
                         const rows = [new TableRow({ tableHeader: true, children: b.headers.map((h, i) => new TableCell({ width: { size: colW[i], type: WidthType.DXA }, children: [new Paragraph({ style: 'Small_Table', children: [new TextRun({ text: h, bold: true })] })] })) })];
                         b.groups.forEach(g => {
                             // Group header: one light grey cell spanning all columns, kept with the row below it
@@ -5076,10 +5406,9 @@
                         const scale = Math.min(maxWpx * (b.widthPct || 100) / 100 / png.width, maxHpx / png.height);
                         children.push(new Paragraph({ alignment: AlignmentType.CENTER, keepNext: true,
                             children: [new ImageRun({ data: png.bytes, transformation: { width: Math.max(1, Math.round(png.width * scale)), height: Math.max(1, Math.round(png.height * scale)) } })] }));
-                        // Word caption: Caption style + SEQ Figure field (works with Insert Table of Figures / cross-references)
-                        const num = numOf.get(b);
+                        // Word caption: Caption style + (STYLEREF-)SEQ Figure field (works with Insert Table of Figures / cross-references)
                         children.push(new Paragraph({ style: 'Caption', alignment: AlignmentType.CENTER, children: [
-                            new Bookmark({ id: REPORT_FIGURE_BOOKMARK(num), children: [new TextRun('Figure '), new SimpleField('SEQ Figure \\* ARABIC', String(num))] }),
+                            new Bookmark({ id: REPORT_FIGURE_BOOKMARK(b.uid), children: captionField('Figure', b) }),
                             new TextRun(`. ${b.title}.`)] }));
                     }
                 });
@@ -5087,7 +5416,22 @@
 
             const page = { size: layoutPage.size, margin: { ...REPORT_DEFAULT_PAGE.margin } };
             Object.keys(layoutPage.margin).forEach(k => { if (layoutPage.margin[k] != null) page.margin[k] = layoutPage.margin[k]; });
+            // Outline numbering for the report's own headings: 1, 1.1, 1.1.1, starting
+            // at the section the report occupies. STYLEREF in the captions reads from it.
+            const headingNumbering = numberHeadings ? { config: [{
+                reference: HEADING_NUM_REF,
+                levels: [0, 1, 2].map(lvl => ({
+                    level: lvl,
+                    format: LevelFormat.DECIMAL,
+                    text: [0, 1, 2].slice(0, lvl + 1).map(i => '%' + (i + 1)).join('.'),
+                    alignment: AlignmentType.START,
+                    ...(lvl === 0 ? { start: firstSection } : {}),
+                    style: { paragraph: { indent: { left: 0, firstLine: 0 } } }
+                }))
+            }] } : null;
+
             const doc = new Document({
+                ...(headingNumbering ? { numbering: headingNumbering } : {}),
                 styles: { paragraphStyles: [
                     { id: 'Caption', name: 'caption', basedOn: 'Normal', next: 'Normal', quickFormat: true,
                       run: { italics: true, size: 18, color: '44546A' }, paragraph: { spacing: { before: 60, after: 240 } } },
@@ -5117,7 +5461,7 @@
             return { ok: true };
         }
 
-        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, buildImportanceEngine, formatProbability, settings, pidDiagram, applyCCFExpansion, buildCCFContext, parseTruncationThreshold }) {
+        function ReportModal({ onClose, backgroundStyle, systemName, systemDescription, systemLogic, sscsInSystem, hasFailureInfo, parseSystemWorksExpression, generateMinimalCutSets, calculateCutSetProbability, calculateMCUB, calculateBDD, buildImportanceEngine, formatProbability, settings, pidDiagram, applyCCFExpansion, buildCCFContext, parseTruncationThreshold, projectTemplate, onStoreTemplate }) {
             const [fileFormat, setFileFormat] = useState(() => {
                 return localStorage.getItem('KUREAS_SYS_reportFormat') || 'word';
             });
@@ -5139,16 +5483,102 @@
             });
             const [generating, setGenerating] = useState(false);
             const [error, setError] = useState('');
-            const [templateMode, setTemplateMode] = useState('none'); // 'none' | 'format' | 'merge'
+            // A template stored in the project is the default: the analyst chose it for
+            // this project, so a report should use it without being told again.
+            const [templateMode, setTemplateMode] = useState(
+                () => (projectTemplate && projectTemplate.mode) || 'none'); // 'none' | 'format' | 'merge'
             const [template, setTemplate] = useState(null);
+            const [storeTemplate, setStoreTemplate] = useState(!!projectTemplate);
+            const [templateNotice, setTemplateNotice] = useState('');
+
+            // Rehydrate the stored template on open. loadWordTemplate only needs a name
+            // and an arrayBuffer(), so the decoded bytes stand in for the File.
+            useEffect(() => {
+                if (!projectTemplate || !projectTemplate.data) return;
+                let cancelled = false;
+                (async () => {
+                    try {
+                        const buf = templateBase64ToBuffer(projectTemplate.data);
+                        const tpl = await loadWordTemplate({
+                            name: projectTemplate.name || 'template.docx',
+                            arrayBuffer: async () => buf
+                        });
+                        if (!cancelled) setTemplate(tpl);
+                    } catch (err) {
+                        if (!cancelled) setError('The template stored in this project could not be read: ' + err.message);
+                    }
+                })();
+                return () => { cancelled = true; };
+            }, []);
+
+            // Keep what the project stores in step with what the dialog shows.
+            const persistTemplate = (tpl, mode, keep) => {
+                if (!onStoreTemplate) return;
+                if (!keep || !tpl || mode === 'none') { onStoreTemplate(null); return; }
+                if (tpl.size > TEMPLATE_MAX_BYTES) { onStoreTemplate(null); return; }
+                onStoreTemplate({
+                    name: tpl.name, size: tpl.size, mode,
+                    data: templateBufferToBase64(tpl.buffer)
+                });
+            };
 
             const handleTemplatePick = async (e) => {
                 const file = e.target.files[0];
                 e.target.value = ''; // allow re-selecting the same file
                 if (!file) return;
-                try { setTemplate(await loadWordTemplate(file)); setError(''); }
-                catch (err) { setTemplate(null); setError('Template error: ' + err.message); }
+                try {
+                    const tpl = await loadWordTemplate(file);
+                    setTemplate(tpl);
+                    setError('');
+                    if (tpl.size > TEMPLATE_MAX_BYTES) {
+                        // Usable for this report, just too big to carry in the project.
+                        setStoreTemplate(false);
+                        persistTemplate(null, templateMode, false);
+                        setTemplateNotice('This template is ' + templateSizeLabel(tpl.size)
+                            + ', over the ' + templateSizeLabel(TEMPLATE_MAX_BYTES)
+                            + ' limit, so it cannot be saved inside the project file. It still applies to this report.');
+                    } else {
+                        setTemplateNotice('');
+                        persistTemplate(tpl, templateMode, storeTemplate);
+                    }
+                } catch (err) {
+                    setTemplate(null);
+                    setTemplateNotice('');
+                    setError('Template error: ' + err.message);
+                }
             };
+
+            const handleTemplateModeChange = (mode) => {
+                setTemplateMode(mode);
+                persistTemplate(template, mode, storeTemplate);
+            };
+
+            const handleClearTemplate = () => {
+                setTemplate(null);
+                setStoreTemplate(false);
+                setTemplateNotice('');
+                persistTemplate(null, templateMode, false);
+            };
+
+            const handleStoreTemplateToggle = (checked) => {
+                setStoreTemplate(checked);
+                persistTemplate(template, templateMode, checked);
+            };
+
+            // Number tables and figures by the section they appear in (Table 5-1), and
+            // the number the first top-level section carries -- set it to match the
+            // report's place in a larger document.
+            const [numberBySection, setNumberBySection] = useState(() =>
+                localStorage.getItem('KUREAS_SYS_reportNumberBySection') === 'true');
+            const [firstSectionNum, setFirstSectionNum] = useState(() =>
+                parseInt(localStorage.getItem('KUREAS_SYS_reportFirstSection'), 10) || 1);
+            // Word's STYLEREF field only produces a section number when the headings
+            // themselves are numbered, so the report can apply outline numbering to its
+            // own headings. A Word template supplies its own, and wins.
+            const [numberHeadings, setNumberHeadings] = useState(() => {
+                const v = localStorage.getItem('KUREAS_SYS_reportNumberHeadings');
+                return v === null ? true : v === 'true';
+            });
             
             // Update fileName when systemName changes
             useEffect(() => {
@@ -5219,6 +5649,10 @@
             useEffect(() => {
                 localStorage.setItem('KUREAS_SYS_reportContentItems', JSON.stringify(contentItems));
             }, [contentItems]);
+
+            useEffect(() => { localStorage.setItem('KUREAS_SYS_reportNumberBySection', numberBySection.toString()); }, [numberBySection]);
+            useEffect(() => { localStorage.setItem('KUREAS_SYS_reportFirstSection', String(firstSectionNum)); }, [firstSectionNum]);
+            useEffect(() => { localStorage.setItem('KUREAS_SYS_reportNumberHeadings', numberHeadings.toString()); }, [numberHeadings]);
             
             const moveItem = (index, direction) => {
                 if (direction === 'up' && index > 0) {
@@ -5564,7 +5998,7 @@
                 const cutSetProbabilities = validCutSets.map(cs => cs.probability);
                 
                 // Calculate system failure probability based on selected method
-                const quantificationMethod = settings?.quantificationMethod || 'mcub';
+                const quantificationMethod = settings?.quantificationMethod || 'bdd';
                 let systemProb = null;
                 let methodUsed = quantificationMethod;
                 
@@ -5650,81 +6084,34 @@
                 else if (fileFormat === 'word') onClose();
             };
 
-            // Build clean preview HTML (no Word namespaces) from the same HTML section generators
+            // Preview: the same sections as the Word report, rendered to clean HTML for the iframe / Print
             const generatePreviewReport = async () => {
                 try {
-                    // Mermaid renderer (same as Word path)
-                    const renderMermaidToImage = async (mermaidCode) => {
-                        try {
-                            mermaid.initialize({ startOnLoad: false, theme: 'default', flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }, securityLevel: 'loose' });
-                            const uid = 'prev-mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                            const { svg } = await mermaid.render(uid, mermaidCode);
-                            const parser = new DOMParser();
-                            const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
-                            const svgEl = svgDoc.documentElement;
-                            let w = 800, h = 600;
-                            const vb = svgEl.getAttribute('viewBox');
-                            if (vb) { const p = vb.split(/[\s,]+/).map(Number); if (p.length === 4) { w = p[2]||800; h = p[3]||600; } }
-                            else { w = parseFloat(svgEl.getAttribute('width'))||800; h = parseFloat(svgEl.getAttribute('height'))||600; }
-                            w = Math.max(w, 100); h = Math.max(h, 100);
-                            svgEl.setAttribute('xmlns','http://www.w3.org/2000/svg');
-                            svgEl.setAttribute('width', w); svgEl.setAttribute('height', h);
-                            const svgData = new XMLSerializer().serializeToString(svgEl);
-                            const b64 = btoa(unescape(encodeURIComponent(svgData)));
-                            const dataUrl = 'data:image/svg+xml;base64,' + b64;
-                            return new Promise(resolve => {
-                                const canvas = document.createElement('canvas');
-                                canvas.width = w*2; canvas.height = h*2;
-                                const ctx = canvas.getContext('2d');
-                                ctx.fillStyle = 'white'; ctx.fillRect(0,0,canvas.width,canvas.height);
-                                const img = new Image();
-                                img.onload = () => { try { ctx.drawImage(img,0,0,canvas.width,canvas.height); resolve(canvas.toDataURL('image/png')); } catch(e){ resolve(dataUrl); } };
-                                img.onerror = () => resolve(dataUrl);
-                                img.src = dataUrl;
-                            });
-                        } catch(err) { return null; }
-                    };
-
                     let body = '';
-                    // Title + date
-                    body += `<h1 style="margin:0 0 8px 0;font-size:24px;color:#1e3a8a;text-align:center;">${systemName || 'System Report'}</h1>`;
+                    body += `<h1 class="title">${escapeHtml(systemName || 'System Report')}</h1>`;
                     if (showDateTime) {
                         body += `<p style="margin:4px 0 0 0;font-size:13px;text-align:center;color:#6b7280;"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>`;
                     }
                     body += `<hr style="margin:16px 0;border:none;border-top:2px solid #e5e7eb;">`;
-
-                    const citations = collectReportCitations();
-                    for (const item of contentItems) {
-                        if (!item.enabled) continue;
-                        switch(item.id) {
-                            case 'systemName':    body += generateHTMLSystemNameSection(); break;
-                            case 'extendedDesc':  body += generateHTMLExtendedDescSection(); break;
-                            case 'sscInfo':       body += generateHTMLSSCInfoSection(citations); break;
-                            case 'references':    body += generateHTMLReferencesSection(citations); break;
-                            case 'fmeaInfo':      body += await generateHTMLFMEAInfoSectionAsync(renderMermaidToImage); break;
-                            case 'systemWorks':   body += generateHTMLSystemWorksSection(); break;
-                            
-                            case 'ftLogic':       body += generateHTMLFTLogicSection(); break;
-                            case 'ftGraphic':     body += generateHTMLFTGraphicSection(); break;
-                            case 'ftCutSets':     if (hasFailureInfo) body += generateHTMLFTCutSetsSection(); break;
-                            case 'ccfTable':      body += generateHTMLCCFTableSection(); break;
-                            case 'impGraphic':    body += generateHTMLImpGraphicSection(); break;
-                            case 'impTable':      if (hasFailureInfo) body += generateHTMLImpTableSection(); break;
-                            case 'pidGraphic':    body += await generateHTMLPIDSectionAsync(); break;
-                        }
-                    }
+                    body += reportSectionsToHtml(await buildReportSections(renderMermaidToImage));
 
                     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>${systemName || 'System Report'}</title>
+<title>${escapeHtml(systemName || 'System Report')}</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 0; padding: 28px 36px; color: #111827; background: #fff; font-size: 13px; line-height: 1.5; }
   h1,h2,h3 { color: #1e3a8a; }
-  h2 { font-size: 17px; border-bottom: 2px solid #bfdbfe; padding-bottom: 4px; margin-top: 28px; }
-  h3 { font-size: 14px; margin-top: 18px; color: #1e40af; }
-  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+  h1.title { margin: 0 0 8px 0; font-size: 24px; text-align: center; }
+  h1 { font-size: 17px; border-bottom: 2px solid #bfdbfe; padding-bottom: 4px; margin-top: 28px; }
+  h2 { font-size: 14px; margin-top: 18px; color: #1e40af; }
+  h3 { font-size: 13px; margin-top: 14px; color: #1e40af; }
+  p { margin: 6px 0 8px 0; text-align: justify; }
+  table { border-collapse: collapse; width: 100%; margin: 4px 0 12px 0; font-size: 12px; table-layout: fixed; }
   th { background: #1e3a8a; color: white; padding: 6px 8px; text-align: left; }
-  td { border: 1px solid #e5e7eb; padding: 5px 8px; vertical-align: top; }
+  td { border: 1px solid #e5e7eb; padding: 5px 8px; vertical-align: top; word-wrap: break-word; }
   tr:nth-child(even) td { background: #f9fafb; }
+  td.group-row { background: #d9d9d9 !important; font-weight: bold; }
+  .caption { font-style: italic; color: #44546a; font-size: 11px; text-align: center; margin: 2px 0 14px 0; }
+  .caption-above { font-style: italic; color: #44546a; font-size: 11px; margin: 10px 0 2px 0; text-align: left; }
   pre, code { font-family: 'Courier New', monospace; background: #f3f4f6; padding: 10px; border-radius: 4px; font-size: 11px; white-space: pre-wrap; display: block; }
   hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
   img { max-width: 100%; border: 1px solid #e5e7eb; border-radius: 6px; }
@@ -5734,6 +6121,7 @@
                     setPreviewHTML(html);
                     setShowHTMLPreview(true);
                 } catch(err) {
+                    console.error('Preview error:', err);
                     setError('Error generating preview: ' + err.message);
                 }
             };
@@ -6308,144 +6696,298 @@
                 URL.revokeObjectURL(url);
             };
             
+            // Rewrites every <img> in rich text (Extended Description) to a PNG data URL with its natural size
+            // recorded, so the Word renderer can embed it. Handles pasted blob: sources, which do not survive
+            // the project file, and JPEG/GIF files, which docx.js writes with a .png extension. An image that
+            // cannot be read (cross-origin, or a blob: URL already released) is left as it is; Word then shows
+            // the placeholder line instead of dropping it silently.
+            const inlineHtmlImages = async (html) => {
+                if (!html || html.indexOf('<img') < 0) return html;
+                const doc = new DOMParser().parseFromString('<!DOCTYPE html><html><body>' + html + '</body></html>', 'text/html');
+                const imgs = Array.from(doc.body.querySelectorAll('img'));
+                if (!imgs.length) return html;
+                // Reading the pixels back off a canvas fails for an image the page is not allowed to read --
+                // a file:/// source, or a web address without CORS headers. Fetching the bytes directly works
+                // for a same-origin or CORS-enabled address, so it is tried first for anything that is not
+                // already a data URL.
+                const fetchAsDataUrl = async (src) => {
+                    if (/^data:/i.test(src)) return null;
+                    try {
+                        const res = await fetch(src);
+                        if (!res.ok) return null;
+                        const blob = await res.blob();
+                        if (!/^image\//.test(blob.type || '')) return null;
+                        return await new Promise((ok, no) => {
+                            const fr = new FileReader();
+                            fr.onload = () => ok(fr.result);
+                            fr.onerror = no;
+                            fr.readAsDataURL(blob);
+                        });
+                    } catch (err) { return null; }
+                };
+                await Promise.all(imgs.map(el => new Promise(async resolve => {
+                    let src = el.getAttribute('src') || '';
+                    if (!src) { resolve(); return; }
+                    if (!/^data:/i.test(src)) {
+                        const fetched = await fetchAsDataUrl(src);
+                        if (fetched) { el.setAttribute('src', fetched); src = fetched; }
+                    }
+                    const img = new Image();
+                    if (!/^data:/i.test(src)) img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        try {
+                            const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+                            if (!w || !h) { resolve(); return; }
+                            // Keep the file a sensible size: a screenshot wider than the page gains nothing from
+                            // its extra pixels once it is scaled to the text width.
+                            const scale = Math.min(1, 1600 / w);
+                            const canvas = document.createElement('canvas');
+                            canvas.width = Math.max(1, Math.round(w * scale));
+                            canvas.height = Math.max(1, Math.round(h * scale));
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = 'white';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            el.setAttribute('src', canvas.toDataURL('image/png'));
+                        } catch (err) {
+                            // Tainted canvas: the page may display the image but not read its pixels.
+                            console.error('Report image could not be read:', err);
+                            el.setAttribute('data-kureas-unreadable', '1');
+                        }
+                        resolve();
+                    };
+                    img.onerror = () => { el.setAttribute('data-kureas-unreadable', '1'); resolve(); };
+                    img.src = src;
+                })));
+                return doc.body.innerHTML;
+            };
+
+            // Renders Mermaid (FMEA) code to a PNG data URL (shared by Preview and Word)
+            const renderMermaidToImage = async (mermaidCode) => {
+                try {
+                    mermaid.initialize({
+                        startOnLoad: false,
+                        theme: 'default',
+                        flowchart: {
+                            useMaxWidth: true,
+                            htmlLabels: true,
+                            curve: 'basis'
+                        },
+                        securityLevel: 'loose'
+                    });
+                    
+                    const uniqueId = 'report-mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                    const { svg } = await mermaid.render(uniqueId, mermaidCode);
+                    
+                    // Parse the SVG to get dimensions and prepare for canvas
+                    const parser = new DOMParser();
+                    const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+                    const svgElement = svgDoc.documentElement;
+                    
+                    // Get dimensions from SVG
+                    let contentWidth = 800, contentHeight = 600;
+                    const viewBox = svgElement.getAttribute('viewBox');
+                    if (viewBox) {
+                        const parts = viewBox.split(/[\s,]+/).map(Number);
+                        if (parts.length === 4) {
+                            contentWidth = parts[2] || 800;
+                            contentHeight = parts[3] || 600;
+                        }
+                    } else {
+                        contentWidth = parseFloat(svgElement.getAttribute('width')) || 800;
+                        contentHeight = parseFloat(svgElement.getAttribute('height')) || 600;
+                    }
+                    
+                    // Ensure minimum dimensions
+                    contentWidth = Math.max(contentWidth, 100);
+                    contentHeight = Math.max(contentHeight, 100);
+                    
+                    // Set proper attributes on SVG
+                    svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                    svgElement.setAttribute('width', contentWidth);
+                    svgElement.setAttribute('height', contentHeight);
+                    
+                    // Serialize to string and create base64 data URL
+                    const svgData = new XMLSerializer().serializeToString(svgElement);
+                    const svgBase64 = btoa(unescape(encodeURIComponent(svgData)));
+                    const dataUrl = 'data:image/svg+xml;base64,' + svgBase64;
+                    
+                    // Convert to PNG using canvas
+                    return new Promise((resolve) => {
+                        const canvas = document.createElement('canvas');
+                        const scale = 2;
+                        canvas.width = contentWidth * scale;
+                        canvas.height = contentHeight * scale;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                resolve(canvas.toDataURL('image/png'));
+                            } catch (e) {
+                                console.error('Canvas draw error:', e);
+                                // Fallback: return SVG data URL directly
+                                resolve(dataUrl);
+                            }
+                        };
+                        img.onerror = () => {
+                            console.error('Image load error');
+                            // Fallback: return SVG data URL directly
+                            resolve(dataUrl);
+                        };
+                        img.src = dataUrl;
+                    });
+                } catch (err) {
+                    console.error('Mermaid render error:', err);
+                    return null;
+                }
+            };
+
             // ==================== WORD REPORT GENERATION ====================
             
             const generateWordReport = async () => {
                 try {
-                    // Helper function to render mermaid to base64 PNG image
-                    const renderMermaidToImage = async (mermaidCode) => {
-                        try {
-                            mermaid.initialize({
-                                startOnLoad: false,
-                                theme: 'default',
-                                flowchart: {
-                                    useMaxWidth: true,
-                                    htmlLabels: true,
-                                    curve: 'basis'
-                                },
-                                securityLevel: 'loose'
-                            });
-                            
-                            const uniqueId = 'report-mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                            const { svg } = await mermaid.render(uniqueId, mermaidCode);
-                            
-                            // Parse the SVG to get dimensions and prepare for canvas
-                            const parser = new DOMParser();
-                            const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
-                            const svgElement = svgDoc.documentElement;
-                            
-                            // Get dimensions from SVG
-                            let contentWidth = 800, contentHeight = 600;
-                            const viewBox = svgElement.getAttribute('viewBox');
-                            if (viewBox) {
-                                const parts = viewBox.split(/[\s,]+/).map(Number);
-                                if (parts.length === 4) {
-                                    contentWidth = parts[2] || 800;
-                                    contentHeight = parts[3] || 600;
-                                }
-                            } else {
-                                contentWidth = parseFloat(svgElement.getAttribute('width')) || 800;
-                                contentHeight = parseFloat(svgElement.getAttribute('height')) || 600;
-                            }
-                            
-                            // Ensure minimum dimensions
-                            contentWidth = Math.max(contentWidth, 100);
-                            contentHeight = Math.max(contentHeight, 100);
-                            
-                            // Set proper attributes on SVG
-                            svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-                            svgElement.setAttribute('width', contentWidth);
-                            svgElement.setAttribute('height', contentHeight);
-                            
-                            // Serialize to string and create base64 data URL
-                            const svgData = new XMLSerializer().serializeToString(svgElement);
-                            const svgBase64 = btoa(unescape(encodeURIComponent(svgData)));
-                            const dataUrl = 'data:image/svg+xml;base64,' + svgBase64;
-                            
-                            // Convert to PNG using canvas
-                            return new Promise((resolve) => {
-                                const canvas = document.createElement('canvas');
-                                const scale = 2;
-                                canvas.width = contentWidth * scale;
-                                canvas.height = contentHeight * scale;
-                                const ctx = canvas.getContext('2d');
-                                ctx.fillStyle = 'white';
-                                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                                
-                                const img = new Image();
-                                img.onload = () => {
-                                    try {
-                                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                        resolve(canvas.toDataURL('image/png'));
-                                    } catch (e) {
-                                        console.error('Canvas draw error:', e);
-                                        // Fallback: return SVG data URL directly
-                                        resolve(dataUrl);
-                                    }
-                                };
-                                img.onerror = () => {
-                                    console.error('Image load error');
-                                    // Fallback: return SVG data URL directly
-                                    resolve(dataUrl);
-                                };
-                                img.src = dataUrl;
-                            });
-                        } catch (err) {
-                            console.error('Mermaid render error:', err);
-                            return null;
-                        }
-                    };
-                    
-                    const sections = await buildWordReportSections(renderMermaidToImage);
-                    return await generateSysReportDocx(systemName || 'System Report', showDateTime, sections, fileName, { mode: templateMode, template });
+                    const sections = await buildReportSections(renderMermaidToImage);
+                    return await generateSysReportDocx(systemName || 'System Report', showDateTime, sections, fileName, {
+                        mode: templateMode, template,
+                        bySection: numberBySection, numberHeadings, firstSection: firstSectionNum
+                    });
                 } catch (error) {
                     console.error(error);
                     return { ok: false, message: 'Error generating Word document: ' + error.message };
                 }
             };
 
-            // Format-independent report content for the Word (docx.js) renderer. Same content and skip rules
-            // as the HTML section generators used by Preview, plus Word table/figure captions and cross-references.
-            const buildWordReportSections = async (renderMermaidToImage) => {
+            // Format-independent report content shared by Preview (reportSectionsToHtml) and Word
+            // (generateSysReportDocx), so both carry the same narrative, numbering, tables and figures.
+            // Each section: { key, label, blocks }; block kinds are listed above generateSysReportDocx.
+            // refPara parts may also be { sec: itemId } -- resolved here to "Section N" once the
+            // section numbers are known (numberReportSections).
+            const buildReportSections = async (renderMermaidToImage) => {
                 const fmtProb = (prob) => {
                     if (prob === null || prob === undefined || prob === '') return '';
                     const v = parseFloat(prob);
                     return isNaN(v) ? String(prob) : formatProbability(v, settings.showProbability);
                 };
+                const fp = (v) => (v === null || v === undefined || isNaN(v)) ? 'N/A' : formatProbability(v, settings.showProbability);
                 const isPng = (url) => typeof url === 'string' && url.indexOf('data:image/png') === 0;
+                // Counting words below ten read better spelled out in prose.
+                const COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+                const spellCount = (n) => (Number.isInteger(n) && n >= 0 && n < 10) ? COUNT_WORDS[n] : String(n);
+                const plural = (n, word, pl) => n === 1 ? word : (pl || word + 's');
+                const countOf = (n, word, pl) => spellCount(n) + ' ' + plural(n, word, pl);
+                const isAre = (n) => n === 1 ? 'is' : 'are';
+                const sysLabel = (systemName && systemName !== 'System_Name') ? 'the ' + systemName + ' system' : 'the system';
+                const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+                const pct = (x) => x >= 99.95 ? '100' : x >= 10 ? x.toFixed(0) : x.toFixed(1);
+                const listNames = (arr) => arr.length <= 1 ? arr.join('') : arr.slice(0, -1).join(', ') + (arr.length > 2 ? ',' : '') + ' and ' + arr[arr.length - 1];
+
+                // Which sections will appear, so a cross-reference is only written to a section that exists
+                // (the same skip rules the cases below apply before writing any block).
+                const enabledIds = new Set(contentItems.filter(i => i.enabled).map(i => i.id));
+                const hasCCF = !!(ccfEvents && Object.keys(ccfEvents).length);
+                const present = (id) => {
+                    if (!enabledIds.has(id)) return false;
+                    switch (id) {
+                        case 'systemName':   return false;
+                        case 'extendedDesc': return !!((systemDescription || '').replace(/<[^>]+>/g, '').trim() || (systemDescription || '').indexOf('<img') >= 0);
+                        case 'ccfTable':     return hasCCF;
+                        case 'pidGraphic':   return !!(pidDiagram && pidDiagram.nodes && pidDiagram.nodes.length);
+                        case 'ftCutSets':
+                        case 'impTable':     return !!hasFailureInfo;
+                        default:             return true;
+                    }
+                };
+                const secRef = (id) => ({ sec: id });
+                // Quantification method wording, from the method actually used for the report's system probability
+                const methodText = (() => {
+                    const m = String(quantMethod || settings?.quantificationMethod || 'bdd').toLowerCase();
+                    if (m.indexOf('bdd') >= 0) return { short: 'BDD', long: 'a binary decision diagram (BDD), which gives the exact probability of the union of the cut sets' };
+                    if (m.indexOf('rare') >= 0) return { short: 'the rare-event approximation', long: 'the rare-event approximation, the sum of the cut set probabilities' };
+                    if (m.indexOf('inclusion') >= 0) return { short: 'inclusion-exclusion', long: 'the inclusion-exclusion expansion of the cut sets' };
+                    return { short: 'MCUB', long: 'the minimal cut set upper bound (MCUB), 1 \u2212 \u220F(1 \u2212 P\u1D62) over the cut sets, which slightly overstates the exact union probability' };
+                })();
+                // Fault tree structure counts
+                const treeStats = (node, acc) => {
+                    if (!node) return acc;
+                    if (node.type === 'BASIC') { acc.basics.add(node.label); return acc; }
+                    acc.gates++;
+                    if (node.type === 'AND') acc.and++; else if (node.type === 'OR') acc.or++; else acc.other++;
+                    (node.children || []).forEach(c => treeStats(c, acc));
+                    return acc;
+                };
+
                 const citations = collectReportCitations();
                 const out = [];
                 for (const item of contentItems) {
                     if (!item.enabled) continue;
                     const blocks = [];
                     const note = (text) => blocks.push({ kind: 'para', text, italics: true });
+                    const para = (text) => blocks.push({ kind: 'para', text });
+                    const refPara = (parts) => blocks.push({ kind: 'refPara', parts });
                     switch (item.id) {
                         case 'extendedDesc': {
-                            if ((systemDescription || '').replace(/<[^>]+>/g, '').trim()) blocks.push({ kind: 'html', html: systemDescription });
+                            const hasText = (systemDescription || '').replace(/<[^>]+>/g, '').trim();
+                            const hasImage = (systemDescription || '').indexOf('<img') >= 0;
+                            if (hasText || hasImage) blocks.push({ kind: 'html', html: await inlineHtmlImages(systemDescription) });
                             break;
                         }
                         case 'sscInfo': {
                             if (sscsInSystem.length === 0) { note('No SSCs in system.'); break; }
-                            blocks.push({ kind: 'refPara', parts: ['The SSCs in the system are summarized in ', { ref: 'sscSummary' }, ', and their failure modes are detailed in ', { ref: 'sscFailureModes' }, '.'] });
+                            const withFM = sscsInSystem.filter(s => s.failureModes && s.failureModes.length);
+                            const allFM = sscsInSystem.reduce((n, s) => n + ((s.failureModes || []).length), 0);
+                            const inactive = sscsInSystem.reduce((n, s) => n + (s.failureModes || []).filter(fm => fm.probabilityType === 'screened' || fm.applicable === false).length, 0);
+                            const linked = sscsInSystem.reduce((n, s) => n + (s.failureModes || []).filter(fm => fm.probabilityType === 'linkedSystem').length, 0);
+                            const types = Array.from(new Set(sscsInSystem.map(s => s.sscType).filter(Boolean)));
+                            const parts = [
+                                cap(sysLabel) + ' is modeled with ' + countOf(sscsInSystem.length, 'structure, system, or component (SSC)', 'structures, systems, and components (SSCs)')
+                                + (types.length ? ', of type ' + listNames(types) : '') + '. '
+                                + (allFM
+                                    ? cap(spellCount(withFM.length)) + ' of the SSCs ' + (withFM.length === 1 ? 'carries' : 'carry') + ' a total of ' + countOf(allFM, 'failure mode')
+                                      + (inactive ? ', of which ' + spellCount(inactive) + ' ' + isAre(inactive) + ' screened out or not applied and so ' + (inactive === 1 ? 'does' : 'do') + ' not enter the fault tree' : '')
+                                      + (linked ? '; ' + spellCount(linked) + ' ' + isAre(linked) + ' quantified from a linked KUREAS-SYS model rather than from reliability data' : '')
+                                      + '. '
+                                    : 'No failure modes have been assigned yet. '),
+                                { ref: 'sscSummary' },
+                                ' summarizes each SSC with its description, component type, SSC type, and the failure modes considered for it'
+                                + (allFM ? ', and ' : '. '), ...(allFM ? [{ ref: 'sscFailureModes' }, ' gives the reliability data behind each failure mode.'] : [])
+                            ];
+                            refPara(parts);
                             blocks.push({ kind: 'table', id: 'sscSummary', title: 'SSC summary',
                                 headers: ['SSC Name', 'Description', 'Component Type', 'SSC Type', 'Failure Modes'], colWidths: [16, 22, 16, 14, 32],
                                 rows: sscsInSystem.map(ssc => [ssc.name || 'N/A', ssc.description || 'N/A', ssc.label || 'N/A', ssc.sscType || 'N/A',
                                                                ssc.failureModes ? ssc.failureModes.map(fm => fm.mode).join(', ') : 'None']) });
-                            blocks.push({ kind: 'heading2', text: 'Detailed Failure Mode Information' });
-                            blocks.push({ kind: 'refPara', parts: fmSectionIntroParts({ ref: 'sscFailureModes' }) });
-                            blocks.push({ kind: 'groupedTable', id: 'sscFailureModes', title: 'Detailed failure mode information',
-                                headers: FM_TABLE_HEADERS, colWidths: FM_TABLE_COL_WIDTHS, groups: buildFailureModeRows(citations.cite) });
+                            if (allFM) {
+                                blocks.push({ kind: 'heading2', text: 'Detailed Failure Mode Information' });
+                                refPara(fmSectionIntroParts({ ref: 'sscFailureModes' }));
+                                blocks.push({ kind: 'groupedTable', id: 'sscFailureModes', title: 'Detailed failure mode information',
+                                    headers: FM_TABLE_HEADERS, colWidths: FM_TABLE_COL_WIDTHS, groups: buildFailureModeRows(citations.cite) });
+                            }
                             break;
                         }
                         case 'fmeaInfo': {
                             if (sscsInSystem.length === 0) { note('No SSCs in system.'); break; }
                             const withFM = sscsInSystem.filter(ssc => ssc.failureModes && ssc.failureModes.length > 0);
                             if (withFM.length === 0) { note('No failure modes defined for any SSCs.'); break; }
+                            const without = sscsInSystem.length - withFM.length;
+                            const intro = 'The failure modes and effects analysis (FMEA) records, for each SSC, the ways it can fail and the effect and '
+                                + 'quantification attached to each failure mode. A diagram is given below for each of the '
+                                + countOf(withFM.length, 'SSC') + ' that ' + (withFM.length === 1 ? 'has' : 'have') + ' failure modes; it shows the SSC at the root, '
+                                + 'its failure modes beneath it, and the effects recorded for each.';
+                            const tail = without ? ' The ' + countOf(without, 'SSC') + ' with no failure modes ' + isAre(without) + ' not diagrammed.' : '';
+                            if (present('sscInfo')) refPara([intro + ' The failure modes are the same ones tabulated in ', secRef('sscInfo'), '.' + tail]);
+                            else para(intro + tail);
                             const figIds = [];
+                            const introAt = blocks.length;
                             for (let i = 0; i < withFM.length; i++) {
                                 const ssc = withFM[i];
                                 blocks.push({ kind: 'heading2', text: ssc.name || '' });
-                                if (ssc.description) blocks.push({ kind: 'para', text: ssc.description });
+                                const fmNames = (ssc.failureModes || []).map(fm => fm.mode).filter(Boolean);
+                                blocks.push({ kind: 'para', text: (ssc.description ? ssc.description + ' ' : '')
+                                    + cap((ssc.name || 'This SSC')) + ' has ' + countOf(fmNames.length, 'failure mode') + (fmNames.length ? ': ' + listNames(fmNames) + '.' : '.') });
                                 const code = generateFMEAMermaidCode(ssc, settings);
                                 if (!code) continue;
                                 let url = null;
@@ -6453,22 +6995,61 @@
                                 if (!isPng(url)) continue;
                                 const fmCount = ssc.failureModes.length; // 1 FM = 30%, 2 = 50%, 3 = 70%, 4+ = 100% of the page width
                                 figIds.push('fmea' + i);
+                                blocks.push({ kind: 'refPara', parts: ['The FMEA diagram for ' + (ssc.name || 'the SSC') + ' is shown in ', { ref: 'fmea' + i }, '.'] });
                                 blocks.push({ kind: 'image', id: 'fmea' + i, dataUrl: url, title: 'FMEA diagram for ' + (ssc.name || 'SSC'),
                                               widthPct: fmCount === 1 ? 30 : fmCount === 2 ? 50 : fmCount === 3 ? 70 : 100 });
                             }
-                            if (figIds.length === 1) blocks.unshift({ kind: 'refPara', parts: ['The FMEA diagram is shown in ', { ref: figIds[0] }, '.'] });
-                            else if (figIds.length > 1) blocks.unshift({ kind: 'refPara', parts: ['FMEA diagrams for the SSCs are shown in ', { ref: figIds[0] }, ' to ', { ref: figIds[figIds.length - 1] }, '.'] });
+                            if (figIds.length === 1) blocks.splice(introAt, 0, { kind: 'refPara', parts: ['The FMEA diagram is shown in ', { ref: figIds[0] }, '.'] });
+                            else if (figIds.length > 1) blocks.splice(introAt, 0, { kind: 'refPara', parts: ['FMEA diagrams for the SSCs are shown in ', { ref: figIds[0] }, ' to ', { ref: figIds[figIds.length - 1] }, '.'] });
                             break;
                         }
                         case 'systemWorks': {
                             const lines = systemWorksLines();
-                            if (lines) blocks.push({ kind: 'code', text: lines.join('\n') });
-                            else note('No system logic defined.');
+                            if (!lines) { note('No system logic defined.'); break; }
+                            const sscRefs = new Set(), modDefs = new Set();
+                            (systemLogic || []).forEach(t => {
+                                if (t.type === 'ssc' || t.type === 'ssc_fm') sscRefs.add(String(t.value).split('.')[0]);
+                                else if (t.type === 'module_def') modDefs.add(t.value);
+                            });
+                            const parts = [
+                                'The success criterion for ' + sysLabel + ' is written as a System Works expression: the system works '
+                                + 'when the expression is true, with each SSC name standing for "that SSC works" and AND / OR combining '
+                                + 'them according to the redundancy and dependence of the design. The expression references '
+                                + countOf(sscRefs.size, 'SSC')
+                                + (modDefs.size ? ' and defines ' + countOf(modDefs.size, 'module') + ' (' + listNames(Array.from(modDefs).map(m => '[' + m + ']')) + ') that group parts of the logic so they can be reused' : '')
+                                + '. The expression is listed below exactly as entered.'
+                            ];
+                            if (present('ftLogic') || present('ftGraphic')) {
+                                parts.push(' Its complement, the fault tree for failure of the system, is developed in ');
+                                parts.push(secRef(present('ftLogic') ? 'ftLogic' : 'ftGraphic'));
+                                parts.push('.');
+                            }
+                            refPara(parts);
+                            blocks.push({ kind: 'code', text: lines.join('\n') });
                             break;
                         }
                         case 'ftLogic': {
                             if (!hasFailureInfo || !failureLogicTree) { note('No system logic defined.'); break; }
-                            try { blocks.push({ kind: 'code', text: faultTreeLogicText() }); }
+                            try {
+                                const text = faultTreeLogicText();
+                                const st = treeStats(failureLogicTree, { gates: 0, and: 0, or: 0, other: 0, basics: new Set() });
+                                const gateMix = [st.and ? spellCount(st.and) + ' AND' : '', st.or ? spellCount(st.or) + ' OR' : '', st.other ? spellCount(st.other) + ' other' : ''].filter(Boolean).join(', ');
+                                const multi = sscsInSystem.filter(s => (s.failureModes || []).filter(fm => fm.applicable !== false && fm.probabilityType !== 'screened').length > 1).length;
+                                const parts = [
+                                    'The fault tree for failure of ' + sysLabel + ' is derived from the System Works expression'
+                                    + (present('systemWorks') ? ' in ' : '') , ...(present('systemWorks') ? [secRef('systemWorks')] : []),
+                                    ' by De Morgan\u2019s laws: where the success expression joins SSCs with AND, the failure of any one of '
+                                    + 'them fails the system (an OR gate), and where it joins them with OR, all of them must fail together '
+                                    + '(an AND gate). The resulting tree has ' + countOf(st.gates, 'gate') + (gateMix ? ' (' + gateMix + ')' : '')
+                                    + ' and ' + countOf(st.basics.size, 'basic event') + '.'
+                                    + (multi ? ' ' + cap(countOf(multi, 'SSC')) + ' with more than one applicable failure mode ' + isAre(multi)
+                                        + ' expanded into an OR gate over one basic event per failure mode, named SSC__Mode.' : '')
+                                    + ' The logic is listed below as an indented tree, gates first and basic events in brackets with their descriptions.'
+                                ];
+                                if (present('ftGraphic')) { parts.push(' The same tree is drawn in '); parts.push({ ref: 'ftGraphic' }); parts.push('.'); }
+                                refPara(parts);
+                                blocks.push({ kind: 'code', text });
+                            }
                             catch (error) { note('Error generating fault tree logic: ' + error.message); }
                             break;
                         }
@@ -6476,7 +7057,12 @@
                             if (!hasFailureInfo || !failureLogicTree) { note('No system logic defined.'); break; }
                             try {
                                 const url = generateFaultTreeImageBase64(failureLogicTree, basicEventData, { background: 'light', showProbability: settings.showProbability || '1' });
-                                blocks.push({ kind: 'refPara', parts: ['The fault tree for the system is shown in ', { ref: 'ftGraphic' }, '.'] });
+                                const parts = [{ ref: 'ftGraphic' }, ' shows the fault tree for ' + sysLabel + '. The top event is failure of the system; '
+                                    + 'each gate combines the events beneath it, and the basic events are the SSC failure modes'
+                                    + (settings.showProbability && settings.showProbability !== '0' ? ', drawn with the probability used to quantify them' : '') + '.'];
+                                if (present('ftLogic')) { parts.push(' The tree is listed in text form in '); parts.push(secRef('ftLogic')); parts.push('.'); }
+                                if (present('ftCutSets')) { parts.push(' Its minimal cut sets are given in '); parts.push(secRef('ftCutSets')); parts.push('.'); }
+                                refPara(parts);
                                 blocks.push({ kind: 'image', id: 'ftGraphic', dataUrl: url, title: 'Fault tree for ' + (systemName || 'the system') });
                             } catch (error) { note('Error generating fault tree graphic: ' + error.message); }
                             break;
@@ -6484,20 +7070,63 @@
                         case 'ftCutSets': {
                             if (!hasFailureInfo) break;
                             if (!cutSets || cutSets.length === 0) { note('No cut sets available.'); break; }
-                            if (mcubValue !== null) blocks.push({ kind: 'para', bold: true, text: 'Minimal Cut Set Upper Bound (MCUB): ' + formatProbability(mcubValue, settings.showProbability) });
+                            const n = cutSets.length;
+                            const sizes = { 1: 0, 2: 0, more: 0 };
+                            cutSets.forEach(cs => { const k = cs.events.length; if (k === 1) sizes[1]++; else if (k === 2) sizes[2]++; else sizes.more++; });
+                            const withCCF = cutSets.filter(cs => cs.hasCCF).length;
+                            const withLinked = cutSets.filter(cs => cs.hasLinked).length;
+                            const valid = cutSets.filter(cs => !cs.hasLinked && cs.probability !== null);
+                            const total = valid.reduce((s, cs) => s + cs.probability, 0);
+                            const sizeText = [sizes[1] ? spellCount(sizes[1]) + ' single-event' : '', sizes[2] ? spellCount(sizes[2]) + ' two-event' : '', sizes.more ? spellCount(sizes.more) + ' with three or more events' : ''].filter(Boolean);
+                            const parts = [
+                                'Solving the fault tree gives ' + countOf(n, 'minimal cut set') + ', the smallest combinations of basic '
+                                + 'events that together fail ' + sysLabel + (sizeText.length > 1 ? ': ' + listNames(sizeText) + '.' : '.')
+                                + (withCCF ? ' ' + cap(spellCount(withCCF)) + ' of them ' + (withCCF === 1 ? 'contains' : 'contain') + ' a common-cause failure event' : '')
+                            ];
+                            if (withCCF && present('ccfTable')) { parts.push(' (see '); parts.push(secRef('ccfTable')); parts.push(').'); }
+                            else if (withCCF) parts.push('.');
+                            if (withLinked) parts.push(' ' + cap(spellCount(withLinked)) + ' ' + (withLinked === 1 ? 'involves' : 'involve') + ' a linked system and ' + isAre(withLinked) + ' quantified from the linked model\u2019s result.');
+                            const trunc = parseTruncationThreshold ? parseTruncationThreshold(settings) : null;
+                            if (trunc && trunc > 0) parts.push(' Cut sets with a probability below the truncation threshold of ' + fp(trunc) + ' were discarded during generation.');
+                            refPara(parts);
+                            if (mcubValue !== null && valid.length) {
+                                const top = valid[0];
+                                const top3 = valid.slice(0, 3).reduce((s, cs) => s + cs.probability, 0);
+                                para('The failure probability of ' + sysLabel + ', computed from the cut sets with ' + methodText.long + ', is '
+                                    + fp(mcubValue) + '. The dominant cut set, ' + top.events.join(' \u00D7 ') + ', contributes ' + fp(top.probability)
+                                    + (total > 0 ? ', about ' + pct(100 * top.probability / total) + '% of the summed cut set probability' : '')
+                                    + (valid.length > 3 && total > 0 ? '; the three highest-ranked cut sets together account for ' + pct(100 * top3 / total) + '%.' : '.'));
+                                blocks.push({ kind: 'para', bold: true, text: 'System failure probability (' + methodText.short + '): ' + fp(mcubValue) });
+                            } else if (mcubValue !== null) {
+                                blocks.push({ kind: 'para', bold: true, text: 'System failure probability (' + methodText.short + '): ' + fp(mcubValue) });
+                            }
                             const shown = cutSets.slice(0, limitCutSets);
-                            blocks.push({ kind: 'refPara', parts: [shown.length === cutSets.length ? `All ${cutSets.length} minimal cut sets are listed in ` : `The first ${shown.length} of ${cutSets.length} minimal cut sets are listed in `, { ref: 'cutSets' }, '.'] });
-                            blocks.push({ kind: 'table', id: 'cutSets', title: shown.length === cutSets.length ? 'Minimal cut sets' : `Minimal cut sets (first ${shown.length} of ${cutSets.length})`,
+                            refPara([shown.length === n ? `All ${n} minimal cut sets are listed in ` : `The ${shown.length} highest-ranked of the ${n} minimal cut sets are listed in `, { ref: 'cutSets' }, ', in order of decreasing probability.']);
+                            blocks.push({ kind: 'table', id: 'cutSets', title: shown.length === n ? 'Minimal cut sets' : `Minimal cut sets (first ${shown.length} of ${n})`,
                                 headers: ['#', 'Cut Set', 'Description', 'Probability'], colWidths: [6, 30, 48, 16],
                                 rows: shown.map((cs, idx) => [String(idx + 1), cs.events.join(' \u00D7 '), cs.description || '', cs.probability !== null ? formatProbability(cs.probability, settings.showProbability) : 'N/A']) });
                             break;
                         }
                         case 'ccfTable': {
-                            if (!ccfEvents || Object.keys(ccfEvents).length === 0) break;
-                            blocks.push({ kind: 'refPara', parts: ['The common-cause failure events are listed in ', { ref: 'ccfTable' }, '.'] });
+                            if (!hasCCF) break;
+                            const entries = Object.entries(ccfEvents).sort((a, b) => a[0].localeCompare(b[0]));
+                            const groups = new Set(entries.map(([, c]) => (c.ccfGroup || []).slice().sort().join('|')));
+                            const betas = Array.from(new Set(entries.map(([, c]) => c.ccfBeta).filter(b => b !== undefined)));
+                            const betaText = betas.length === 1 ? 'a beta factor of ' + betas[0].toFixed(3) : betas.length > 1 ? 'beta factors from ' + Math.min(...betas).toFixed(3) + ' to ' + Math.max(...betas).toFixed(3) : 'the beta factor in the project settings';
+                            const parts = [
+                                'Common-cause failures are modeled with the beta-factor method: a fraction \u03B2 of each affected component\u2019s '
+                                + 'failure probability is assigned to a single event that fails every component in the group at once, and the '
+                                + 'independent events keep the remaining (1 \u2212 \u03B2) share. Applying ' + betaText
+                                + (settings?.ccfBetaSource ? ' (' + settings.ccfBetaSource + ')' : '')
+                                + ' to the redundant SSCs of ' + sysLabel + ' produced ' + countOf(entries.length, 'common-cause event') + ' over '
+                                + countOf(groups.size, 'component group') + '. ', { ref: 'ccfTable' },
+                                ' lists each event with the probability it carries, the beta factor applied, and the components it fails together.'
+                            ];
+                            if (present('ftCutSets')) { parts.push(' Cut sets containing these events appear in '); parts.push(secRef('ftCutSets')); parts.push(' alongside the independent ones.'); }
+                            refPara(parts);
                             blocks.push({ kind: 'table', id: 'ccfTable', title: 'Common-cause failure events',
                                 headers: ['CCF Event Name', 'Description', 'Failure Probability', 'Beta Factor', 'Affected Components'], colWidths: [18, 30, 12, 10, 30],
-                                rows: Object.entries(ccfEvents).sort((a, b) => a[0].localeCompare(b[0])).map(([ccfName, ccf]) => [ccfName, ccf.description || '', fmtProb(ccf.probability),
+                                rows: entries.map(([ccfName, ccf]) => [ccfName, ccf.description || '', fmtProb(ccf.probability),
                                     ccf.ccfBeta !== undefined ? ccf.ccfBeta.toFixed(3) : '', ccf.ccfGroup ? ccf.ccfGroup.join(', ') : '']) });
                             break;
                         }
@@ -6505,7 +7134,20 @@
                             if (!hasFailureInfo || importanceMeasures.length === 0) { note('No importance measures available.'); break; }
                             try {
                                 const url = generateImportanceMeasureImageBase64(importanceMeasures, 'swim', 'rir');
-                                blocks.push({ kind: 'refPara', parts: ['The importance measures are plotted in ', { ref: 'impGraphic' }, '.'] });
+                                const byRir = importanceMeasures.slice().sort((a, b) => (b.rir || 0) - (a.rir || 0));
+                                const bySwim = importanceMeasures.slice().sort((a, b) => (b.swim || 0) - (a.swim || 0));
+                                const parts = [
+                                    'Importance measures rank the ' + countOf(importanceMeasures.length, 'basic event') + ' in the cut sets by '
+                                    + 'their effect on the system failure probability. The risk increase ratio (RIR) is the factor by which '
+                                    + 'the system failure probability rises if the event is certain to occur, and the SWIM measure (NUREG/CR-5632) '
+                                    + 'combines the event\u2019s risk-reduction contribution with a steeply weighted RIR term, so that events which '
+                                    + 'are both significant contributors today and highly damaging if degraded score highest. ', { ref: 'impGraphic' },
+                                    ' plots SWIM against RIR for each event; events toward the upper right matter most. '
+                                    + 'The highest RIR belongs to ' + byRir[0].event + ' (RIR ' + (byRir[0].rir || 0).toFixed(1) + ')'
+                                    + (bySwim[0].event !== byRir[0].event ? ', and the highest SWIM to ' + bySwim[0].event + ' (' + fp(bySwim[0].swim) + ').' : ', which also has the highest SWIM (' + fp(bySwim[0].swim) + ').')
+                                ];
+                                if (present('impTable')) { parts.push(' The full set of measures is tabulated in '); parts.push(secRef('impTable')); parts.push('.'); }
+                                refPara(parts);
                                 blocks.push({ kind: 'image', id: 'impGraphic', dataUrl: url, title: 'Importance measures (SWIM vs. RIR)' });
                             } catch (error) { note('Error generating importance measure graphic: ' + error.message); }
                             break;
@@ -6513,18 +7155,37 @@
                         case 'impTable': {
                             if (!hasFailureInfo) break;
                             if (importanceMeasures.length === 0) { note('No importance measures available.'); break; }
-                            const fp = (prob) => (prob === null || prob === undefined || isNaN(prob)) ? '-' : formatProbability(prob, settings?.showProbability);
-                            blocks.push({ kind: 'refPara', parts: ['The importance measures for each basic event are listed in ', { ref: 'impTable' }, '.'] });
+                            const fpm = (prob) => (prob === null || prob === undefined || isNaN(prob)) ? '-' : formatProbability(prob, settings?.showProbability);
+                            const byRir = importanceMeasures.slice().sort((a, b) => (b.rir || 0) - (a.rir || 0));
+                            const byRrr = importanceMeasures.slice().sort((a, b) => (b.rrr || 0) - (a.rrr || 0));
+                            const topN = (arr, key, fmt) => listNames(arr.slice(0, Math.min(3, arr.length)).map(m => m.event + ' (' + fmt(m[key]) + ')'));
+                            const parts = [
+                                { ref: 'impTable' }, ' lists four importance measures for each of the ' + countOf(importanceMeasures.length, 'basic event')
+                                + ' in the cut sets, sorted by SWIM. RIR (risk increase ratio) is P(system | event = 1) / P(system), the factor by which the system '
+                                + 'failure probability rises if the event is certain. RRR (risk reduction ratio) is P(system) / P(system | event = 0), the factor '
+                                + 'by which it falls if the event is made impossible. PC (partial contribution) is 1 \u2212 1/RRR, the fraction of the system '
+                                + 'failure probability that involves the event, and SWIM (NUREG/CR-5632) is PC + (1 \u2212 1/RIR)^7.64, which adds a steeply '
+                                + 'weighted risk-increase term. The system failure probability is ' + fp(mcubValue) + ' (' + methodText.short + '). '
+                                + 'Ranked by RIR the leading events are ' + topN(byRir, 'rir', v => (v || 0).toFixed(1)) + '; ranked by RRR they are '
+                                + topN(byRrr, 'rrr', v => v >= 999 ? '\u221E' : (v || 0).toFixed(1)) + '.'
+                            ];
+                            refPara(parts);
                             blocks.push({ kind: 'table', id: 'impTable', title: 'Importance measures',
                                 headers: ['Event', 'Description', 'Prob', 'RIR', 'RRR', 'PC', 'SWIM'], colWidths: [18, 22, 12, 12, 12, 12, 12],
-                                rows: importanceMeasures.map(m => [m.event, m.description || '', fp(m.probability), m.rir.toFixed(1), m.rrr >= 999 ? '\u221E' : m.rrr.toFixed(1), fp(m.pc), fp(m.swim)]) });
+                                rows: importanceMeasures.map(m => [m.event, m.description || '', fpm(m.probability), m.rir.toFixed(1), m.rrr >= 999 ? '\u221E' : m.rrr.toFixed(1), fpm(m.pc), fpm(m.swim)]) });
                             break;
                         }
                         case 'pidGraphic': {
                             if (!pidDiagram || !pidDiagram.nodes || pidDiagram.nodes.length === 0) break;
                             try {
                                 const url = renderPIDDiagramDataUrl();
-                                blocks.push({ kind: 'refPara', parts: ['The P&ID diagram for the system is shown in ', { ref: 'pidGraphic' }, '.'] });
+                                const nn = pidDiagram.nodes.length, ne = (pidDiagram.edges || []).length, ng = (pidDiagram.groups || []).length;
+                                const parts = [{ ref: 'pidGraphic' }, ' shows the piping and instrumentation diagram (P&ID) for ' + sysLabel
+                                    + ', with ' + countOf(nn, 'component symbol') + ' joined by ' + countOf(ne, 'connection')
+                                    + (ng ? ' and grouped into ' + countOf(ng, 'labeled region') : '') + '. The symbols carry the SSC names used '
+                                    + (present('sscInfo') ? 'in ' : 'in the fault tree'), ...(present('sscInfo') ? [secRef('sscInfo')] : []),
+                                    ', so each modeled failure can be located in the physical arrangement.'];
+                                refPara(parts);
                                 blocks.push({ kind: 'image', id: 'pidGraphic', dataUrl: url, title: 'P&ID diagram' });
                             } catch (err) {
                                 console.error('PID report render error:', err);
@@ -6534,7 +7195,13 @@
                         }
                         case 'references': {
                             const entries = citations.entries();
-                            if (entries.length) blocks.push({ kind: 'references', entries });
+                            if (entries.length) {
+                                const parts = ['The ' + countOf(entries.length, 'source') + ' cited in the Source column of the failure mode data'
+                                    + (present('sscInfo') ? ' (' : '') , ...(present('sscInfo') ? [secRef('sscInfo'), ')'] : []),
+                                    ' ' + isAre(entries.length) + ' listed below by citation key.'];
+                                refPara(parts);
+                                blocks.push({ kind: 'references', entries });
+                            }
                             else note('No sources cited.');
                             break;
                         }
@@ -6543,27 +7210,91 @@
                     }
                     if (blocks.length) out.push({ key: item.id, label: item.label, blocks });
                 }
-                return out;
+                return numberReportSections(out);
+            };
+
+            // Assigns section numbers and table/figure numbers to the assembled sections, and resolves
+            // { sec: itemId } parts to "Section N". Tables and images get:
+            //   num   - number within the report (or within the section when numbering by section)
+            //   uid   - never-restarting counter used for the Word bookmark name
+            //   label - the caption text, "3" or "5-2"
+            //   sec   - the enclosing section number (used by the STYLEREF caption field)
+            const numberReportSections = (sections) => {
+                const secNumOf = {};
+                let tableNum = 0, figureNum = 0, tableUid = 0, figureUid = 0;
+                sections.forEach((s, i) => {
+                    s.num = firstSectionNum + i;
+                    secNumOf[s.key] = s.num;
+                    if (numberBySection) { tableNum = 0; figureNum = 0; }
+                    let sub = 0;
+                    s.blocks.forEach(b => {
+                        if (b.kind === 'heading2') { b.num = s.num + '.' + (++sub); }
+                        else if (b.kind === 'table' || b.kind === 'groupedTable') {
+                            b.num = ++tableNum; b.uid = ++tableUid; b.sec = s.num;
+                            b.label = numberBySection ? s.num + '-' + b.num : String(b.num);
+                        } else if (b.kind === 'image') {
+                            b.num = ++figureNum; b.uid = ++figureUid; b.sec = s.num;
+                            b.label = numberBySection ? s.num + '-' + b.num : String(b.num);
+                        }
+                    });
+                });
+                // Section cross-references: the number is fixed text (Word has no field for a heading's
+                // outline number without a bookmark), and reads "Section N" or "the ... section" when unnumbered.
+                sections.forEach(s => s.blocks.forEach(b => {
+                    if (b.kind !== 'refPara') return;
+                    b.parts = b.parts.map(part => {
+                        if (!part || typeof part !== 'object' || part.sec === undefined) return part;
+                        const target = sections.find(x => x.key === part.sec);
+                        if (!target) return '';
+                        return numberHeadings ? 'Section ' + target.num : 'the ' + target.label + ' section';
+                    });
+                }));
+                return sections;
+            };
+
+            // Preview HTML from the shared sections: same numbering, narrative, captions and cross-references as Word
+            const reportSectionsToHtml = (sections) => {
+                const esc = escapeHtml;
+                const labels = {};
+                sections.forEach(s => s.blocks.forEach(b => { if (b.id && (b.kind === 'table' || b.kind === 'groupedTable')) labels[b.id] = 'Table ' + b.label; else if (b.id && b.kind === 'image') labels[b.id] = 'Figure ' + b.label; }));
+                const hn = (num) => numberHeadings && num !== undefined ? num + '\u2003' : '';
+                const runText = (b) => `<${b.bold ? 'strong' : b.italics ? 'em' : 'span'}>${esc(String(b.text)).replace(/\n/g, '<br>')}</${b.bold ? 'strong' : b.italics ? 'em' : 'span'}>`;
+                let body = '';
+                for (const s of sections) {
+                    body += `<h1>${hn(s.num)}${esc(s.label)}</h1>\n`;
+                    for (const b of s.blocks) {
+                        switch (b.kind) {
+                            case 'para':     body += `<p>${runText(b)}</p>\n`; break;
+                            case 'refPara':  body += `<p>${b.parts.map(part => typeof part === 'string' ? esc(part) : (labels[part.ref] ? esc(labels[part.ref]) : '')).join('')}</p>\n`; break;
+                            case 'heading2': body += `<h2>${hn(b.num)}${esc(b.text)}</h2>\n`; break;
+                            case 'html':     body += b.html + '\n'; break;
+                            case 'code':     body += `<pre class="code">${esc(b.text)}</pre>\n`; break;
+                            case 'table':
+                                body += `<p class="caption-above">Table ${b.label}. ${esc(b.title)}.</p>\n<table>` + (b.colWidths ? `<colgroup>${b.colWidths.map(w => `<col style="width:${w}%;">`).join('')}</colgroup>` : '')
+                                      + `<tr>${b.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr>`
+                                      + b.rows.map(r => `<tr>${r.map(c => `<td>${esc(c == null ? '' : String(c))}</td>`).join('')}</tr>`).join('\n') + `</table>\n`;
+                                break;
+                            case 'groupedTable':
+                                body += `<p class="caption-above">Table ${b.label}. ${esc(b.title)}.</p>\n<table><colgroup>${b.colWidths.map(w => `<col style="width:${w}%;">`).join('')}</colgroup>`
+                                      + `<tr>${b.headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr>`
+                                      + b.groups.map(g => `<tr><td colspan="${b.headers.length}" class="group-row">${esc(g.header)}</td></tr><tr>${g.cells.map(c => `<td>${esc(c == null ? '' : String(c))}</td>`).join('')}</tr>`).join('\n') + `</table>\n`;
+                                break;
+                            case 'references':
+                                b.entries.forEach(r => { body += `<p style="padding-left:0.5in;text-indent:-0.5in;"><strong>[${esc(r.key)}]</strong>${r.text ? ' ' + esc(r.text) : ''}</p>\n`; });
+                                break;
+                            case 'image':
+                                body += `<p style="text-align:center;"><img src="${b.dataUrl}" style="width:${b.widthPct || 100}%;max-width:100%;height:auto;" /></p>\n<p class="caption">Figure ${b.label}. ${esc(b.title)}.</p>\n`;
+                                break;
+                        }
+                    }
+                }
+                return body;
             };
             
             const escapeHtml = (text) => {
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
-            };
-            
-            const generateHTMLSystemNameSection = () => {
-                // No output - just a placeholder for compatibility
-                return '';
-            };
-            
-            const generateHTMLExtendedDescSection = () => {
-                // Skip section entirely if no description provided
-                const raw = (systemDescription || '').replace(/<[^>]+>/g, '').trim();
-                if (!raw) return '';
-                let html = `<h1>Extended Description</h1>\n`;
-                html += systemDescription + '\n';
-                return html;
             };
             
             // Detailed Failure Mode Information table content, one group per failure mode (shared by Preview,
@@ -6609,13 +7340,11 @@
                         else if (fm.missionTime) opTime = fm.missionTime + ' hrs';
 
                         const notes = [];
-                        if (fm.data?.distribution_type) {
-                            let distText = fm.data.distribution_type;
-                            const shapeParam = fm.data.distribution_shape_parameter || fm.data.shape_parameter;
-                            const scaleParam = fm.data.distribution_scale_parameter || fm.data.scale_parameter;
-                            if (shapeParam !== undefined && scaleParam !== undefined && scaleParam !== '') distText += '(' + shapeParam + ', ' + scaleParam + ')';
-                            else if (shapeParam !== undefined) distText += '(' + shapeParam + ')';
-                            notes.push(distText);
+                        // Describe the uncertainty from the SAPHIRE UdT mapping, so the
+                        // parameters shown are the ones that distribution actually takes.
+                        const uncR = saphireUncertainty(fm);
+                        if (uncR.UdT || fm.data?.distribution_type) {
+                            notes.push(saphireUdtText(uncR.UdT, uncR.UdValue, uncR.UdValue2));
                         }
                         if (units === 'hft' && fm.pipeLength) notes.push('Pipe: ' + fm.pipeLength + ' ft');
                         if (fm.failureModel && fm.failureModel !== '0' && fm.failureModel !== '2') notes.push('FM' + fm.failureModel);
@@ -6704,63 +7433,6 @@
                 return generateTextTree(failureLogicTree);
             };
 
-            const generateHTMLSSCInfoSection = (citations) => {
-                let html = `<h1>SSC Information</h1>\n`;
-                
-                if (sscsInSystem.length === 0) {
-                    html += `<p><em>No SSCs in system.</em></p>\n`;
-                    return html;
-                }
-                
-                html += `
-<table>
-<tr>
-<th>SSC Name</th>
-<th>Description</th>
-<th>Component Type</th>
-<th>SSC Type</th>
-<th>Failure Modes</th>
-</tr>
-`;
-                
-                sscsInSystem.forEach(ssc => {
-                    const fmList = ssc.failureModes ? ssc.failureModes.map(fm => fm.mode).join(', ') : 'None';
-                    html += `
-<tr>
-<td>${escapeHtml(ssc.name || 'N/A')}</td>
-<td>${escapeHtml(ssc.description || 'N/A')}</td>
-<td>${escapeHtml(ssc.label || 'N/A')}</td>
-<td>${escapeHtml(ssc.sscType || 'N/A')}</td>
-<td>${escapeHtml(fmList)}</td>
-</tr>
-`;
-                });
-                
-                html += `</table>\n`;
-                
-                // Detailed Failure Mode Information: shaded "SSC Name: Failure Mode Description" row, then the values row
-                html += `<h2>Detailed Failure Mode Information</h2>\n`;
-                html += `<p>${escapeHtml(fmSectionIntroText('The table below'))}</p>\n`;
-                html += `<table>\n<colgroup>\n${FM_TABLE_COL_WIDTHS.map(w => `<col style="width: ${w}%;">`).join('')}\n</colgroup>\n<tr>${FM_TABLE_HEADERS.map(h => `<th>${h}</th>`).join('')}</tr>\n`;
-                buildFailureModeRows(citations ? citations.cite : null).forEach(g => {
-                    html += `<tr><td colspan="${FM_TABLE_HEADERS.length}" style="background-color: #d9d9d9;">${escapeHtml(g.header)}</td></tr>\n`;
-                    html += '<tr>' + g.cells.map(c => '<td>' + escapeHtml(c) + '</td>').join('') + '</tr>\n';
-                });
-                html += `</table>\n`;
-                
-                return html;
-            };
-
-            const generateHTMLReferencesSection = (citations) => {
-                const entries = citations ? citations.entries() : [];
-                let html = `<h1>References</h1>\n`;
-                if (!entries.length) return html + `<p><em>No sources cited.</em></p>\n`;
-                entries.forEach(r => {
-                    html += `<p style="padding-left: 0.5in; text-indent: -0.5in;"><strong>[${escapeHtml(r.key)}]</strong>${r.text ? ' ' + escapeHtml(r.text) : ''}</p>\n`;
-                });
-                return html;
-            };
-            
             // Async version for Word report - renders actual mermaid diagrams as images
             // Generate P&ID section for HTML report by rendering to a canvas data URL
             // Render the P&ID diagram to a PNG data URL (shared by Preview and Word). Throws on a render error.
@@ -6945,300 +7617,6 @@
                     ctx.restore();
                     return offCanvas.toDataURL('image/png');
             };
-            const generateHTMLPIDSectionAsync = async () => {
-                if (!pidDiagram || !pidDiagram.nodes || pidDiagram.nodes.length === 0) return '';
-                let html = `<h1>P&ID Diagram</h1>\n`;
-                try {
-                    const dataUrl = renderPIDDiagramDataUrl();
-                    html += `<p><img src="${dataUrl}" style="max-width:100%;height:auto;border:1px solid #e5e7eb;border-radius:4px;" alt="P&amp;ID Diagram" /></p>\n`;
-                } catch (err) {
-                    console.error('PID report render error:', err);
-                    html += '<p><em>P&ID diagram could not be rendered for this report.</em></p>\n';
-                }
-                return html;
-            };
-
-            const generateHTMLFMEAInfoSectionAsync = async (renderMermaidToImage) => {
-                let html = `<h1>FMEA Information</h1>\n`;
-                
-                if (sscsInSystem.length === 0) {
-                    html += `<p><em>No SSCs in system.</em></p>\n`;
-                    return html;
-                }
-                
-                // Check if any SSCs have failure modes
-                const sscsWithFMEA = sscsInSystem.filter(ssc => 
-                    ssc.failureModes && ssc.failureModes.length > 0
-                );
-                
-                if (sscsWithFMEA.length === 0) {
-                    html += `<p><em>No failure modes defined for any SSCs.</em></p>\n`;
-                    return html;
-                }
-                
-                // For each SSC with FMEA, show name, description, and rendered FMEA diagram
-                // Size dynamically: 1 FM = 30%, 2 FM = 50%, 3 FM = 70%, 4+ FM = 100%
-                for (const ssc of sscsWithFMEA) {
-                    html += `<h2>${escapeHtml(ssc.name)}</h2>\n`;
-                    if (ssc.description) {
-                        html += `<p>${escapeHtml(ssc.description)}</p>\n`;
-                    }
-                    
-                    // Generate and render mermaid diagram as image with dynamic sizing
-                    const mermaidCode = generateFMEAMermaidCode(ssc, settings);
-                    if (mermaidCode) {
-                        try {
-                            const imageData = await renderMermaidToImage(mermaidCode);
-                            if (imageData) {
-                                // Determine size based on number of failure modes
-                                const fmCount = (ssc.failureModes || []).length;
-                                let imgWidth = '100%'; // default for 4+ failure modes
-                                if (fmCount === 1) {
-                                    imgWidth = '30%';
-                                } else if (fmCount === 2) {
-                                    imgWidth = '50%';
-                                } else if (fmCount === 3) {
-                                    imgWidth = '70%';
-                                }
-                                html += `<p><img src="${imageData}" style="width: ${imgWidth}; height: auto;" /></p>\n`;
-                            }
-                        } catch (err) {
-                            console.error('Error rendering FMEA diagram:', err);
-                        }
-                    }
-                }
-                
-                return html;
-            };
-            
-            const generateHTMLSystemWorksSection = () => {
-                let html = `<h1>System Works Expression</h1>\n`;
-                const lines = systemWorksLines();
-                if (lines) {
-                    html += `<pre class="code">${escapeHtml(lines.join('\n'))}</pre>\n`;
-                } else {
-                    html += `<p><em>No system logic defined.</em></p>\n`;
-                }
-                return html;
-            };
-            
-
-            const generateHTMLFTLogicSection = () => {
-                let html = `<h1>Fault Tree Logic</h1>\n`;
-                
-                if (!hasFailureInfo || !failureLogicTree) {
-                    html += `<p><em>No system logic defined.</em></p>\n`;
-                    return html;
-                }
-                
-                try {
-                    html += `<pre class="tree-text">${escapeHtml(faultTreeLogicText())}</pre>\n`;
-                } catch (error) {
-                    html += `<p><em>Error generating fault tree logic: ${escapeHtml(error.message)}</em></p>\n`;
-                }
-                
-                return html;
-            };
-            
-            const generateHTMLFTGraphicSection = () => {
-                let html = `<h1>Fault Tree Graphic</h1>\n`;
-                
-                if (!hasFailureInfo || !failureLogicTree) {
-                    html += `<p><em>No system logic defined.</em></p>\n`;
-                    return html;
-                }
-                
-                try {
-                    // Generate image using pre-computed failureLogicTree and basicEventData
-                    const imageData = generateFaultTreeImageBase64(failureLogicTree, basicEventData, { background: 'light', showProbability: settings.showProbability || '1' });
-                    html += `<img src="${imageData}" style="max-width: 100%; height: auto;" />\n`;
-                    
-                } catch (error) {
-                    html += `<p><em>Error generating fault tree graphic: ${escapeHtml(error.message)}</em></p>\n`;
-                }
-                
-                return html;
-            };
-            
-            const generateHTMLFTCutSetsSection = () => {
-                let html = `<h1>Fault Tree Cut Sets</h1>\n`;
-                
-                if (!hasFailureInfo || !cutSets || cutSets.length === 0) {
-                    html += `<p><em>No cut sets available.</em></p>\n`;
-                    return html;
-                }
-                
-                try {
-                    // Show MCUB first
-                    if (mcubValue !== null) {
-                        html += `<p class="mcub-title">Minimal Cut Set Upper Bound (MCUB): ${formatProbability(mcubValue, settings.showProbability)}</p>\n`;
-                    }
-                    
-                    const displayCutSets = cutSets.slice(0, limitCutSets);
-                    html += `<p>Showing ${displayCutSets.length} of ${cutSets.length} cut sets</p>\n`;
-                    
-                    html += `
-<table>
-<tr>
-<th>#</th>
-<th>Cut Set</th>
-<th>Description</th>
-<th>Probability</th>
-</tr>
-`;
-                    
-                    displayCutSets.forEach((cs, idx) => {
-                        const events = cs.events.join(' \u00D7 ');
-                        const desc = cs.description || '';
-                        const prob = cs.probability !== null ? formatProbability(cs.probability, settings.showProbability) : 'N/A';
-                        html += `
-<tr>
-<td>${idx + 1}</td>
-<td>${escapeHtml(events)}</td>
-<td>${escapeHtml(desc)}</td>
-<td>${prob}</td>
-</tr>
-`;
-                    });
-                    
-                    html += `</table>\n`;
-                    
-                } catch (error) {
-                    html += `<p><em>Error generating cut sets: ${escapeHtml(error.message)}</em></p>\n`;
-                }
-                
-                return html;
-            };
-            
-            const generateHTMLCCFTableSection = () => {
-                // Only generate if there are CCF events
-                if (!ccfEvents || Object.keys(ccfEvents).length === 0) {
-                    return '';
-                }
-                
-                let html = `<h1>Common-Cause Failure Table</h1>\n`;
-                html += `<table>\n<colgroup>\n<col style="width: 18%;"><col style="width: 30%;"><col style="width: 12%;"><col style="width: 10%;"><col style="width: 30%;">\n</colgroup>\n<tr><th>CCF Event Name</th><th>Description</th><th>Failure Probability</th><th>Beta Factor</th><th>Affected Components</th></tr>\n`;
-                
-                // Helper to format probability according to settings
-                const formatProbForTable = (prob) => {
-                    if (prob === null || prob === undefined || prob === '') return '';
-                    const probVal = parseFloat(prob);
-                    if (isNaN(probVal)) return escapeHtml(String(prob));
-                    return formatProbability(probVal, settings.showProbability);
-                };
-                // Sort CCF events alphabetically by name
-                const sortedCCFEntries = Object.entries(ccfEvents).sort((a, b) => a[0].localeCompare(b[0]));
-                
-                sortedCCFEntries.forEach(([ccfName, ccfData]) => {
-                    const description = escapeHtml(ccfData.description || '');
-                    const probability = formatProbForTable(ccfData.probability);
-                    const betaFactor = ccfData.ccfBeta !== undefined ? ccfData.ccfBeta.toFixed(3) : '';
-                    const affectedComponents = ccfData.ccfGroup ? ccfData.ccfGroup.join(', ') : '';
-                    
-                    html += `
-<tr>
-<td>${escapeHtml(ccfName)}</td>
-<td>${description}</td>
-<td>${probability}</td>
-<td>${betaFactor}</td>
-<td>${escapeHtml(affectedComponents)}</td>
-</tr>
-`;
-                });
-                
-                html += `</table>\n`;
-                return html;
-            };
-            
-            const generateHTMLImpGraphicSection = () => {
-                let html = `<h1>Importance Measure Graphic</h1>\n`;
-                
-                if (!hasFailureInfo || importanceMeasures.length === 0) {
-                    html += `<p><em>No importance measures available.</em></p>\n`;
-                    return html;
-                }
-                
-                try {
-                    // Generate image using default axis settings
-                    const xAxis = 'swim';
-                    const yAxis = 'rir';
-                    const imageData = generateImportanceMeasureImageBase64(importanceMeasures, xAxis, yAxis);
-                    html += `<img src="${imageData}" style="max-width: 100%; height: auto;" />\n`;
-                    
-                } catch (error) {
-                    html += `<p><em>Error generating importance measure graphic: ${escapeHtml(error.message)}</em></p>\n`;
-                }
-                
-                return html;
-            };
-            
-            const generateHTMLImpTableSection = () => {
-                let html = `<h1>Importance Measure Table</h1>\n`;
-                
-                if (!hasFailureInfo || importanceMeasures.length === 0) {
-                    html += `<p><em>No importance measures available.</em></p>\n`;
-                    return html;
-                }
-                
-                // Helper to format probability according to settings
-                const formatProb = (prob) => {
-                    if (prob === null || prob === undefined || isNaN(prob)) return '-';
-                    return formatProbability(prob, settings?.showProbability);
-                };
-                
-                try {
-                    html += `
-<table>
-<colgroup>
-<col style="width: 18%;">
-<col style="width: 22%;">
-<col style="width: 12%;">
-<col style="width: 12%;">
-<col style="width: 12%;">
-<col style="width: 12%;">
-<col style="width: 12%;">
-</colgroup>
-<tr>
-<th>Event</th>
-<th>Description</th>
-<th>Prob</th>
-<th>RIR</th>
-<th>RRR</th>
-<th>PC</th>
-<th>SWIM</th>
-</tr>
-`;
-                    
-                    importanceMeasures.forEach(m => {
-                        // Format values using settings
-                        const probText = formatProb(m.probability);
-                        const rirText = m.rir.toFixed(1);
-                        const rrrText = m.rrr >= 999 ? '\u221E' : m.rrr.toFixed(1);
-                        const pcText = formatProb(m.pc);
-                        const swimText = formatProb(m.swim);
-                        
-                        html += `
-<tr>
-<td>${escapeHtml(m.event)}</td>
-<td>${escapeHtml(m.description)}</td>
-<td>${probText}</td>
-<td>${rirText}</td>
-<td>${rrrText}</td>
-<td>${pcText}</td>
-<td>${swimText}</td>
-</tr>
-`;
-                    });
-                    
-                    html += `</table>\n`;
-                    
-                } catch (error) {
-                    html += `<p><em>Error calculating importance measures: ${escapeHtml(error.message)}</em></p>\n`;
-                }
-                
-                return html;
-            };
-            
             const paneStyle = { backgroundColor: backgroundStyle.paneBackground, color: backgroundStyle.color };
             const inputStyle = { backgroundColor: backgroundStyle.backgroundColor, color: backgroundStyle.color, borderColor: backgroundStyle.borderColor };
             const borderStyle = { borderColor: backgroundStyle.borderColor };
@@ -7254,29 +7632,25 @@
 
             if (showHTMLPreview) {
                 return (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-                        <div className="rounded-lg shadow-xl w-full m-4 flex flex-col" style={{ ...paneStyle, maxWidth: '1100px', height: '94vh' }} onClick={e => e.stopPropagation()}>
-                            <div className="p-6 pb-3 flex items-center justify-between border-b flex-shrink-0" style={borderStyle}>
-                                <h2 className="text-xl font-bold">Report Preview</h2>
-                                <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center" style={{ zIndex: 1100 }}>
+                        <div style={{ background: 'white', borderRadius: '8px', boxShadow: '0 4px 24px rgba(0,0,0,0.35)', width: '92vw', maxWidth: '1100px', height: '90vh', display: 'flex', flexDirection: 'column', color: '#111827' }}>
+                            <div style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '16px' }}>Report Preview</span>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button disabled={generating} onClick={downloadWordFromPreview}
+                                        style={{ padding: '5px 14px', background: '#1e40af', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', opacity: generating ? 0.5 : 1 }}>{generating ? 'Generating\u2026' : '\u2193 Word'}</button>
+                                    <button onClick={generateMarkdownReport}
+                                        style={{ padding: '5px 14px', background: '#1e40af', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>{'\u2193 Markdown'}</button>
+                                    <button onClick={() => { const w = window.open('', '_blank'); if (w) { w.document.write(previewHTML); w.document.close(); setTimeout(() => w.print(), 400); } }}
+                                        style={{ padding: '5px 14px', background: '#1e40af', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Print</button>
+                                    <button onClick={() => { setError(''); setShowHTMLPreview(false); }}
+                                        style={{ padding: '5px 14px', background: '#6b7280', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>Close</button>
+                                </div>
                             </div>
-                            <div className="p-4 flex-1 overflow-hidden">
-                                <iframe srcDoc={previewHTML} title="Report Preview"
-                                        style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: '4px', background: '#ffffff' }} />
+                            {error && <div className="mx-4 mt-3 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm flex-shrink-0">{error}</div>}
+                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <iframe srcDoc={previewHTML} style={{ width: '100%', height: '100%', border: 'none' }} title="Report Preview" />
                             </div>
-                            <div className="p-4 border-t flex justify-end gap-2 flex-shrink-0" style={borderStyle}>
-                                <button onClick={() => { setError(''); setShowHTMLPreview(false); }} className="px-4 py-2 border rounded hover:bg-gray-100" style={borderStyle}>Back to Options</button>
-                                <button onClick={() => {
-                                            const w = window.open('', '_blank');
-                                            if (w) { w.document.write(previewHTML); w.document.close(); setTimeout(() => w.print(), 400); }
-                                        }}
-                                        className="px-4 py-2 border rounded hover:bg-gray-100" style={borderStyle}>Print</button>
-                                <button onClick={generateMarkdownReport} className="px-4 py-2 border rounded hover:bg-gray-100" style={borderStyle}>Download Markdown</button>
-                                <button onClick={downloadWordFromPreview} disabled={generating} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
-                                    {generating ? 'Generating\u2026' : 'Download Word'}
-                                </button>
-                            </div>
-                            {error && <div className="mx-4 mb-3 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm flex-shrink-0">{error}</div>}
                         </div>
                     </div>
                 );
@@ -7284,102 +7658,222 @@
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-                    <div className="rounded-lg shadow-xl max-w-lg w-full m-4 max-h-[92vh] overflow-y-auto" style={paneStyle} onClick={e => e.stopPropagation()}>
-                        <div className="p-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold">Generate Report</h2>
-                                <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
-                            </div>
-                            {error && <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">{error}</div>}
-                            <p className="text-sm text-gray-500 mb-4">Covers the current system{systemName ? ' (' + systemName + ')' : ''} and its SSCs ({sscsInSystem.length}).</p>
+                    <div
+                        className="bg-white rounded-lg shadow-xl w-full m-4 flex flex-col"
+                        style={{ maxWidth: '820px', maxHeight: '90vh', backgroundColor: backgroundStyle.paneBackground, color: backgroundStyle.color }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="p-4 border-b flex items-center justify-between flex-shrink-0" style={borderStyle}>
+                            <h2 className="text-lg font-bold">Generate Report</h2>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
 
-                            <label className="block text-sm font-medium mb-2">Report Sections</label>
-                            <p className="text-xs text-gray-500 mb-2">Toggle sections on or off, and use the arrows to change their order in the report.</p>
-                            <div className="border rounded mb-4" style={borderStyle}>
-                                {contentItems.map((item, i) => (
-                                    <div key={item.id} className={`flex items-center gap-2 px-3 py-2 text-sm ${i < contentItems.length - 1 ? 'border-b' : ''}`} style={borderStyle}>
-                                        <input type="checkbox" checked={item.enabled} onChange={() => toggleItem(i)} />
-                                        <span className="flex-1">{item.label}</span>
-                                        <button onClick={() => moveItem(i, 'up')} disabled={i === 0} className="px-1.5 text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed" title="Move up">&uarr;</button>
-                                        <button onClick={() => moveItem(i, 'down')} disabled={i === contentItems.length - 1} className="px-1.5 text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed" title="Move down">&darr;</button>
-                                    </div>
-                                ))}
-                            </div>
+                        {/* Two-column body */}
+                        <div className="flex-1 flex overflow-hidden">
 
-                            <label className="block text-sm font-medium mb-2">Output</label>
-                            <div className="flex gap-2 mb-4">
-                                {[['preview', 'Preview'], ['word', 'Word'], ['markdown', 'Markdown']].map(([key, label]) => (
-                                    <button key={key} type="button" onClick={() => setFileFormat(key)}
-                                            className={`flex-1 px-3 py-2 rounded text-sm ${fileFormat === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {fileFormat !== 'preview' && (
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium mb-1">File Name</label>
-                                    <div className="flex items-center gap-2">
-                                        <input className="w-full px-3 py-2 border rounded text-sm" style={inputStyle} value={fileName} onChange={e => setFileName(e.target.value)} placeholder="Enter file name" />
-                                        <span className="text-sm text-gray-500 flex-shrink-0">.{fileFormat === 'word' ? 'docx' : 'md'}</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            <label className="block text-sm font-medium mb-2">Options</label>
-                            <div className="mb-4 space-y-2">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm whitespace-nowrap">Limit cut sets to:</span>
-                                    <input type="number" min="1" value={limitCutSets} onChange={e => setLimitCutSets(parseInt(e.target.value) || 100)}
-                                           className="w-24 px-2 py-1.5 border rounded text-sm" style={inputStyle} />
-                                </div>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" checked={showDateTime} onChange={e => setShowDateTime(e.target.checked)} />
-                                    <span className="text-sm">Include creation date/time</span>
-                                </label>
-                            </div>
-
-                            {fileFormat !== 'markdown' && (
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium mb-2">Word Template</label>
-                                    <div className="flex gap-2 mb-2">
-                                        {[['none', 'None'], ['format', 'Import Format'], ['merge', 'Merge into Template']].map(([key, label]) => (
-                                            <button key={key} type="button" onClick={() => setTemplateMode(key)}
-                                                    className={`flex-1 px-2 py-1.5 rounded text-sm ${templateMode === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    {templateMode !== 'none' && (
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <label className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200 cursor-pointer flex-shrink-0">
-                                                    Choose File&hellip;
-                                                    <input type="file" accept=".docx,.dotx" className="hidden" onChange={handleTemplatePick} />
-                                                </label>
-                                                <span className="text-sm text-gray-500 truncate flex-1" title={template ? template.name : ''}>{template ? template.name : 'No file selected'}</span>
-                                                {template && <button type="button" onClick={() => setTemplate(null)} className="text-sm text-gray-500 hover:text-gray-800 flex-shrink-0">Clear</button>}
+                            {/* Left: Report Sections */}
+                            <div className="border-r overflow-y-auto p-4" style={{ width: '40%', borderColor: backgroundStyle.borderColor }}>
+                                <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Report Sections</div>
+                                <div className="space-y-0.5">
+                                    {contentItems.map((item, index) => (
+                                        <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded" style={{ background: 'transparent' }}>
+                                            <input type="checkbox" checked={item.enabled} onChange={() => toggleItem(index)} className="w-4 h-4" />
+                                            <span className="flex-1 text-sm">{item.label}</span>
+                                            <div className="flex gap-1">
+                                                <button onClick={() => moveItem(index, 'up')} disabled={index === 0}
+                                                    className="px-1 py-0.5 text-xs border rounded hover:bg-gray-100 disabled:opacity-30"
+                                                    style={borderStyle} title="Move up">{'\u25B2'}</button>
+                                                <button onClick={() => moveItem(index, 'down')} disabled={index === contentItems.length - 1}
+                                                    className="px-1 py-0.5 text-xs border rounded hover:bg-gray-100 disabled:opacity-30"
+                                                    style={borderStyle} title="Move down">{'\u25BC'}</button>
                                             </div>
-                                            {templateMode === 'format' && (
-                                                <p className="text-xs text-gray-500 mt-1">Applies the file's styles (Title, Heading 1/2, Normal), theme fonts and colors, heading numbering, and page size/margins to the generated report. Headers, footers, and content are not copied.</p>
-                                            )}
-                                            {templateMode === 'merge' && (
-                                                <p className="text-xs text-gray-500 mt-1">Keeps the file's cover page, headers/footers, and content, and inserts the report where a paragraph contains {'{{REPORT_BODY}}'}. Also fills {'{{PROJECT_NAME}}'} (the system name), {'{{REPORT_DATE}}'}, and {'{{GENERATED_BY}}'} anywhere in the body, headers, or footers. A table of contents is refreshed when the file is opened.</p>
-                                            )}
-                                            {templateMode === 'merge' && template && (
-                                                <p className={`text-xs mt-1 ${template.hasBodyToken ? 'text-green-700' : 'text-amber-700'}`}>
-                                                    {template.hasBodyToken ? 'Placeholder ' + '{{REPORT_BODY}}' + ' found.' : 'No ' + '{{REPORT_BODY}}' + ' placeholder found; the report will be appended at the end of the document.'}
-                                                </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Right: Options */}
+                            <div className="flex-1 overflow-y-auto p-4">
+                                <div className="space-y-5">
+
+                                    {/* Type */}
+                                    <div>
+                                        <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Type</div>
+                                        <div className="flex gap-2">
+                                            {[{ value: 'preview', label: 'Preview' }, { value: 'word', label: 'Word' }, { value: 'markdown', label: 'Markdown' }].map(fmt => (
+                                                <button key={fmt.value} onClick={() => setFileFormat(fmt.value)}
+                                                    className={'flex-1 px-3 py-2 rounded text-sm font-medium ' + (fileFormat === fmt.value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}
+                                                >{fmt.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* File Name */}
+                                    {fileFormat !== 'preview' && (
+                                        <div>
+                                            <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">File Name</div>
+                                            <div className="flex items-center gap-2">
+                                                <input type="text" value={fileName} onChange={e => setFileName(e.target.value)}
+                                                    className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    style={inputStyle}
+                                                    placeholder="Enter file name (without extension)" />
+                                                <span className="text-sm text-gray-500 flex-shrink-0">.{fileFormat === 'word' ? 'docx' : 'md'}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Word Template */}
+                                    {fileFormat !== 'markdown' && (
+                                        <div>
+                                            <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Word Template</div>
+                                            <div className="flex gap-2 mb-2">
+                                                {[['none', 'None'], ['format', 'Import Format'], ['merge', 'Merge into Template']].map(([key, label]) => (
+                                                    <button key={key} type="button" onClick={() => handleTemplateModeChange(key)}
+                                                            className={`flex-1 px-2 py-1.5 rounded text-sm ${templateMode === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {templateMode !== 'none' && (
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200 cursor-pointer flex-shrink-0">
+                                                            Choose File&hellip;
+                                                            <input type="file" accept=".docx,.dotx" className="hidden" onChange={handleTemplatePick} />
+                                                        </label>
+                                                        <span className="text-sm text-gray-600 truncate flex-1" title={template ? template.name : ''}>
+                                                            {template ? template.name + ' (' + templateSizeLabel(template.size) + ')' : 'No file selected'}
+                                                        </span>
+                                                        {template && <button type="button" onClick={handleClearTemplate} className="text-sm text-gray-500 hover:text-gray-800 flex-shrink-0">Clear</button>}
+                                                    </div>
+                                                    {template && (
+                                                        <label className="flex items-start gap-2 mt-2 cursor-pointer">
+                                                            <input type="checkbox" className="w-4 h-4 mt-0.5"
+                                                                   checked={storeTemplate}
+                                                                   disabled={template.size > TEMPLATE_MAX_BYTES}
+                                                                   onChange={e => handleStoreTemplateToggle(e.target.checked)} />
+                                                            <span className="text-sm" style={{ color: backgroundStyle.color, opacity: template.size > TEMPLATE_MAX_BYTES ? 0.5 : 1 }}>
+                                                                Save template file inside the KUREAS-SYS project file
+                                                                <span className="block text-xs text-gray-500">
+                                                                    The project carries its own house style, and a report opened from it
+                                                                    uses the template by default. Limit {templateSizeLabel(TEMPLATE_MAX_BYTES)}.
+                                                                </span>
+                                                            </span>
+                                                        </label>
+                                                    )}
+                                                    {templateNotice && (
+                                                        <p className="text-xs mt-1" style={{ color: '#b45309' }}>{templateNotice}</p>
+                                                    )}
+                                                    {projectTemplate && !template && !error && (
+                                                        <p className="text-xs mt-1 text-gray-500">Loading the template stored in this project&hellip;</p>
+                                                    )}
+                                                    {templateMode === 'format' && (
+                                                        <p className="text-xs text-gray-500 mt-1">Applies the file's styles (Title, Heading 1/2, Normal), theme fonts and colors, heading numbering, and page size/margins to the generated report. Headers, footers, and content are not copied.</p>
+                                                    )}
+                                                    {templateMode === 'merge' && (
+                                                        <p className="text-xs text-gray-500 mt-1">Keeps the file's cover page, headers/footers, and content, and inserts the report where a paragraph contains {'{{REPORT_BODY}}'}. Also fills {'{{PROJECT_NAME}}'} (the system name), {'{{REPORT_DATE}}'}, and {'{{GENERATED_BY}}'} anywhere in the body, headers, or footers. A table of contents is refreshed when the file is opened.</p>
+                                                    )}
+                                                    {templateMode === 'merge' && template && (
+                                                        <p className={`text-xs mt-1 ${template.hasBodyToken ? 'text-green-700' : 'text-amber-700'}`}>
+                                                            {template.hasBodyToken ? 'Placeholder ' + '{{REPORT_BODY}}' + ' found.' : 'No ' + '{{REPORT_BODY}}' + ' placeholder found; the report will be appended at the end of the document.'}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-xs text-gray-400 mt-1">The template applies to the Word output; Preview always shows the module's own layout.</p>
+                                                </div>
                                             )}
                                         </div>
                                     )}
-                                </div>
-                            )}
 
-                            <div className="flex justify-end gap-2 mt-6">
-                                <button onClick={onClose} className="px-4 py-2 border rounded hover:bg-gray-100" style={borderStyle}>Cancel</button>
-                                <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
-                                    {generating ? 'Generating\u2026' : (fileFormat === 'preview' ? 'Preview' : 'Generate')}
+                                    {/* Options */}
+                                    <div>
+                                        <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Options</div>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <label className="text-sm whitespace-nowrap" style={{ color: backgroundStyle.color }}>Limit Cut Sets to:</label>
+                                                <input type="number" value={limitCutSets} onChange={e => setLimitCutSets(parseInt(e.target.value) || 100)}
+                                                    min="1" className="w-24 px-2 py-1.5 border rounded text-sm"
+                                                    style={inputStyle} />
+                                            </div>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={showDateTime} onChange={e => setShowDateTime(e.target.checked)} className="w-4 h-4" />
+                                                <span className="text-sm" style={{ color: backgroundStyle.color }}>Include creation date/time</span>
+                                            </label>
+                                            {fileFormat !== 'markdown' && (
+                                                <React.Fragment>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={numberBySection}
+                                                               onChange={e => setNumberBySection(e.target.checked)} className="w-4 h-4" />
+                                                        <span className="text-sm" style={{ color: backgroundStyle.color }}>Number tables and figures by section (Table 5-1)</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 cursor-pointer pl-6">
+                                                        <input type="checkbox" checked={numberHeadings}
+                                                               onChange={e => setNumberHeadings(e.target.checked)} className="w-4 h-4" />
+                                                        <span className="text-sm" style={{ color: backgroundStyle.color }}>Number the report headings (1, 1.1, 1.1.1)</span>
+                                                    </label>
+                                                    {numberHeadings && templateMode !== 'none' && (
+                                                        <div className="text-xs pl-6" style={{ color: '#b45309' }}>
+                                                            A Word template is selected, so its own heading numbering is used in the Word
+                                                            output and this setting only affects the Preview. Make sure Heading 1 is numbered
+                                                            in the template, or the section part of each caption will come out blank.
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-2 pl-6">
+                                                        <span className="text-sm" style={{ color: backgroundStyle.color }}>
+                                                            First section number
+                                                        </span>
+                                                        <input type="number" min="1" max="99" step="1"
+                                                               value={firstSectionNum}
+                                                               onChange={e => setFirstSectionNum(Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)))}
+                                                               className="border rounded px-2 py-1 text-sm w-20"
+                                                               style={inputStyle}
+                                                               title="Where this report begins in a larger document. Used for the in-text section cross-references and, when numbering by section is on, for the table and figure prefixes." />
+                                                    </div>
+                                                    <div className="text-xs pl-6" style={{ color: backgroundStyle.color, opacity: 0.6 }}>
+                                                        In Word, captions are written as STYLEREF and SEQ fields and in-text citations
+                                                        as REF fields, so adding or moving a section renumbers both. Select all and
+                                                        press F9 to refresh them.
+                                                    </div>
+                                                </React.Fragment>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Section notes */}
+                                    <div style={{ borderTop: '1px solid ' + backgroundStyle.borderColor, paddingTop: '12px' }}>
+                                        <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Section Notes</div>
+                                        <div className="text-xs text-gray-500 space-y-1">
+                                            <p><strong>SSC Information</strong> summarizes the SSCs and tabulates the reliability data behind each failure mode; put it before FMEA Information and References so they can cite it.</p>
+                                            <p><strong>System Works Expression</strong>, <strong>Fault Tree Logic</strong>, and <strong>Fault Tree Graphic</strong> develop the success logic into the fault tree; keep them in that order so the narrative reads forward.</p>
+                                            <p><strong>Fault Tree Cut Sets</strong> reports the minimal cut sets, the system failure probability, and the dominant contributors. <strong>Common-Cause Failure Table</strong> appears only when CCF events exist.</p>
+                                            <p><strong>Importance Measure Graphic</strong> and <strong>Table</strong> rank the basic events by RIR, RRR, PC, and SWIM.</p>
+                                            <p><strong>References</strong> lists every source cited in the Source column, wherever it sits in the order.</p>
+                                        </div>
+                                        <p className="text-xs mt-2" style={{ fontFamily: 'monospace', fontSize: '10px', color: backgroundStyle.color, opacity: 0.6, margin: '8px 0 0 0' }}>
+                                            System: {systemName || '(unnamed)'} &nbsp;|&nbsp; SSCs: {sscsInSystem.length} &nbsp;|&nbsp; Cut sets: {cutSets ? cutSets.length : 0}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        {error && (
+                            <div className="mx-4 mb-2 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm flex-shrink-0">{error}</div>
+                        )}
+                        <div className="border-t p-4 flex justify-between items-center gap-2 flex-shrink-0" style={borderStyle}>
+                            <div className="text-sm text-gray-500" style={{ minHeight: '20px' }}>{generating && 'Building the report\u2026'}</div>
+                            <div className="flex gap-2">
+                                <button onClick={onClose} disabled={generating}
+                                    className="px-4 py-2 border rounded text-sm font-medium hover:bg-gray-100 disabled:opacity-50"
+                                    style={{ borderColor: backgroundStyle.borderColor, color: backgroundStyle.color }}>Cancel</button>
+                                <button onClick={handleGenerate} disabled={generating}
+                                    className="px-5 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 disabled:opacity-50">
+                                    {generating ? 'Generating\u2026' : fileFormat === 'preview' ? 'Preview Report' : fileFormat === 'word' ? '\u2193 Word Report' : '\u2193 Markdown Report'}
                                 </button>
                             </div>
                         </div>
@@ -12833,8 +13327,13 @@
                 });
             }, [sscsInSystem]);
 
-            // Dirty flag — push node/edge/settings changes back to parent
+            // Dirty flag — push node/edge/settings changes back to parent.
+            // The first run is mount, which carries no user edit: pushing then would
+            // rewrite pidDiagram (defaults merged into settings) and mark the project
+            // changed just for opening the diagram.
+            const pidPushedOnce = React.useRef(false);
             React.useEffect(() => {
+                if (!pidPushedOnce.current) { pidPushedOnce.current = true; return; }
                 setPidDiagram({ nodes, edges, groups, settings: diagSettings });
             }, [nodes, edges, groups, diagSettings]);
 
@@ -16179,6 +16678,8 @@
             const [precomputedCurrentResults, setPrecomputedCurrentResults] = useState(null);
             const [showPIDModal, setShowPIDModal] = useState(false);
             const [pidDiagram, setPidDiagram] = useState({ nodes: [], edges: [], groups: [], settings: {} });
+            // Word template kept inside the project for the Report dialog: { name, size, mode, data (base64) } or null
+            const [projectTemplate, setProjectTemplate] = useState(null);
             const [fmeaInitialSSC, setFmeaInitialSSC] = useState(null);
             const [showDuplicateSSCModal, setShowDuplicateSSCModal] = useState(false);
             const [duplicateSSCSource, setDuplicateSSCSource] = useState(null);
@@ -16221,13 +16722,22 @@
             // The pattern: setHasUnsavedChanges(false) at load time also bumps
             // skipNextChangeFlag, which the effect consumes on its next run.
             const skipNextChangeFlag = useRef(true); // true on first render
+
+            // The P&ID is compared by content, not by object identity: the diagram
+            // editor re-pushes a fresh object on every interaction, and only a real
+            // content change should count as a project change.
+            const pidFingerprint = React.useMemo(() => {
+                try { return JSON.stringify(pidDiagram || {}); } catch (e) { return ''; }
+            }, [pidDiagram]);
+
             useEffect(() => {
                 if (skipNextChangeFlag.current) {
                     skipNextChangeFlag.current = false;
                     return;
                 }
                 setHasUnsavedChanges(true);
-            }, [systemName, systemAcronym, systemDescription, sscsInSystem, systemLogic]);
+            }, [systemName, systemAcronym, systemDescription, sscsInSystem, systemLogic,
+                boundaryConditions, pidFingerprint]);
 
             // Keep selectedItem in sync with sscsInSystem (e.g., when FMEA modal updates an SSC)
             useEffect(() => {
@@ -16761,6 +17271,12 @@
                             groups:   { type: 'array',  description: 'Node grouping objects' },
                             settings: { type: 'object', description: 'Canvas display settings' }
                         }},
+                        projectTemplate:    { type: 'object',  description: 'Optional Word template (.docx/.dotx) carried with the project for the Report dialog', fields: {
+                            name: { type: 'string', description: 'Template file name' },
+                            size: { type: 'number', description: 'Template file size in bytes' },
+                            mode: { type: 'string', description: 'How the template is applied: format | merge' },
+                            data: { type: 'string', description: 'Template file contents, base64' }
+                        }},
                         projectSettings:    { type: 'object',  description: 'Project-level quantification and CCF settings', fields: {
                             showProbability:        { type: 'boolean', description: 'Whether to display computed probabilities in the UI' },
                             quantificationMethod:   { type: 'string',  description: 'Quantification method: MCUB | RareEvent | InclusionExclusion' },
@@ -16790,6 +17306,7 @@
                     systemLogic,
                     failureLogicTree,
                     pidDiagram,
+                    ...(projectTemplate ? { projectTemplate } : {}),
                     projectSettings
                 };
 
@@ -16854,6 +17371,7 @@
                                 );
                                 setSystemLogic(normalizedLogic);
                                 setPidDiagram(data.pidDiagram || { nodes: [], edges: [], groups: [], settings: {} });
+                                setProjectTemplate(data.projectTemplate && data.projectTemplate.data ? data.projectTemplate : null);
                                 
                                 // Restore project-level settings (CCF model, qualitative probabilities)
                                 if (data.projectSettings) {
@@ -19591,7 +20109,7 @@
              * Call buildImportanceEngine ONCE, then loop over events calling the returned fn.
              */
             function buildImportanceEngine(validCutSets, combinedEventData, systemProb, settings) {
-                const method = settings?.quantificationMethod || 'mcub';
+                const method = settings?.quantificationMethod || 'bdd';
 
                 if (method === 'bdd') {
                     // ── BDD path: build tree once ──────────────────────────────
@@ -21338,7 +21856,7 @@
                         let method = 'N/A';
                         
                         if (cutSetProbabilities.length > 0) {
-                            const quantMethod = settings?.quantificationMethod || 'mcub';
+                            const quantMethod = settings?.quantificationMethod || 'bdd';
                             if (quantMethod === 'rare') {
                                 systemProb = Math.min(1.0, cutSetProbabilities.reduce((sum, p) => sum + p, 0));
                                 method = 'Rare Event';
@@ -21516,7 +22034,7 @@
                     try {
                         const cutSetProbabilities = validCutSets.map(cs => cs.probability);
                         if (cutSetProbabilities.length > 0) {
-                            const quantMethod = settings?.quantificationMethod || 'mcub';
+                            const quantMethod = settings?.quantificationMethod || 'bdd';
                             if (quantMethod === 'rare') {
                                 systemProb = Math.min(1.0, cutSetProbabilities.reduce((sum, p) => sum + p, 0));
                                 method = 'Rare Event';
@@ -22553,7 +23071,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 // the user first opens it. Switching to BDD pays a one-time tree-build
                 // cost (paid in the designerRecalc useMemo) but then live drags stay fast
                 // because evaluateBDDTree just walks the cached tree with a fresh probMap.
-                const [designerMethod, setDesignerMethod] = useState(() => settings?.quantificationMethod || 'mcub');
+                const [designerMethod, setDesignerMethod] = useState(() => settings?.quantificationMethod || 'bdd');
                 const modalRef = useRef(null);
                 
                 // Save axis selections to localStorage when they change
@@ -23044,7 +23562,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                     const cutSetProbabilities = validCutSets.map(cs => cs.probability);
                     
                     // Calculate system failure probability based on selected method
-                    const quantMethod = settings?.quantificationMethod || 'mcub';
+                    const quantMethod = settings?.quantificationMethod || 'bdd';
                     let systemProb = null;
                     let quantMethodUsed = quantMethod;
                     let quantDetails = null;
@@ -24922,9 +25440,9 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                                                                     >{m.label}</button>
                                                                                 ))}
                                                                             </div>
-                                                                            {designerMethod !== (settings?.quantificationMethod || 'mcub') && (
+                                                                            {designerMethod !== (settings?.quantificationMethod || 'bdd') && (
                                                                                 <span className="opacity-70 text-xs ml-1" title="The designer's method differs from the project's configured method, so the Nominal value here may differ from the Cut Sets tab.">
-                                                                                    (project: {(settings?.quantificationMethod || 'mcub').toUpperCase().replace('RARE', 'Rare Event')})
+                                                                                    (project: {(settings?.quantificationMethod || 'bdd').toUpperCase().replace('RARE', 'Rare Event')})
                                                                                 </span>
                                                                             )}
                                                                         </span>
@@ -25790,9 +26308,16 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                 onClick={saveSystemDefinition}
                                 disabled={!hasDataLoaded}
                                 className={`px-3 py-1.5 rounded text-sm ${hasDataLoaded ? 'bg-blue-900 hover:bg-blue-800' : 'bg-gray-500 cursor-not-allowed opacity-50'}`}
-                                title={hasDataLoaded ? "Save the current system as a KUREAS-SYS project file" : "Load data before saving"}
+                                title={!hasDataLoaded
+                                    ? "Load data before saving"
+                                    : hasUnsavedChanges
+                                        ? "Unsaved changes \u2014 save the current system as a KUREAS-SYS project file"
+                                        : "Save the current system as a KUREAS-SYS project file"}
                             >
                                 Save <strong>SYS</strong>
+                                {hasDataLoaded && hasUnsavedChanges && (
+                                    <span className="ml-0.5 font-bold text-yellow-300">*</span>
+                                )}
                             </button>
                             <button
                                 onClick={handleOpenFailureAnalysis}
@@ -27150,6 +27675,14 @@ IF FUEL FAILS THEN ENGINE-LIGHT IS TRUE;`}</pre>
                             applyCCFExpansion={applyCCFExpansion}
                             buildCCFContext={buildCCFContext}
                             parseTruncationThreshold={parseTruncationThreshold}
+                            projectTemplate={projectTemplate}
+                            onStoreTemplate={(stored) => {
+                                // Only a real change marks the project dirty (the dialog re-persists on every option click)
+                                const same = (a, b) => (!a && !b) || (a && b && a.name === b.name && a.mode === b.mode && a.data === b.data);
+                                if (same(stored, projectTemplate)) return;
+                                setProjectTemplate(stored);
+                                setHasUnsavedChanges(true);
+                            }}
                         />
                     )}
 
