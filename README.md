@@ -55,7 +55,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.6 | System modeling, P&ID, FMEA, failure analysis, CCF, Reliability Designer™, importance measures, and comparison function |
 | **KUREAS-BAYES** | `KUREAS-BAYES.html` | v1.0 | Manage knowledge of component operational behavior and experience to support Bayesian analysis of how components fail. |
-| **KUREAS-SEQ (planned)** | `KUREAS-SEQ.html` | vX.0 | Process Operational Logic (POL) diagrams and event tree generation |
+| **KUREAS-SEQ** | `KUREAS-SEQ.html` | v1.2 | Facility operational diagrams, event tree generation, sequence quantification |
 | **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
 | **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | vX.0 | General-purpose `.KNOW` file viewer and editor |
 
@@ -166,16 +166,17 @@ System-level knowledge management: define structures, systems, and components (S
 
 ---
 
-## KUREAS-SEQ — Process Operational Logic
+## KUREAS-SEQ — Facility Operational Logic
 
-Define accident sequences using Process Operational Logic (POL) diagrams — flowcharts that capture the logical progression from initiating events through system responses to end states.
+Define accident sequences using facility operational scripting and associated diagrams — flowcharts that capture the logical progression from initiating events through system responses to end states.
 
 ### Features
 
-- **POL diagram editor** — create flowcharts with node types: Initiating Event, Function, Transition, and End State; rendered using Mermaid.js
-- **Shared POL diagrams** — reusable sub-diagrams referenced from multiple main POLs with override/reset capabilities
+- **Script creation** — create scripts describing how a facility responds to initiating events
+- **Diagram creation** — create flowcharts with node types: Initiating Event, Function, Transition, and End State; rendered using Mermaid.js
+- **Shared operational scripts** — reusable scripts that describe how a facility operates
 - **Hazard data integration** — import `HA_*.KNOW` files to populate initiating events with frequencies and operating state assignments
-- **Boundary conditions** — Boolean, State, Percent, and User-Defined types; integrated with NUREG-2169 fire ignition data
+- **Boundary conditions** — Boolean, State, and User-Defined types; integrated with NUREG-2169 fire ignition data
 - **Operating state modeling** — nodes can reference and transition between defined plant operating states
 - **Event tree generation** — automatically generate event tree structures from POL diagram logic with Mermaid code clipboard copy and PNG export
 - **Rich text notes** — attach formatted documentation to any node
