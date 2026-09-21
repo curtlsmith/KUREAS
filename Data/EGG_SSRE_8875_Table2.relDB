@@ -77,7 +77,7 @@ Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),External Leakage per foot 
 Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),External Rupture per foot (EXRUPT), Small 1-4 inch (PIPE-S) External Rupture per foot (EXRUPT),hft,Lognormal,3.0E-10,3.0E-10,10, EGG-SSRE-8875-Na
 Sodium Fluid (NA),Pipe (PIPE),Small 1-4 inch (PIPE-S),Plugging (PLUG), Small 1-4 inch (PIPE-S) Plugging (PLUG),hft,Lognormal,1.0E-09,1.0E-09,10, EGG-SSRE-8875-Na
 Sodium Fluid (NA),Pipe (PIPE),Large >4 inch (PIPE-L),External Leakage per foot (EXLEAK), Large >4 inch (PIPE-L) External Leakage per foot (EXLEAK),hft,Lognormal,3.0E-09,3.0E-09,10, EGG-SSRE-8875-Na
-Sodium Fluid (NA),Pipe (PIPE),Large >4 inch (PIPE-S),External Rupture per foot (EXRUPT), Large >4 inch (PIPE-S) External Rupture per foot (EXRUPT),hft,Lognormal,3.0E-10,3.0E-10,10, EGG-SSRE-8875-Na
+Sodium Fluid (NA),Pipe (PIPE),Large >4 inch (PIPE-L),External Rupture per foot (EXRUPT), Large >4 inch (PIPE-L) External Rupture per foot (EXRUPT),hft,Lognormal,3.0E-10,3.0E-10,10, EGG-SSRE-8875-Na
 Sodium Fluid (NA),Pipe (PIPE),Filter (FILT),Plugging (PLUG), Filter (FILT) Plugging (PLUG),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
 Sodium Fluid (NA),Pipe (PIPE),Filter (FILT),Fail Open (FO), Filter (FILT) Fail Open (FO),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
 Sodium Fluid (NA),Pipe (PIPE),Strainer (STRA),Plugging (PLUG), Strainer (STRA) Plugging (PLUG),h,Lognormal,3.0E-06,3.0E-06,10, EGG-SSRE-8875-Na
