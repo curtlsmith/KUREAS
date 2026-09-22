@@ -953,6 +953,120 @@
             };
         }
 
+        /**
+         * Acronyms defined in report text. A definition is a run of words followed by
+         * an abbreviation in parentheses, "Common Cause Failure (CCF)", where the
+         * initial letters of the words spell the abbreviation in order. Small joining
+         * words ("of", "and", "the") may be skipped, and a hyphenated word supplies one
+         * letter per part, so "Facility Operating State (FOS)" and "Common-Cause Failure
+         * (CCF)" both qualify while "Frequency (per yr)" does not.
+         * Returns [{ acronym, definition }] sorted by acronym; where the same acronym
+         * is spelled out differently in two places, the definitions are joined with ";".
+         */
+        function findAcronymDefinitions(text, out) {
+            if (!text) return;
+            const STOP = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'for', 'in', 'on', 'to', 'by',
+                                  'at', 'with', 'from', 'per', 'de', 'la', 'le']);
+            const re = /\(([A-Za-z][A-Za-z0-9&/]{1,11})\)/g;
+            let m;
+            while ((m = re.exec(text)) !== null) {
+                const acro = m[1];
+                const letters = acro.replace(/[^A-Za-z0-9]/g, '');
+                if (letters.length < 2 || (letters.match(/[A-Z]/g) || []).length < 2) continue;
+                // Words on the same line before the bracket, most recent last.
+                const before = text.slice(0, m.index);
+                const lineStart = Math.max(before.lastIndexOf('\n'), before.lastIndexOf('. '),
+                                           before.lastIndexOf('; '), before.lastIndexOf(': '),
+                                           before.lastIndexOf(', '), before.lastIndexOf('('));
+                const phrase = before.slice(lineStart + 1);
+                const tokens = [];
+                const tre = /[A-Za-z0-9][A-Za-z0-9'\u2019]*/g;
+                let t;
+                while ((t = tre.exec(phrase)) !== null) tokens.push({ w: t[0], at: t.index });
+                if (tokens.length === 0) continue;
+                let i = letters.length - 1, j = tokens.length - 1;
+                let startTok = -1, spare = 1;   // one word may carry no letter ("set" in MCUB)
+                while (i >= 0 && j >= 0) {
+                    const w = tokens[j].w;
+                    if (w.toLowerCase() === acro.toLowerCase()) { startTok = -1; break; }
+                    if (w[0].toLowerCase() === letters[i].toLowerCase()) {
+                        i--; j--; startTok = j + 1;
+                    } else if (STOP.has(w.toLowerCase())) {
+                        j--;
+                    } else if (spare > 0 && startTok >= 0) {
+                        spare--; j--;
+                    } else break;
+                }
+                if (i >= 0 || startTok < 0) continue;
+                // At least two words, or one word carrying every letter is not a phrase.
+                if (tokens.length - startTok < 2) continue;
+                const def = phrase.slice(tokens[startTok].at).trim();
+                if (!def) continue;
+                const key = acro.toUpperCase();
+                const cur = out.get(key);
+                if (!cur) out.set(key, { acronym: acro, defs: [def] });
+                else if (!cur.defs.some(d => d.toLowerCase() === def.toLowerCase())) cur.defs.push(def);
+            }
+        }
+
+        function collectReportAcronyms(blocks) {
+            const out = new Map();
+            const cellText = (c) => (c && typeof c === 'object') ? (c.text || '') : (c === null || c === undefined ? '' : String(c));
+            const runsText = (runs) => (runs || []).map(r => r.text || '').join('');
+            (blocks || []).forEach(b => {
+                switch (b.kind) {
+                    case 'h2': case 'h3': case 'h4': case 'note': case 'nodata':
+                        findAcronymDefinitions(b.text, out); break;
+                    case 'p':
+                        findAcronymDefinitions(b.runs ? runsText(b.runs) : b.text, out); break;
+                    case 'list':
+                        (b.items || []).forEach(it => findAcronymDefinitions(runsText(it), out)); break;
+                    case 'references':
+                        (b.entries || []).forEach(r => findAcronymDefinitions(r.text, out)); break;
+                    case 'image':
+                        findAcronymDefinitions(b.caption, out); break;
+                    case 'table':
+                        findAcronymDefinitions(b.title, out);
+                        (b.headers || []).forEach(h => findAcronymDefinitions(cellText(h), out));
+                        (b.rows || []).forEach(row => {
+                            if (Array.isArray(row)) row.forEach(c => findAcronymDefinitions(cellText(c), out));
+                            else if (row && row.group !== undefined) findAcronymDefinitions(String(row.group), out);
+                        });
+                        break;
+                    default: break;
+                }
+            });
+            return [...out.values()]
+                .map(a => ({ acronym: a.acronym, definition: a.defs.join('; ') }))
+                .sort((a, b) => a.acronym.localeCompare(b.acronym));
+        }
+
+        /**
+         * After a numbered table block has been removed from `blocks`, shift the
+         * tables that followed it in the same numbering scope down by one, and
+         * rewrite the in-text "Table N" cross references that point at them so the
+         * sentences agree with the captions. Word REF fields resolve by bookmark and
+         * need no change; the text here is what the HTML preview shows.
+         */
+        function renumberTablesAfter(blocks, removed) {
+            if (!removed) return;
+            const relabel = new Map();
+            blocks.forEach(b => {
+                if (b.kind !== 'table' || b.uid === undefined || b.uid <= removed.uid) return;
+                if (removed.bySection && b.sec !== removed.sec) return;
+                b.num = b.num - 1;
+                b.label = removed.bySection ? (b.sec + '-' + b.num) : String(b.num);
+                relabel.set(b.uid, b.label);
+            });
+            const fix = (runs) => (runs || []).forEach(r => {
+                if (r.ref && r.ref.kind === 'table' && relabel.has(r.ref.uid)) r.text = 'Table ' + relabel.get(r.ref.uid);
+            });
+            blocks.forEach(b => {
+                if (b.kind === 'p') fix(b.runs);
+                else if (b.kind === 'list') (b.items || []).forEach(fix);
+            });
+        }
+
         // Text shown beside a WORKS branch on the event tree when the project credits
         // it with (1 - P): the credited probability in parentheses, formatted with the
         // caller's showDigits-aware formatter so it matches the rest of the graphic.
@@ -1194,6 +1308,21 @@
                 const sys = Object.values(loadedSystems || {}).find(s =>
                     (ex.fileName && s.fileName === ex.fileName) || (ex.systemName && s.systemName === ex.systemName));
                 Object.assign(eventInfo, (sys && sys.eventInfo) || {});
+                // A system that is not in loadedSystems -- a top event given by a
+                // distribution in the script, or a hazard curve level's own copy --
+                // brings its basic event data along with it.
+                Object.assign(eventInfo, ex.eventInfo || {});
+                // Last resort: a one-event cut set that carries its own probability
+                // defines that event, so a merged cut set containing it can still be
+                // quantified instead of coming out blank.
+                (ex.cutSets || []).forEach(c => {
+                    const evs = c.events || [];
+                    if (evs.length !== 1) return;
+                    const nm = String(evs[0]);
+                    if (nm.startsWith('NOT-') || eventInfo[nm]) return;
+                    const pv = Number(c.probability);
+                    if (c.probability !== null && c.probability !== undefined && !isNaN(pv)) eventInfo[nm] = { probability: pv };
+                });
             });
 
             const baseOf = (e) => e.startsWith('NOT-') ? e.slice(4) : e;
@@ -1408,7 +1537,9 @@
 
             if (model === 'frequency') {
                 let f = null;
-                const dist = ev.frequencyDistribution || '';
+                // The editor displays 'point' when no distribution is stored, so treat
+                // a missing value the same way.
+                const dist = ev.frequencyDistribution || 'point';
                 if (dist === 'point' && ev.pointEstimate) f = parseFloat(ev.pointEstimate);
                 else if (dist === 'gamma' && ev.gammaShape && ev.gammaScale) f = parseFloat(ev.gammaShape) * parseFloat(ev.gammaScale);
                 else if (dist === 'lognormal' && ev.lognormalMean) f = parseFloat(ev.lognormalMean);
@@ -1420,7 +1551,11 @@
 
             if (model === 'prob-per-opportunity') {
                 // KUREAS-HA: freq = opportunities/period x periods/yr x mean probability
-                const dist = ev.probabilityDistribution || 'cni';
+                // KUREAS-HA's default is 'cni' and it does not always store it; SEQ's own
+                // override editor shows 'point' by default. With no distribution stored,
+                // use whichever of the two values is actually present.
+                const dist = ev.probabilityDistribution
+                    || (ev.probCniMean ? 'cni' : (ev.probPointEstimate ? 'point' : 'cni'));
                 let p = null;
                 if (dist === 'point' && ev.probPointEstimate) p = parseFloat(ev.probPointEstimate);
                 else if (dist === 'beta' && ev.betaShape && ev.betaScale) {
@@ -1564,7 +1699,8 @@
                     else if (dist === 'point') params.push(`value = ${ev.pointEstimate || '?'}`);
                     params.push(`units ${ev.frequencyUnits || '/yr'}`);
                 } else if (ev.occurrenceModel === 'prob-per-opportunity') {
-                    const dist = ev.probabilityDistribution || 'cni';
+                    const dist = ev.probabilityDistribution
+                        || (ev.probCniMean ? 'cni' : (ev.probPointEstimate ? 'point' : 'cni'));
                     if (dist === 'beta') params.push(`\u03B1 = ${ev.betaShape || '?'}`, `\u03B2 = ${ev.betaScale || '?'}`);
                     else if (dist === 'lognormal') params.push(`mean = ${ev.probLognormalMean || '?'}`, `EF = ${ev.probLognormalEF || '?'}`);
                     else if (dist === 'cni') params.push(`mean = ${ev.probCniMean || '?'}`);
@@ -1582,7 +1718,9 @@
                     modelLabel: modelLabels[ev.occurrenceModel] || ev.occurrenceModel || '\u2014',
                     distLabel: ev.occurrenceModel === 'frequency'
                         ? (distLabels[ev.frequencyDistribution] || ev.frequencyDistribution || '')
-                        : (ev.occurrenceModel === 'prob-per-opportunity' ? (distLabels[ev.probabilityDistribution] || '') : ''),
+                        : (ev.occurrenceModel === 'prob-per-opportunity'
+                            ? (distLabels[ev.probabilityDistribution
+                                || (ev.probCniMean ? 'cni' : (ev.probPointEstimate ? 'point' : 'cni'))] || '') : ''),
                     params,
                     freq: r.freq,
                     curve: r.curve,
@@ -4645,7 +4783,8 @@
                                                 setEditingFullPath(prev => ({ ...prev, occurrenceData: {
                                                     occurrenceModel: 'prob-per-opportunity',
                                                     opportunitiesPerPeriod: ev.opportunitiesPerPeriod || '',
-                                                    probabilityDistribution: ev.probabilityDistribution || 'point',
+                                                    probabilityDistribution: ev.probabilityDistribution
+                                                        || (ev.probCniMean ? 'cni' : (ev.probPointEstimate ? 'point' : 'cni')),
                                                     betaShape: ev.betaShape || '', betaScale: ev.betaScale || '',
                                                     probLognormalMean: ev.probLognormalMean || '', probLognormalEF: ev.probLognormalEF || '',
                                                     probCniMean: ev.probCniMean || '', probPointEstimate: ev.probPointEstimate || ''
@@ -8431,7 +8570,7 @@
                                             return pb - pa;
                                         });
                                         sorted2.forEach((cs2, i2) => { cs2.index = i2 + 1; });
-                                        systemExpansion2 = { systemName: sys2.systemName || name2, fileName: sys2.fileName || '', cutSets: sorted2 };
+                                        systemExpansion2 = { systemName: sys2.systemName || name2, fileName: sys2.fileName || '', eventInfo: sys2.eventInfo || {}, cutSets: sorted2 };
                                     }
                                 }
                                 return { teId: teo.teId, name: name2, description: te?.description || '', occurred, branch: teo.branch, position: teo.position, systemExpansion: systemExpansion2,
@@ -8635,6 +8774,7 @@
                                     systemExpansion = {
                                         systemName: sys.systemName || name,
                                         fileName: sys.fileName || '',
+                                        eventInfo: sysEventInfo,
                                         cutSets: sorted
                                     };
                                 }
@@ -16753,6 +16893,7 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
             });
 
             const baseContentItems = [
+                { id: 'acronyms',             label: 'Acronyms',               enabled: true },
                 { id: 'projectName',          label: 'Project Name',           enabled: true },
                 { id: 'projectDescription',   label: 'Project Description',    enabled: true },
                 { id: 'initiatingEventTable', label: 'Events',                  enabled: true },
@@ -16783,7 +16924,11 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                         const filtered = parsed.filter(i => validIds.has(i.id));
                         const savedIds = new Set(filtered.map(i => i.id));
                         const newItems = defaultContentItems.filter(i => !savedIds.has(i.id));
-                        return [...filtered, ...newItems];
+                        // A section that belongs at the top of the report goes in front of
+                        // the saved order the first time it appears; the user can move it after.
+                        const front = newItems.filter(i => i.id === 'acronyms');
+                        const rest  = newItems.filter(i => i.id !== 'acronyms');
+                        return [...front, ...filtered, ...rest];
                     } catch (e) { return defaultContentItems; }
                 }
                 return defaultContentItems;
@@ -16800,7 +16945,9 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                     const have = new Set(kept.map(i => i.id));
                     const added = defaultContentItems.filter(i => !have.has(i.id));
                     if (added.length === 0 && kept.length === prev.length && kept.every((i, n) => i === prev[n])) return prev;
-                    return [...kept, ...added];
+                    const front = added.filter(i => i.id === 'acronyms');
+                    const rest  = added.filter(i => i.id !== 'acronyms');
+                    return [...front, ...kept, ...rest];
                 });
             }, [reportElements]);
 
@@ -17163,6 +17310,7 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                                 cutSetItems.push({
                                     name, occurred: false,
                                     systemExpansion: { systemName: sys.systemName, fileName: sys.fileName || '',
+                                                       eventInfo: sys.eventInfo || {},
                                                        cutSets: (sys.cutSets || []).map((cs, i) => ({ index: i + 1, events: cs.events || [], probability: cs.probability })) }
                                 });
                             }
@@ -17683,7 +17831,7 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                     }
 
                     const res = { node, saved, ieName, script, endStateOutcomes, nodeMetadata,
-                                  rawFreq, curve, freqNum, freqStr, polLike, scenario, levels,
+                                  rawFreq, curve, freqNum, freqStr, polLike, scenario, levels, failedByEs,
                                   ieLabel: node.name || node.id };
                     ieAnalysisCache.set(node.id, res);
                     return res;
@@ -17805,6 +17953,22 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .forEach(e => { if (e.detail && e.detail.fmSource) citations.cite(e.detail.fmSource); });
                 }
+
+                // -- Acronyms --
+                // The definitions live in prose written by the other sections, so this
+                // section reserves its place (heading, sentence and table number) and is
+                // filled in after the section loop from the text the report actually holds.
+                let acronymSlot = null;
+                sections.acronyms = async () => {
+                    addH2('Acronyms');
+                    const intro = add({ kind: 'p', runs: [
+                        { text: 'Acronyms and abbreviations used in this report are defined in ' },
+                        tblRef(), { text: '.' }
+                    ] });
+                    const table = addTable('Acronyms and abbreviations used in this report',
+                        ['Acronym', 'Definition'], [], [20, 80]);
+                    acronymSlot = { intro, table };
+                };
 
                 sections.projectName = async () => {
                     addH2('Project Name');
@@ -18133,11 +18297,16 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                                     + ' resolves to ' + spellCount(cs.length) + ' minimal cut set' + (cs.length === 1 ? '' : 's')
                                     + ' drawn from ' + spellCount(beCount) + ' basic event' + (beCount === 1 ? '' : 's')
                                     + (failP !== null ? ', giving a failure probability of ' + fmtNum(failP) : '')
-                                    + '. The cut sets are listed in ' },
+                                    + ((limitCutSets > 0 && cs.length > limitCutSets)
+                                        ? '. The top ' + spellCount(limitCutSets) + ' cut sets, by probability, are listed in '
+                                        : '. The cut set' + (cs.length === 1 ? ' is' : 's are') + ' listed in ') },
                                 tblRef(), { text: '.' }
                             ] });
 
-                            const all = cs;
+                            // Ranked by probability so a capped list really is the top of it.
+                            const csProb = (c) => (c.probability !== null && c.probability !== undefined
+                                && !isNaN(c.probability)) ? Number(c.probability) : -1;
+                            const all = cs.slice().sort((a, b) => csProb(b) - csProb(a));
                             const show = limitCutSets > 0 ? all.slice(0, limitCutSets) : all;
                             const truncNote = show.length < all.length ? ', showing the first ' + show.length : '';
                             const rows = show.map((c, ci) => ([
@@ -18248,11 +18417,39 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                                     ([{ text: pathPhrase(sq) + ', reaching ' + sq.endState + '.' + describeNew(sq) }])) });
                             }
 
+                            // FAILED() asserts a top event as failed with certainty, so the
+                            // reader needs to know which events were forced and where.
+                            const failedNote = (() => {
+                                const fb = info.failedByEs;
+                                if (!fb) return '';
+                                const list = (set) => {
+                                    const a = [...(set || [])];
+                                    return a.length <= 1 ? (a[0] || '')
+                                        : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+                                };
+                                const parts = [];
+                                const g = fb['__global__'];
+                                if (g && g.size > 0) {
+                                    parts.push(list(g) + (g.size === 1 ? ' is' : ' are')
+                                        + ' asserted as failed for every scenario of this initiating event');
+                                }
+                                Object.keys(fb).filter(k => k !== '__global__' && fb[k] && fb[k].size > 0).forEach(k => {
+                                    const esNode = (info.polLike?.nodes || []).find(n => n.id === k);
+                                    const esName = esNode?.label || k.replace(/^ES_/, '');
+                                    parts.push(list(fb[k]) + (fb[k].size === 1 ? ' is' : ' are')
+                                        + ' asserted as failed on the path to ' + esName);
+                                });
+                                if (parts.length === 0) return '';
+                                return ' The script uses the FAILED() keyword: ' + parts.join('; ')
+                                    + '. An event named in FAILED() is taken to fail with probability 1.0 rather than '
+                                    + 'quantified from its fault tree, and appears in the diagram as a failed node.';
+                            })();
+
                             if (hasScript) {
                                 add({ kind: 'p', runs: [
                                     { text: 'These operational states are modelled using the notation in '
                                         + 'the Facility Works Script shown in ' },
-                                    tblRef(), { text: '.' }
+                                    tblRef(), { text: '.' + (pngUrl ? '' : failedNote) }
                                 ] });
                                 addTable('Facility Works Script for ' + ieLabel + ' scenarios',
                                     ['Facility Works Script'],
@@ -18264,7 +18461,7 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                                 add({ kind: 'p', runs: [
                                     { text: 'The Facility Works Script is visualized by the associated '
                                         + 'facility operational diagram shown in ' },
-                                    figRef(), { text: '.' }
+                                    figRef(), { text: '.' + failedNote }
                                 ] });
                                 addImage(pngUrl, 'facility operational diagram for ' + ieLabel + '.');
                             }
@@ -18349,8 +18546,16 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                                 if (withCs.length > 0) {
                                     add({ kind: 'p', text: 'The cut sets for each sequence reaching a negative end '
                                         + 'state are the Boolean product of the cut sets of the systems that fail along '
-                                        + 'that sequence. Success branches are not credited as (1 \u2212 P), so these cut '
-                                        + 'sets account for the whole of the sequence. Each is shown both as a conditional '
+                                        + 'that sequence. '
+                                        + (sbtSeq.mode === 'ignore'
+                                            ? 'Success branches are not credited, so these cut sets account for the whole of the sequence. '
+                                            : 'Only the systems that fail along the sequence appear in these cut sets; where '
+                                              + (sbtSeq.mode === 'threshold'
+                                                  ? 'a success branch with success probability below ' + sbtSeq.x
+                                                  : 'a success branch')
+                                              + ' is credited with (1 \u2212 P), that credit is carried in the sequence probability '
+                                              + 'in the table above rather than in the cut sets. ')
+                                        + 'Each is shown both as a conditional '
                                         + 'probability and as a frequency, the latter being the initiating event frequency '
                                         + 'times that cut set\u2019s probability.'
                                         + (info.curve
@@ -18514,7 +18719,9 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                                 + 'Boolean cut set arising under two initiating events appears twice, once '
                                 + 'per initiating event, with its own frequency. ' },
                             tblRef(),
-                            { text: ' ranks them by their frequency contribution.' }
+                            { text: (limitCutSets > 0 && nCutSets > limitCutSets)
+                                ? ' ranks the top ' + spellCount(limitCutSets) + ' by their frequency contribution.'
+                                : ' ranks them by their frequency contribution.' }
                         ] });
 
                         const show = limitCutSets > 0 ? agg.slice(0, limitCutSets) : agg;
@@ -18538,6 +18745,28 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                 sections.endStateSummary = async () => {
                     addH2('End State Summary');
                     const esSummary = buildEndStateSummary(reportIEs);
+                    // Contributing cut sets are end state cut sets -- the initiating event
+                    // ANDed with a sequence cut set -- counted per end state exactly as the
+                    // Overall Results section counts them, so the two sections agree.
+                    const esCutSetKeys = new Map();
+                    for (const node of reportIEs) {
+                        let info;
+                        try { info = analyzeIE(node); } catch (err) { continue; }
+                        const passes = (info.levels && info.levels.length > 0)
+                            ? info.levels.map((L, i) => ({ sequences: L.sequences,
+                                term: (info.ieName || info.ieLabel) + ' @ Magnitude Level ' + (i + 1) }))
+                            : [{ sequences: info.scenario.sequences, term: info.ieName || info.ieLabel }];
+                        passes.forEach(pass => pass.sequences.forEach(sq => {
+                            if (!sq.endState) return;
+                            let set = esCutSetKeys.get(sq.endState);
+                            if (!set) { set = new Set(); esCutSetKeys.set(sq.endState, set); }
+                            (sq.cutSets || []).forEach(c => {
+                                const csKey = (c.events || []).slice().sort().join('|');
+                                if (csKey) set.add(pass.term + '\u0000' + csKey);
+                            });
+                        }));
+                    }
+                    esSummary.forEach(es => { es.totalCutSets = (esCutSetKeys.get(es.label) || new Set()).size; });
                     if (esSummary.length === 0) {
                         add({ kind: 'nodata', text: 'No end state data available. Ensure IEs have Facility Works scripts with parseable sequences.' });
                     } else {
@@ -18563,7 +18792,8 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                         const widths = nCols === 5 ? [38, 13, 19, 15, 15] : [44, 15, 21, 20];
                         addTable('End state summary across all reported initiating events', headers, rows, widths);
                         if (hasFreq && hasProb) {
-                            add({ kind: 'note', text: 'Frequency = sum of (IE frequency \u00D7 sequence probability) across all contributing sequences. Computed using ' + (settings?.quantificationMethod || 'MCUB').toUpperCase() + '. ' + successBranchText(settings).note });
+                            add({ kind: 'note', text: 'Frequency = sum of (IE frequency \u00D7 sequence probability) across all contributing sequences. Computed using ' + (settings?.quantificationMethod || 'MCUB').toUpperCase() + '. ' + successBranchText(settings).note
+                                + ' Contributing cut sets are end state cut sets, the initiating event ANDed with a sequence cut set, counted as in the Overall Results section; a hazard curve level counts as its own initiating event.' });
                         }
                     }
                 };
@@ -18587,6 +18817,24 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                         emitLibElement((reportElements || []).find(e => 'libEl:' + e.id === id));
                     } else if (item.enabled && sections[id]) {
                         await sections[id]();
+                    }
+                }
+
+                if (acronymSlot) {
+                    const skip = new Set([acronymSlot.intro, acronymSlot.table]);
+                    const rows = collectReportAcronyms(blocks.filter(b => !skip.has(b)))
+                        .map(a => [{ text: a.acronym, bold: true }, a.definition]);
+                    if (rows.length > 0) {
+                        acronymSlot.table.rows = rows;
+                    } else {
+                        // Nothing to list: drop the reserved table and close the gap it
+                        // would leave in the table numbering.
+                        const at = blocks.indexOf(acronymSlot.table);
+                        blocks.splice(blocks.indexOf(acronymSlot.intro), 1);
+                        if (at >= 0) blocks.splice(blocks.indexOf(acronymSlot.table), 1);
+                        blocks.splice(blocks.indexOf(blocks.find(b => b.kind === 'h2' && b.text === 'Acronyms')) + 1, 0,
+                            { kind: 'nodata', text: 'No acronyms are defined in this report.' });
+                        renumberTablesAfter(blocks, acronymSlot.table);
                     }
                 }
 
@@ -22286,7 +22534,28 @@ async function mergeReportIntoTemplate(reportBlob, tpl, tokenValues) {
                             ieScripts={ieScripts}
                             onSaveIeScript={handleIeScriptChange}
                             onSave={(newList) => {
-                                setHaData(prev => ({ ...prev, hazardList: newList }));
+                                setHaData(prev => {
+                                    // The IE list only shows leaves whose status is 'included' for
+                                    // the selected FOS. Nodes added in Modify List have no HA
+                                    // status at all, so mark every new leaf 'included' for every
+                                    // FOS; otherwise it silently vanishes from the list.
+                                    const oldIds = new Set();
+                                    const collect = (nodes) => (nodes || []).forEach(n => { oldIds.add(n.id); collect(n.children); });
+                                    collect(prev.hazardList);
+                                    const states = { ...(prev.hazardStates || {}) };
+                                    const markNew = (nodes) => (nodes || []).forEach(n => {
+                                        const isLeaf = !(n.children && n.children.length > 0);
+                                        if (isLeaf && !oldIds.has(n.id)) {
+                                            operatingStates.forEach(os => {
+                                                const key = `${n.id}_${os.id}`;
+                                                if (!states[key]) states[key] = 'included';
+                                            });
+                                        }
+                                        markNew(n.children);
+                                    });
+                                    markNew(newList);
+                                    return { ...prev, hazardList: newList, hazardStates: states };
+                                });
                                 setHasUnsavedChanges(true);
                             }}
                             onClose={() => { setShowModifyIEList(false); setIeDetailsFocusId(null); }}
