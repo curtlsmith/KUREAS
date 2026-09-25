@@ -53,7 +53,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.2 | Hazard analysis, initiating event frequency quantification, and screening |
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.3 | Fault tree logic editing, visualization, and analysis |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
-| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.6 | System modeling, P&ID, FMEA, failure analysis, CCF, Reliability Designer™, importance measures, and comparison function |
+| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.7 | Systems modeling, P&ID, FMEA, failure analysis, CCF, Reliability Designer™, importance measures, human reliability modeling, customizable report generation, and design comparison function |
 | **KUREAS-BAYES** | `KUREAS-BAYES.html` | v1.0 | Manage knowledge of component operational behavior and experience to support Bayesian analysis of how components fail. |
 | **KUREAS-SEQ** | `KUREAS-SEQ.html` | v1.2 | Facility operational diagrams, event tree generation, sequence quantification |
 | **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
