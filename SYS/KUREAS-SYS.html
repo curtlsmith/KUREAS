@@ -213,6 +213,11 @@
             ccfBetaDistBeta: '',
             ccfBetaDistLow: '',
             ccfBetaDistHigh: '',
+            // Alpha-factor model: alpha_1..alpha_m for CCCGs of size m = 2, 3, 4
+            ccfAlpha2_1: '0.98', ccfAlpha2_2: '0.02',
+            ccfAlpha3_1: '0.985', ccfAlpha3_2: '0.01', ccfAlpha3_3: '0.005',
+            ccfAlpha4_1: '0.983', ccfAlpha4_2: '0.01', ccfAlpha4_3: '0.004', ccfAlpha4_4: '0.003',
+            ccfAlphaSource: 'Based upon alpha factors from Table 12 in the report INL/EXT-21-43723.',
             ccfBetaSource: 'Based upon 1-alpha_2 from Table 12 in the report INL/EXT-21-43723.',
             // Basic event naming (How the System Fails): character(s) placed between an SSC name
             // and its failure mode, and between the parts of a CCF event name.
@@ -264,6 +269,9 @@
         const BE_CCF_MARK = '\u001E';
         function beFMKey(sscName, modeName) { return String(sscName) + BE_FM_SEP + String(modeName); }
         function beCCFKey(prefix, failureMode) { return BE_CCF_MARK + String(prefix) + (failureMode ? BE_FM_SEP + failureMode : ''); }
+        // Joins the parts of a CCF prefix (group prefix, member tag) inside the internal key; written out
+        // as the project's basic-event separator, like BE_FM_SEP.
+        const BE_TAG_SEP = '\u001D';
         function beIsCCFKey(k) { return typeof k === 'string' && k.charAt(0) === BE_CCF_MARK; }
         function beIsFMKey(k) { return typeof k === 'string' && !beIsCCFKey(k) && k.includes(BE_FM_SEP); }
         function beParseKey(k) {
@@ -279,8 +287,50 @@
             if (!str.includes(BE_FM_SEP) && !beIsCCFKey(str)) return str;
             const sep = getBENameSeparator(s);
             const k = beParseKey(str);
-            if (k.isCCF) return k.sscName + (k.failureMode ? sep + k.failureMode : '') + sep + 'CCF';
+            if (k.isCCF) return k.sscName.split(BE_TAG_SEP).join(sep) + (k.failureMode ? sep + k.failureMode : '') + sep + 'CCF';
             return k.sscName + sep + k.failureMode;
+        }
+
+        // ── Common-cause failure: alpha-factor model (NUREG/CR-5485, eq. 5.7, non-staggered testing) ──
+        // Project settings hold alpha factors for common cause component groups (CCCGs) of size 2, 3 and 4;
+        // a CCCG larger than four is quantified with the size-4 factors ("four or more"), and a cut-set
+        // combination of more than four with Q_4. For a specific combination of k of the m components:
+        //     Q_k^(m) = k / C(m-1, k-1) * (alpha_k / alpha_t) * Q_t,   alpha_t = sum_j j * alpha_j
+        // The ratio is unchanged by scaling every alpha, so alphas that do not sum to one still give the
+        // intended split; the settings panel flags the sum. Non-staggered testing is assumed because it
+        // gives the larger CCF probability.
+        // Defaults: INL/EXT-21-43723, Table 12.
+        const CCF_ALPHA_DEFAULTS = {
+            ccfAlpha2_1: '0.98',  ccfAlpha2_2: '0.02',
+            ccfAlpha3_1: '0.985', ccfAlpha3_2: '0.01',  ccfAlpha3_3: '0.005',
+            ccfAlpha4_1: '0.983', ccfAlpha4_2: '0.01',  ccfAlpha4_3: '0.004', ccfAlpha4_4: '0.003'
+        };
+        const CCF_ALPHA_SOURCE_DEFAULT = 'Based upon alpha factors from Table 12 in the report INL/EXT-21-43723.';
+        const CCF_ALPHA_KEYS = Object.keys(CCF_ALPHA_DEFAULTS);
+        function ccfModelOn(s) { return !!s && (s.ccfModel === 'beta' || s.ccfModel === 'alpha'); }
+        function ccfAlphaVector(s, m) {
+            const out = [];
+            for (let k = 1; k <= m; k++) {
+                const key = 'ccfAlpha' + m + '_' + k;
+                const v = parseFloat(s && s[key] !== undefined && s[key] !== '' ? s[key] : CCF_ALPHA_DEFAULTS[key]);
+                out.push(isNaN(v) || v < 0 ? 0 : v);
+            }
+            return out;
+        }
+        function ccfBinom(n, r) { let c = 1; for (let i = 1; i <= r; i++) c = c * (n - r + i) / i; return c; }
+        // Q_k^(m) / Q_t for a CCCG of size m and a combination of k (both capped at four).
+        function ccfAlphaMultiplier(s, m, k) {
+            const mm = Math.min(Math.max(m, 2), 4), kk = Math.min(Math.max(k, 2), mm);
+            const a = ccfAlphaVector(s, mm);
+            const at = a.reduce((t, x, i) => t + (i + 1) * x, 0);
+            if (!(at > 0)) return 0;
+            return Math.min(1, kk / ccfBinom(mm - 1, kk - 1) * a[kk - 1] / at);
+        }
+        // Short label for reports and headers: "beta factor, β = 0.02" / "alpha factor (non-staggered)".
+        function ccfModelLabel(s) {
+            if (!ccfModelOn(s)) return 'Not applied';
+            if (s.ccfModel === 'alpha') return 'Alpha-factor model (NUREG/CR-5485, non-staggered testing)' + (s.ccfAlphaSource ? ' (' + s.ccfAlphaSource + ')' : '');
+            return 'Beta-factor model' + (s.ccfBetaFactor !== undefined && s.ccfBetaFactor !== '' ? ', \u03B2 = ' + s.ccfBetaFactor : '') + (s.ccfBetaSource ? ' (' + s.ccfBetaSource + ')' : '');
         }
 
         // ── IDs ───────────────────────────────────────────────────────────────────
@@ -366,6 +416,8 @@
             'showProbability', 'quantificationMethod', 'qualitativeProbLow', 'qualitativeProbMedium', 'qualitativeProbHigh',
             'ccfModel', 'ccfBetaFactor', 'ccfBetaDistribution', 'ccfBetaEF', 'ccfBetaDistAlpha', 'ccfBetaDistBeta',
             'ccfBetaDistLow', 'ccfBetaDistHigh', 'ccfBetaSource', 'beNameSeparator', 'beNameSeparatorCustom',
+            'ccfAlpha2_1', 'ccfAlpha2_2', 'ccfAlpha3_1', 'ccfAlpha3_2', 'ccfAlpha3_3',
+            'ccfAlpha4_1', 'ccfAlpha4_2', 'ccfAlpha4_3', 'ccfAlpha4_4', 'ccfAlphaSource',
             'cutSetTruncation', 'qaRequireReasonForUnlock', 'qaRequireIndependentVerify', 'qaRequireSourceForVerify',
             'defaultMissionTime', 'reportImpPlotX', 'reportImpPlotY'
         ];
@@ -718,6 +770,126 @@
                     </div>
                 </div>
             );
+        }
+
+        // ── SAPHIRE .FTL fault tree logic -> HtSW scripts ─────────────────────────────
+        // An FTL holds failure logic; an HtSW script holds success logic, so each gate is written as
+        // its dual: OR -> AND, AND -> OR, NOR -> NOT( ... AND ... ), NAND -> NOT( ... OR ... ),
+        // N/M (fails when N of M inputs fail) -> COMBINE(M-N+1, ...), a complemented input /X -> NOT X,
+        // and TRAN -> SUBSYS(ID) of the tree it transfers to. Every gate becomes a module, written
+        // leaves-first because modules are compiled in the order they are defined.
+        const SAPHIRE_GATE_TYPES = ['AND', 'OR', 'NAND', 'NOR', 'TRAN', 'NULL'];
+        function sysParseSaphireFTL(text) {
+            const trees = [];
+            let cur = null, last = null;
+            const isGateType = (t) => SAPHIRE_GATE_TYPES.includes(String(t || '').toUpperCase()) || /^\d+\/\d+$/.test(String(t || ''));
+            String(text || '').split(/\r?\n/).forEach(raw => {
+                const line = raw.replace(/\s+$/, '');
+                const t = line.trim();
+                if (!t || t.startsWith('*')) return;
+                if (t.toUpperCase().startsWith('^EOS')) { cur = null; last = null; return; }
+                if (/=\s*$/.test(t)) {                                   // "PROJECT, TREE =" (or "TREE =")
+                    const head = t.replace(/=\s*$/, '').split(',').map(x => x.trim());
+                    cur = { project: head.length > 1 ? head[0] : '', name: (head.length > 1 ? head[1] : head[0]).replace(/\s+/g, ''), gates: {}, order: [] };
+                    trees.push(cur); last = null; return;
+                }
+                if (!cur) { cur = { project: '', name: 'TREE' + (trees.length + 1), gates: {}, order: [] }; trees.push(cur); }
+                const parts = t.split(/\s+/);
+                // An indented line that does not start a gate continues the previous gate's inputs
+                if (/^\s/.test(line) && last && !(parts.length >= 2 && isGateType(parts[1]))) {
+                    parts.forEach(x => last.inputs.push(x)); return;
+                }
+                const name = parts[0], type = String(parts[1] || '').toUpperCase();
+                if (!isGateType(type)) { cur.errors = (cur.errors || []).concat(name + ': unknown gate type "' + (parts[1] || '') + '"'); last = null; return; }
+                last = { name, type, inputs: parts.slice(2) };
+                if (!cur.gates[name.toUpperCase()]) cur.order.push(name.toUpperCase());
+                cur.gates[name.toUpperCase()] = last;
+            });
+            trees.forEach(tr => {
+                tr.gates = Object.fromEntries(Object.entries(tr.gates).map(([k, g]) => [k, { ...g, inputs: g.inputs.map(x => ({ name: x.replace(/^\//, ''), neg: x.startsWith('/') })) }]));
+                const used = new Set();
+                Object.values(tr.gates).forEach(g => g.inputs.forEach(x => used.add(x.name.toUpperCase())));
+                const tn = tr.name.toUpperCase();
+                tr.root = (tr.gates[tn] && !used.has(tn)) ? tn : (tr.order.find(k => !used.has(k)) || tr.order[0] || null);
+            });
+            return trees.filter(tr => tr.root);
+        }
+        // trees: from sysParseSaphireFTL. treeIds: TREE (upper) -> system ID for every tree a TRAN may
+        // reach (this file and systems already in the project). Returns per tree the HtSW tokens, the
+        // basic-event names it uses, and notes.
+        function sysSaphireTreeToHtSW(tr, treeIds, gateDesc) {
+            const K = (v) => ({ type: 'keyword', value: v, deletable: true });
+            const EOL = { type: 'eol', value: ';', deletable: true };
+            const events = new Set(), notes = [];
+            const modules = [];                                      // [{ name, tokens }] leaves-first
+            const done = new Set(), onPath = new Set();
+            const subsys = (id) => [K('SUBSYS'), K('('), { type: 'text', value: id, deletable: true }, K(')')];
+            const transferTarget = (g) => String((g.inputs[0] && g.inputs[0].name) || g.name).toUpperCase();
+            // Tokens for "input works"; plain = must be a single element (inside COMBINE)
+            const item = (inp, owner, idx, plain) => {
+                const key = inp.name.toUpperCase();
+                // "EVAC OR EVAC": SAPHIRE tree EVAC whose single input is the basic event EVAC
+                const g = key === String(owner).toUpperCase() ? null : tr.gates[key];
+                let toks;
+                if (g && g.type === 'TRAN') {
+                    const id = treeIds[transferTarget(g)];
+                    if (id) toks = subsys(id);
+                    else { notes.push('Transfer ' + g.name + ' -> ' + transferTarget(g) + ' is not in this file or project; imported as a basic event.'); events.add(transferTarget(g)); toks = [{ type: 'ssc', value: transferTarget(g), deletable: true }]; }
+                } else if (g) {
+                    emit(key);
+                    toks = [{ type: 'module_ref', value: g.name, deletable: true }];
+                } else {
+                    events.add(inp.name);
+                    toks = [{ type: 'ssc', value: inp.name, deletable: true }];
+                }
+                if (inp.neg) toks = [K('NOT'), ...toks];
+                if (plain && (toks.length > 1)) {                    // COMBINE takes single elements only
+                    const helper = owner + '-IN' + (idx + 1);
+                    modules.push({ name: helper, tokens: toks });
+                    toks = [{ type: 'module_ref', value: helper, deletable: true }];
+                }
+                return toks;
+            };
+            const join = (list, op) => list.flatMap((t, i) => i ? [K(op), ...t] : t);
+            const expr = (g) => {
+                const ins = g.inputs;
+                if (/^\d+\/\d+$/.test(g.type)) {
+                    const failN = parseInt(g.type, 10), m = ins.length;
+                    if (m !== parseInt(g.type.split('/')[1], 10)) notes.push(g.name + ': ' + g.type + ' gate has ' + m + ' inputs; ' + failN + '/' + m + ' used.');
+                    const k = Math.min(Math.max(m - failN + 1, 1), m);
+                    return [K('COMBINE'), K('('), { type: 'number', value: String(k), deletable: true }, ...ins.flatMap((x, i) => item(x, g.name, i, true)), K(')')];
+                }
+                const items = ins.map((x, i) => item(x, g.name, i, false));
+                switch (g.type) {
+                    case 'OR':   return join(items, 'AND');
+                    case 'AND':  return join(items, 'OR');
+                    case 'NOR':  return [K('NOT'), K('('), ...join(items, 'AND'), K(')')];
+                    case 'NAND': return [K('NOT'), K('('), ...join(items, 'OR'), K(')')];
+                    case 'NULL': if (items.length > 1) notes.push(g.name + ': NULL gate with ' + items.length + ' inputs treated as OR.'); return join(items, 'AND');
+                    default:     return join(items, 'AND');
+                }
+            };
+            function emit(key) {
+                if (done.has(key)) return;
+                if (onPath.has(key)) { notes.push('Loop through gate ' + tr.gates[key].name + ' broken.'); return; }
+                onPath.add(key);
+                const g = tr.gates[key];
+                const body = expr(g);
+                onPath.delete(key);
+                done.add(key);
+                modules.push({ name: g.name, tokens: body, desc: gateDesc && gateDesc[key] });
+            }
+            const root = tr.gates[tr.root];
+            let rootTokens;
+            if (root.type === 'TRAN') rootTokens = item({ name: root.name, neg: false }, root.name, 0, false);
+            else { onPath.add(tr.root); rootTokens = expr(root); onPath.delete(tr.root); done.add(tr.root); }
+            const tokens = [{ type: 'keyword', value: 'SYSTEM WORKS =', deletable: false }, ...rootTokens, EOL,
+                { type: 'comment', value: '# Imported from SAPHIRE fault tree ' + tr.name + ': gates written as their success-logic duals (OR -> AND, AND -> OR, N/M -> COMBINE).', deletable: true }, EOL];
+            modules.forEach(m => {
+                if (m.desc) tokens.push({ type: 'comment', value: '# ' + m.desc, deletable: true }, EOL);
+                tokens.push({ type: 'module_def', value: m.name, deletable: true }, ...m.tokens, EOL);
+            });
+            return { tokens, events: [...events], notes, gateCount: done.size + modules.filter(m => !tr.gates[m.name.toUpperCase()]).length };
         }
 
         function getFontSizeClass(setting) {
@@ -2576,7 +2748,8 @@
                                         <div className="flex gap-2 mb-4">
                                             {[
                                                 { value: 'none', label: 'None' },
-                                                { value: 'beta', label: 'Beta Factor' }
+                                                { value: 'beta', label: 'Beta Factor' },
+                                                { value: 'alpha', label: 'Alpha Factor' }
                                             ].map(option => (
                                                 <button
                                                     key={option.value}
@@ -2591,6 +2764,61 @@
                                                 </button>
                                             ))}
                                         </div>
+
+                                        {/* Alpha Factor Settings */}
+                                        {localSettings.ccfModel === 'alpha' && (() => {
+                                            const val = (k) => localSettings[k] !== undefined ? localSettings[k] : CCF_ALPHA_DEFAULTS[k];
+                                            const fmt = (x) => x > 0 ? Number(x).toExponential(2).toUpperCase() : '\u2014';
+                                            return (
+                                            <div className="bg-blue-50 border border-blue-200 rounded p-4 space-y-3">
+                                                <div className="text-sm text-blue-800">
+                                                    <strong>Alpha Factor Model</strong> (NUREG/CR-5485, eq. 5.7, non-staggered testing): a cut set holding k events that share the same
+                                                    failure mode, probability, distribution and component type is ORed with a CCF event for that combination, with
+                                                    Q<sub>k</sub><sup>(m)</sup> = k / C(m&minus;1, k&minus;1) &times; (&#945;<sub>k</sub> / &#945;<sub>t</sub>) &times; Q<sub>t</sub>,
+                                                    &#945;<sub>t</sub> = &Sigma; k&#945;<sub>k</sub>. m is the number of such events in the system; groups larger than four use the size-4 factors.
+                                                </div>
+                                                {[2, 3, 4].map(m => {
+                                                    const keys = Array.from({ length: m }, (_, i) => 'ccfAlpha' + m + '_' + (i + 1));
+                                                    const sum = keys.reduce((t, k) => t + (parseFloat(val(k)) || 0), 0);
+                                                    return (
+                                                        <div key={m}>
+                                                            <div className="text-xs font-semibold text-gray-700 mb-1">Group size {m}{m === 4 ? ' (four or more)' : ''}
+                                                                <span className="font-normal ml-2" style={{ color: Math.abs(sum - 1) > 1e-6 ? '#b45309' : '#6b7280' }}>&Sigma;&#945; = {sum.toFixed(4)}{Math.abs(sum - 1) > 1e-6 ? ' (normally 1; only the ratios are used)' : ''}</span>
+                                                            </div>
+                                                            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(' + m + ', minmax(0, 1fr))' }}>
+                                                                {keys.map((k, i) => (
+                                                                    <div key={k}>
+                                                                        <label className="block text-xs text-gray-600">&#945;<sub>{i + 1}</sub></label>
+                                                                        <input type="text" value={val(k)} onChange={(e) => handleChange(k, e.target.value)} className="w-full px-2 py-1 border rounded text-sm font-mono" />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                <div>
+                                                    <div className="text-xs font-semibold text-gray-700 mb-1">Resulting CCF multipliers Q<sub>k</sub><sup>(m)</sup> / Q<sub>t</sub></div>
+                                                    <table className="text-xs border-collapse">
+                                                        <thead><tr>
+                                                            <th className="border px-2 py-0.5 text-left">m \ k</th>
+                                                            {[2, 3, 4].map(k => <th key={k} className="border px-2 py-0.5">k = {k}{k === 4 ? '+' : ''}</th>)}
+                                                        </tr></thead>
+                                                        <tbody>{[2, 3, 4].map(m => (
+                                                            <tr key={m}>
+                                                                <td className="border px-2 py-0.5">m = {m}{m === 4 ? '+' : ''}</td>
+                                                                {[2, 3, 4].map(k => <td key={k} className="border px-2 py-0.5 font-mono text-right">{k <= m ? fmt(ccfAlphaMultiplier(localSettings, m, k)) : ''}</td>)}
+                                                            </tr>
+                                                        ))}</tbody>
+                                                    </table>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-700 mb-1">Source</label>
+                                                    <input type="text" value={localSettings.ccfAlphaSource !== undefined ? localSettings.ccfAlphaSource : CCF_ALPHA_SOURCE_DEFAULT} onChange={(e) => handleChange('ccfAlphaSource', e.target.value)}
+                                                        className="w-full px-3 py-2 border rounded text-sm" />
+                                                </div>
+                                            </div>
+                                            );
+                                        })()}
 
                                         {/* Beta Factor Settings - only show when Beta Factor model selected */}
                                         {localSettings.ccfModel === 'beta' && (
@@ -3986,7 +4214,7 @@
                 zip.file(PROJ + '.GTD', crlf([stamp, ...gtd]));
                 zip.file(PROJ + '.FTD', crlf([stamp, ...ftd]));
                 if (fas.length) zip.file(PROJ + '.FAS', crlf([PROJ + ' =', '', '* SAPHIRE Fault Tree Post-Processing Rules', stamp,
-                    '* CCF substitution rules (beta factor ' + (settings && settings.ccfBetaFactor) + ') matching the CCF events in ' + PROJ + '.BEI', '', ...fas]));
+                    '* CCF substitution rules (' + (settings && settings.ccfModel === 'alpha' ? 'alpha factor, NUREG/CR-5485 eq. 5.7 non-staggered' : 'beta factor ' + (settings && settings.ccfBetaFactor)) + ') matching the CCF events in ' + PROJ + '.BEI', '', ...fas]));
                 const blob = await zip.generateAsync({ type: 'blob' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -4882,14 +5110,14 @@
                                         { label: 'CCF Event Name' },
                                         { label: 'Description' },
                                         { label: 'Failure Probability' },
-                                        { label: 'Beta Factor' },
+                                        { label: settings?.ccfModel === 'alpha' ? 'Qk/Qt' : 'Beta Factor' },
                                         { label: 'Affected Components' }
                                     ],
                                     rows: Object.entries(ccfEvents).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,d]) => [
                                         beOutName(name, settings),
                                         d.description || '',
                                         fmtProb(d.probability) || '',
-                                        d.ccfBeta !== undefined ? d.ccfBeta.toFixed(3) : '',
+                                        d.ccfBeta !== undefined ? (d.ccfModel === 'alpha' ? Number(d.ccfBeta).toExponential(2).toUpperCase() : d.ccfBeta.toFixed(3)) : '',
                                         (d.ccfGroup||[]).map(e => beOutName(e, settings)).join(', ')
                                     ])
                                 }
@@ -5105,7 +5333,7 @@
                                 {format === 'knowRPT'
                                     ? <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-REPORT package captures all system data: SSC table, failure modes, FMEA diagrams, fault tree, cut sets, importance measures, and P&amp;ID.</>
                                     : format === 'saphireMARD'
-                                    ? <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The SAPHIRE files are built from the complete system fault tree. Names are converted to SAPHIRE form (upper case; letters, digits, _ and - only; 48 characters) and descriptions have commas replaced with semicolons. {settings && settings.ccfModel === 'beta' ? 'The .FAS rules are generated from the same CCF expansion that defines the CCF events in the .BEI.' : 'CCF is off (Settings \u203A Common-Cause Failure Model), so no .FAS rules file is included.'}</>
+                                    ? <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The SAPHIRE files are built from the complete system fault tree. Names are converted to SAPHIRE form (upper case; letters, digits, _ and - only; 48 characters) and descriptions have commas replaced with semicolons. {ccfModelOn(settings) ? 'The .FAS rules are generated from the same CCF expansion that defines the CCF events in the .BEI.' : 'CCF is off (Settings \u203A Common-Cause Failure Model), so no .FAS rules file is included.'}</>
                                     : <><strong>&#x2139;&#xFE0F; Whole-system export</strong> — The KUREAS-FTL file is built from the complete system fault tree and includes all basic events derived from the SYSTEM WORKS expression. The component selection above does not apply.</>
                                 }
                                 {format === 'knowFTL' && (
@@ -6814,9 +7042,7 @@
                                 ['Prepared by (local account)', acctName ? acctName + (acct.organization ? ', ' + acct.organization : '') : 'Local account not set'],
                                 ['Quantification method', methodShort],
                                 ['Truncation threshold', trunc ? fp(trunc) : 'None'],
-                                ['Common-cause failure model', settings?.ccfModel && settings.ccfModel !== 'none'
-                                    ? String(settings.ccfModel) + (settings.ccfBetaFactor !== undefined && settings.ccfBetaFactor !== '' ? ', \u03B2 = ' + settings.ccfBetaFactor : '') + (settings.ccfBetaSource ? ' (' + settings.ccfBetaSource + ')' : '')
-                                    : 'Not applied'],
+                                ['Common-cause failure model', ccfModelLabel(settings)],
                                 ['SSCs / failure modes', (sscsInSystem || []).length + ' / ' + fmList.length]
                             ] }
                         ];
@@ -7016,7 +7242,10 @@
                             ['Quantification method', methodShort + (trunc ? ', cut sets truncated below ' + fp(trunc) : ', no truncation') + '.', 'Exact BDD without truncation; rare-event or MCUB bounds for comparison.'],
                             ['Failure models', models.length ? models.join('; ') + '. Constant failure rates and demand probabilities are assumed.' : 'None.', 'Time-dependent or age-dependent rates; test-interval and repair effects where not already modeled.'],
                             ['Reliability data', sources.length ? 'Parameter estimates taken from ' + sources.join(', ') + '.' : 'Parameter estimates as entered for each failure mode.', 'Plant- or design-specific data, or Bayesian update of the generic estimates.'],
-                            ['Common-cause failure', beta ? 'Beta-factor model, \u03B2 = ' + (settings.ccfBetaFactor !== undefined && settings.ccfBetaFactor !== '' ? settings.ccfBetaFactor : 'not set') + (settings.ccfBetaSource ? ' (' + settings.ccfBetaSource + ')' : '') + ', applied to redundant components of the same type and failure mode.' : 'Not applied; redundant components are treated as independent.', beta ? 'Alpha-factor or MGL parameters; a component-specific beta.' : 'A beta-factor or alpha-factor model for redundant components.'],
+                            ['Common-cause failure', settings?.ccfModel === 'alpha'
+                                ? ccfModelLabel(settings) + ', applied to cut-set combinations of redundant components of the same type, failure mode, probability and distribution; each combination of k of the m components gets its own event quantified with Q_k^(m).'
+                                : beta ? 'Beta-factor model, \u03B2 = ' + (settings.ccfBetaFactor !== undefined && settings.ccfBetaFactor !== '' ? settings.ccfBetaFactor : 'not set') + (settings.ccfBetaSource ? ' (' + settings.ccfBetaSource + ')' : '') + ', applied to redundant components of the same type and failure mode.' : 'Not applied; redundant components are treated as independent.',
+                              settings?.ccfModel === 'alpha' ? 'Staggered testing (smaller Q_k); component-specific alpha factors; the independent events reduced to Q_1 = (\u03B1_1/\u03B1_t)Q_t.' : beta ? 'Alpha-factor or MGL parameters; a component-specific beta.' : 'A beta-factor or alpha-factor model for redundant components.'],
                             ['Excluded failure modes', screenedN ? spell(screenedN) + ' failure mode' + (screenedN === 1 ? '' : 's') + ' screened out or not applied.' : 'None excluded.', 'Include the excluded modes with bounding probabilities.'],
                             ['Injected systems', subN ? spell(subN) + ' other system model' + (subN === 1 ? '' : 's') + ' ' + (subN === 1 ? 'is' : 'are') + ' injected with SUBSYS and solved within this fault tree, with shared SSCs treated as the same basic events.' : 'No other system model is injected; support-system dependencies are outside the model boundary.', subN ? 'Bound the injected systems by a single failure probability instead of solving them jointly.' : 'Inject support systems with SUBSYS(ID).']
                         ];
@@ -7121,7 +7350,7 @@
                             if (hasCCF && total > 0) {
                                 parts.push('Common-cause failures account for about ' + pctOf(ccfShare, total) + ' of the summed cut set probability');
                                 cite(parts, 'ccfTable'); parts.push('. ');
-                                if (ccfShare / total > 0.25) recs.push(['CCF contributes ' + pctOf(ccfShare, total) + ' of the result', 'The result is sensitive to the beta factor (' + (settings?.ccfBetaFactor !== undefined && settings.ccfBetaFactor !== '' ? settings.ccfBetaFactor : 'not set') + '); document its source and consider a plant- or design-specific value.', 'ccfTable']);
+                                if (ccfShare / total > 0.25) recs.push(['CCF contributes ' + pctOf(ccfShare, total) + ' of the result', 'The result is sensitive to the ' + (settings?.ccfModel === 'alpha' ? 'alpha factors' : 'beta factor (' + (settings?.ccfBetaFactor !== undefined && settings.ccfBetaFactor !== '' ? settings.ccfBetaFactor : 'not set') + ')') + '; document ' + (settings?.ccfModel === 'alpha' ? 'their' : 'its') + ' source and consider a plant- or design-specific value.', 'ccfTable']);
                             } else if (!hasCCF && (sscsInSystem || []).length > 1) {
                                 const types = {};
                                 (sscsInSystem || []).forEach(x => { const t = String(x.sscType || '').trim(); if (t) types[t] = (types[t] || 0) + 1; });
@@ -7840,7 +8069,7 @@
                     return formatProbability(probVal, settings.showProbability);
                 };
                 
-                section += '| CCF Event Name | Description | Failure Probability | Beta Factor | Affected Components |\n';
+                section += '| CCF Event Name | Description | Failure Probability | ' + (settings?.ccfModel === 'alpha' ? 'Qk/Qt' : 'Beta Factor') + ' | Affected Components |\n';
                 section += '|----------------|-------------|---------------------|-------------|---------------------|\n';
                 
                 // Sort CCF events alphabetically by name
@@ -7849,7 +8078,7 @@
                 sortedCCFEntries.forEach(([ccfName, ccfData]) => {
                     const description = (ccfData.description || '').replace(/\|/g, '\\|');
                     const probability = formatProb(ccfData.probability);
-                    const betaFactor = ccfData.ccfBeta !== undefined ? ccfData.ccfBeta.toFixed(3) : '';
+                    const betaFactor = ccfData.ccfBeta !== undefined ? (ccfData.ccfModel === 'alpha' ? Number(ccfData.ccfBeta).toExponential(2).toUpperCase() : ccfData.ccfBeta.toFixed(3)) : '';
                     const affectedComponents = ccfData.ccfGroup ? ccfData.ccfGroup.map(e => beOutName(e, settings)).join(', ').replace(/\|/g, '\\|') : '';
                     
                     section += `| ${beOutName(ccfName, settings)} | ${description} | ${probability} | ${betaFactor} | ${affectedComponents} |\n`;
@@ -8352,7 +8581,16 @@
                             const groups = new Set(entries.map(([, c]) => (c.ccfGroup || []).slice().sort().join('|')));
                             const betas = Array.from(new Set(entries.map(([, c]) => c.ccfBeta).filter(b => b !== undefined)));
                             const betaText = betas.length === 1 ? 'a beta factor of ' + betas[0].toFixed(3) : betas.length > 1 ? 'beta factors from ' + Math.min(...betas).toFixed(3) + ' to ' + Math.max(...betas).toFixed(3) : 'the beta factor in the project settings';
-                            const parts = [
+                            const isAlphaCcf = settings?.ccfModel === 'alpha';
+                            const parts = isAlphaCcf ? [
+                                'Common-cause failures are modeled with the alpha-factor method of NUREG/CR-5485 (equation 5.7, non-staggered testing, which gives the larger probability)'
+                                + '. ' + (settings?.ccfAlphaSource ? String(settings.ccfAlphaSource).trim().replace(/\.?$/, '.') + ' ' : '')
+                                + 'Wherever a cut set holds k basic events that share a failure mode, probability, distribution and component type, the cut set is ORed with a common-cause event '
+                                + 'for that combination with probability Q_k^(m) = k / C(m\u22121, k\u22121) \u00D7 (\u03B1_k / \u03B1_t) \u00D7 Q_t, where m is the number of such events in the system '
+                                + '(groups of more than four are quantified as four or more). This produced ' + countOf(entries.length, 'common-cause event') + ' for '
+                                + countOf(groups.size, 'component combination') + '. ', { ref: 'ccfTable' },
+                                ' lists each event with its probability, the multiplier Q_k^(m)/Q_t applied, and the components it fails together.'
+                            ] : [
                                 'Common-cause failures are modeled with the beta-factor method: a fraction \u03B2 of each affected component\u2019s '
                                 + 'failure probability is assigned to a single event that fails every component in the group at once, and the '
                                 + 'independent events keep the remaining (1 \u2212 \u03B2) share. Applying ' + betaText
@@ -8364,9 +8602,9 @@
                             if (present('ftCutSets')) { parts.push(' Cut sets containing these events appear in '); parts.push(secRef('ftCutSets')); parts.push(' alongside the independent ones.'); }
                             refPara(parts);
                             blocks.push({ kind: 'table', id: 'ccfTable', title: 'Common-cause failure events',
-                                headers: ['CCF Event Name', 'Description', 'Failure Probability', 'Beta Factor', 'Affected Components'], colWidths: [18, 30, 12, 10, 30],
+                                headers: ['CCF Event Name', 'Description', 'Failure Probability', isAlphaCcf ? 'Q\u2096/Q\u209C' : 'Beta Factor', 'Affected Components'], colWidths: [18, 30, 12, 10, 30],
                                 rows: entries.map(([ccfName, ccf]) => [beOutName(ccfName, settings), ccf.description || '', fmtProb(ccf.probability),
-                                    ccf.ccfBeta !== undefined ? ccf.ccfBeta.toFixed(3) : '', ccf.ccfGroup ? ccf.ccfGroup.map(e => beOutName(e, settings)).join(', ') : '']) });
+                                    ccf.ccfBeta !== undefined ? (isAlphaCcf ? Number(ccf.ccfBeta).toExponential(2).toUpperCase() : ccf.ccfBeta.toFixed(3)) : '', ccf.ccfGroup ? ccf.ccfGroup.map(e => beOutName(e, settings)).join(', ') : '']) });
                             break;
                         }
                         case 'impGraphic': {
@@ -10415,7 +10653,7 @@
 
         // SEQ Boundary Condition Selection Modal
         // Import dialog — laid out like the Export dialog: pick a source, then Import.
-        function ImportModal({ onChooseDB, onChooseSYS, onChooseSEQ, onChooseFTL, onChooseBEI, onClose }) {
+        function ImportModal({ onChooseDB, onChooseSYS, onChooseSEQ, onChooseFTL, onChooseBEI, onChooseSaphireFTL, onClose }) {
             useEscapeKey(onClose);
             const OPTIONS = {
                 db:  { label: 'Reliability or FMEA database (.relDB, .fmeaDB)', color: '#4338ca', run: onChooseDB,
@@ -10427,7 +10665,9 @@
                 ftl: { label: 'Basic events from a KUREAS-FTL file (.KNOW_FTL)', color: '#15803d', run: onChooseFTL,
                        desc: 'Import basic events from a KUREAS-FTL fault tree file as new SSCs.' },
                 bei: { label: 'Basic events from SAPHIRE (.BEI, optional .BED)', color: '#b91c1c', run: onChooseBEI,
-                       desc: 'Import basic events from a SAPHIRE MAR-D basic event data file as new SSCs. Select the matching .BED file at the same time to bring in the event descriptions.' }
+                       desc: 'Import basic events from a SAPHIRE MAR-D basic event data file as new SSCs. Select the matching .BED file at the same time to bring in the event descriptions.' },
+                saphireFtl: { label: 'Fault tree logic from SAPHIRE (.FTL)', color: '#9a3412', run: onChooseSaphireFTL,
+                       desc: 'Create one system for each fault tree in a SAPHIRE MAR-D .FTL file, with an HtSW script written as the success-logic dual of the tree (each gate becomes a module). Basic events become SSCs. Select the matching .BEI, .BED, .GTD and .FTD files at the same time for probabilities, event, gate and tree descriptions.' }
             };
             const [choice, setChoice] = useState('db');
             return (
@@ -18896,6 +19136,29 @@
         //   modules and variables are prefixed NAME- so they cannot collide with the
         //   parent's; comments are dropped; SUBSYS(NAME) itself becomes [NAME].
         // Missing or circular references are left as a plain identifier and reported.
+        // Estimated token count of a system's script after SUBSYS expansion, without expanding it:
+        // own tokens + the estimate of every system each SUBSYS call injects (memoized; cycles count once).
+        function sysExpandedSizeEstimator(systems) {
+            const memo = new Map(), onPath = new Set();
+            const size = (id) => {
+                if (memo.has(id)) return memo.get(id);
+                const sys = (systems || []).find(x => x.id === id);
+                if (!sys || onPath.has(id)) return 0;
+                onPath.add(id);
+                const t = sys.systemLogic || [];
+                let n = t.length;
+                for (let i = 0; i < t.length && n <= 1e9; i++) {
+                    if (t[i].type === 'keyword' && t[i].value === SYS_SUBSYS_KEYWORD && t[i + 1] && t[i + 1].value === '(' && t[i + 2]) {
+                        const sub = sysFindByName(systems, String(t[i + 2].value || '').trim());
+                        if (sub) n += size(sub.id);
+                    }
+                }
+                onPath.delete(id);
+                memo.set(id, n);
+                return n;
+            };
+            return size;
+        }
         function sysExpandSubsystemTokens(tokens, systems, normalize, stack, problems) {
             const norm = normalize || (x => x);
             const st = stack || [];
@@ -18973,7 +19236,10 @@
                         </div>
                     </div>
                     <div className="overflow-y-auto p-1" style={{ minHeight: 0 }}>
-                        {(systems || []).map(s => {
+                        {(systems || []).slice().sort((a, b) =>      // alphabetical by name (then ID); display only
+                            String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' })
+                            || String(a.acronym || '').localeCompare(String(b.acronym || ''), undefined, { numeric: true, sensitivity: 'base' })
+                        ).map(s => {
                             const active = s.id === activeId;
                             const locked = qaIsLocked(s) || (lockedIds && lockedIds.has(s.id));
                             return (
@@ -20090,6 +20356,16 @@
             // FAILED(...) statements: the analysis sees those SSCs / failure modes at P = 1.0
             const failedNames = React.useMemo(() => sysFailedNames(analysisLogic), [analysisLogic]);
             const failedSscs = React.useMemo(() => sysApplyFailed(analysisSscs, failedNames), [analysisSscs, failedNames]);
+            // Finished solver results by input content (last few). FailureAnalysisModal is declared inside
+            // this component, so an App re-render remounts it; the remounted window takes its result from
+            // here instead of solving again.
+            const solveCacheRef = useRef(new Map());
+            const solveCacheGet = (k) => solveCacheRef.current.get(k) || null;
+            const solveCachePut = (k, r) => { const m = solveCacheRef.current; m.delete(k); m.set(k, r); while (m.size > 4) m.delete(m.keys().next().value); };
+            // Solver jobs in flight by input content. A remount of the window attaches to the running job;
+            // a job is cancelled only once no window has re-attached after an unmount (Close, Cancel).
+            const solveJobsRef = useRef(new Map());
+            const cancelSolveJobs = () => { solveJobsRef.current.forEach(e => e.job.cancel()); solveJobsRef.current.clear(); };
 
             // Keep selectedItem in sync with sscsInSystem (e.g., when FMEA modal updates an SSC)
             useEffect(() => {
@@ -20561,9 +20837,9 @@
 
             // Save system definition
             const saveSystemDefinition = () => {
-                // Compute failure logic tree if system logic exists
+                // Compute failure logic tree if system logic exists (skipped when too large; see below)
                 let failureLogicTree = null;
-                try {
+                if (sysExpandedSizeEstimator(systems.map(x => x.id === activeSystemId ? activeSystemObj() : x))(activeSystemId) <= 20000) try {
                     const parsed = parseSystemWorksExpression(systemLogic, systemName);
                     if (parsed) {
                         failureLogicTree = beTreeOut(parsed, settings);
@@ -20588,6 +20864,7 @@
                     ccfBetaDistLow: settings.ccfBetaDistLow,
                     ccfBetaDistHigh: settings.ccfBetaDistHigh,
                     ccfBetaSource: settings.ccfBetaSource,
+                    ...Object.fromEntries([...CCF_ALPHA_KEYS, 'ccfAlphaSource'].map(k => [k, settings[k]])),
                     beNameSeparator: settings.beNameSeparator,
                     beNameSeparatorCustom: settings.beNameSeparatorCustom,
                     defaultMissionTime: settings.defaultMissionTime,
@@ -20602,8 +20879,15 @@
                 // Every system of the project, the active one taken from the live workspace.
                 // Each carries its own expanded failure logic so other KUREAS apps can read it
                 // without resolving SUBSYS themselves.
+                // A tree is written only when its SUBSYS-expanded script is of manageable size: a
+                // support system is copied once per path that reaches it, so SAPHIRE-derived models
+                // with deep transfer chains expand to hundreds of thousands of tokens and the save
+                // never finished. The tree is derived data (rebuilt from systemLogic on open).
+                const expandedSize = sysExpandedSizeEstimator(systems.map(x => x.id === activeSystemId ? activeSystemObj() : x));
+                const TREE_TOKEN_LIMIT = 20000;
                 const systemsOut = (systems || []).map(x => {
                     const sys = x.id === activeSystemId ? activeSystemObj() : x;
+                    if (expandedSize(sys.id) > TREE_TOKEN_LIMIT) return { ...sys, failureLogicTree: null, failureLogicTreeOmitted: 'expanded logic too large to store; rebuilt from systemLogic on open' };
                     let tree = null;
                     try { tree = beTreeOut(parseSystemWorksExpressionCore(sysExpandSubsystemTokens(sys.systemLogic, systems, normalizeBracketTokens, [sys.id]), sys.name), settings); } catch (e) { tree = null; }
                     return { ...sys, failureLogicTree: tree };
@@ -20649,7 +20933,7 @@
                             description: { type: 'string', description: 'Narrative description of the boundary condition' }
                         }},
                         systemLogic:        { type: 'array',   description: 'Tokenised system success logic expression (SYSTEM WORKS = ...)' },
-                        failureLogicTree:   { type: 'object',  description: 'Auto-generated fault-tree structure derived from systemLogic; compatible with KUREAS-FTL gate/BE schema' },
+                        failureLogicTree:   { type: 'object',  description: 'Auto-generated fault-tree structure derived from systemLogic (null, with failureLogicTreeOmitted, when the SUBSYS-expanded logic is too large to store); compatible with KUREAS-FTL gate/BE schema' },
                         pidDiagram:         { type: 'object',  description: 'P&ID canvas data', fields: {
                             nodes:    { type: 'array',  description: 'Canvas node objects (SSC representations)' },
                             edges:    { type: 'array',  description: 'Canvas edge/connection objects' },
@@ -20675,7 +20959,8 @@
                             qualitativeProbLow:     { type: 'number',  description: 'Upper boundary for LOW qualitative probability band' },
                             qualitativeProbMedium:  { type: 'number',  description: 'Upper boundary for MEDIUM qualitative probability band' },
                             qualitativeProbHigh:    { type: 'number',  description: 'Upper boundary for HIGH qualitative probability band' },
-                            ccfModel:               { type: 'string',  description: 'Common Cause Failure model: none | beta' },
+                            ccfModel:               { type: 'string',  description: 'Common Cause Failure model: none | beta | alpha' },
+                            ccfAlpha2_1:            { type: 'number',  description: 'Alpha-factor model: alpha_k for a CCCG of size m is ccfAlpha<m>_<k> (m = 2, 3, 4; groups larger than 4 use the size-4 factors); quantified with NUREG/CR-5485 eq. 5.7, non-staggered testing' },
                             ccfBetaFactor:          { type: 'number',  description: 'Point-estimate beta factor for CCF' },
                             ccfBetaDistribution:    { type: 'string',  description: 'Distribution type for beta uncertainty: point | lognormal | beta' },
                             ccfBetaEF:              { type: 'number',  description: 'Error factor for CCF beta lognormal distribution' },
@@ -20800,7 +21085,7 @@
                                     if (data.projectSettings.ccfBetaDistHigh !== undefined) newSettings.ccfBetaDistHigh = data.projectSettings.ccfBetaDistHigh;
                                     if (data.projectSettings.ccfBetaSource !== undefined) newSettings.ccfBetaSource = data.projectSettings.ccfBetaSource;
                                     if (data.projectSettings.cutSetTruncation !== undefined) newSettings.cutSetTruncation = data.projectSettings.cutSetTruncation;
-                                    ['qaRequireReasonForUnlock', 'qaRequireIndependentVerify', 'qaRequireSourceForVerify', 'beNameSeparator', 'beNameSeparatorCustom', 'defaultMissionTime', 'reportImpPlotX', 'reportImpPlotY'].forEach(k => { if (data.projectSettings[k] !== undefined) newSettings[k] = data.projectSettings[k]; });
+                                    ['qaRequireReasonForUnlock', 'qaRequireIndependentVerify', 'qaRequireSourceForVerify', 'beNameSeparator', 'beNameSeparatorCustom', 'defaultMissionTime', 'reportImpPlotX', 'reportImpPlotY', ...CCF_ALPHA_KEYS, 'ccfAlphaSource'].forEach(k => { if (data.projectSettings[k] !== undefined) newSettings[k] = data.projectSettings[k]; });
                                     setSettings(newSettings);
                                     SettingsManager.save(newSettings);
                                 }
@@ -21129,6 +21414,88 @@
                         setShowFTLImportModal(true);
                     } catch (err) {
                         alert('Error reading SAPHIRE file: ' + err.message);
+                    }
+                };
+                input.click();
+            };
+
+            // SAPHIRE .FTL fault tree logic -> one new system per tree (optional .BEI/.BED/.GTD/.FTD)
+            const loadSaphireFTLLogic = () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.multiple = true;
+                // No file-type filter: MAR-D exports are often named without an extension (_FTL, _BEI ...)
+                input.onchange = async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    const pick = (ext) => files.find(f => new RegExp('(^|[._])' + ext + '$', 'i').test(f.name));
+                    const ftl = pick('ftl');
+                    if (!ftl) { alert('Please select a SAPHIRE fault tree logic file (.FTL). Its .BEI, .BED, .GTD and .FTD files can be selected at the same time.'); return; }
+                    try {
+                        const rowsOf = (text) => text.split(/\r?\n/).map(l => l.trim())
+                            .filter(l => l && !l.startsWith('*') && !l.startsWith('^') && !/=\s*$/.test(l))
+                            .map(l => l.split(',').map(x => x.trim()));
+                        const readMap = async (f) => { const m = {}; if (f) rowsOf(await f.text()).forEach(r => { if (r[0] && r[1]) m[r[0].toUpperCase()] = r[1]; }); return m; };
+                        const trees = sysParseSaphireFTL(await ftl.text());
+                        if (!trees.length) { alert('No fault tree logic was found in ' + ftl.name + '.'); return; }
+                        const bed = await readMap(pick('bed')), gtd = await readMap(pick('gtd')), ftd = await readMap(pick('ftd'));
+                        const bei = {};
+                        const beiFile = pick('bei');
+                        if (beiFile) rowsOf(await beiFile.text()).forEach(r => { if (r[0]) bei[r[0].toUpperCase()] = r; });
+
+                        // Existing project: system IDs and SSC definitions (the active system from the live workspace)
+                        const current = (systems || []).map(x => x.id === activeSystemId ? activeSystemObj() : x);
+                        const usedIds = new Set(current.map(x => String(x.acronym || '').toUpperCase()).filter(Boolean));
+                        const treeIds = {};
+                        current.forEach(x => { if (x.acronym) treeIds[x.acronym.toUpperCase()] = x.acronym; });
+                        trees.forEach(tr => { treeIds[tr.name.toUpperCase()] = sysUniqueId(tr.name, usedIds); });
+                        const projectSsc = {};
+                        current.forEach(x => (x.sscsInSystem || []).forEach(c => { const k = String(c.name || '').toUpperCase(); if (k && !projectSsc[k]) projectSsc[k] = c; }));
+
+                        const num = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+                        const newFm = (r) => {
+                            const fdt = String(r[1] || '1').trim().toUpperCase();
+                            const base = { units: 'd', description: '', distribution_type: 'Lognormal', distribution_shape_parameter: '', distribution_scale_parameter: '' };
+                            const fmId = 'fm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                            if (fdt === 'T' || fdt === 'F') return { id: fmId, mode: 'Failure', applicable: true, probabilityType: 'probability', failureModel: '5', logicFlag: fdt, data: { ...base, mean: fdt === 'T' ? '1' : '0', distribution_type: 'CNI' } };
+                            let prob = num(r[12]); if (!prob) prob = num(r[5]);
+                            if (!prob && fdt === '3') { const lam = num(r[6]), mt = num(r[8]); if (lam && mt) prob = 1 - Math.exp(-lam * mt); }
+                            return prob ? { id: fmId, mode: 'Failure', applicable: true, probabilityType: 'probability', failureModel: '0', data: { ...base, mean: String(prob) } } : null;
+                        };
+                        const stamp = qaEditStamp();
+                        const made = {}, report = [], noData = new Set(), renamed = [];
+                        const newSystems = trees.map(tr => {
+                            const conv = sysSaphireTreeToHtSW(tr, treeIds, gtd);
+                            const sscs = conv.events.map(ev => {
+                                const id = beCleanId(ev);
+                                if (id !== ev) renamed.push(ev + ' \u2192 ' + id);
+                                const k = id.toUpperCase();
+                                if (projectSsc[k]) return cloneSscs([projectSsc[k]])[0];        // same SSC (shared by ID)
+                                if (!made[k]) {
+                                    const fm = bei[ev.toUpperCase()] ? newFm(bei[ev.toUpperCase()]) : null;
+                                    if (!fm) noData.add(id);
+                                    made[k] = { id: 'ssc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9), name: id, description: bed[ev.toUpperCase()] || '',
+                                                label: 'Basic Event', sscType: '', failureModes: fm ? [fm] : [], source: { name: ftl.name, description: 'Imported from SAPHIRE' } };
+                                }
+                                return cloneSscs([made[k]])[0];
+                            });
+                            const idMap = {};
+                            conv.events.forEach(ev => { idMap[ev] = beCleanId(ev); });
+                            const tokens = conv.tokens.map(t => t.type === 'ssc' && idMap[t.value] ? { ...t, value: idMap[t.value] } : t);
+                            report.push(treeIds[tr.name.toUpperCase()] + ': ' + conv.gateCount + ' module' + (conv.gateCount === 1 ? '' : 's') + ', ' + sscs.length + ' SSC' + (sscs.length === 1 ? '' : 's')
+                                + ((tr.errors || []).length || conv.notes.length ? '\n    ' + [...(tr.errors || []), ...conv.notes].join('\n    ') : ''));
+                            const sys = sysNewSystem(tr.name, { acronym: treeIds[tr.name.toUpperCase()], description: ftd[tr.name.toUpperCase()] || '', systemLogic: tokens, sscsInSystem: sscs });
+                            const out = qaAddContributor(sys, stamp);
+                            out.sscsInSystem = out.sscsInSystem.map(c => qaAddContributor(c, stamp));
+                            return out;
+                        });
+                        setSystems(prev => [...prev, ...newSystems]);
+                        loadSystemIntoWorkspace(newSystems[0]);
+                        setHasUnsavedChanges(true);
+                        alert('Imported ' + newSystems.length + ' fault tree' + (newSystems.length === 1 ? '' : 's') + ' from ' + ftl.name + ' as new systems:\n\n' + report.join('\n')
+                            + (renamed.length ? '\n\nEvent names changed to valid IDs: ' + renamed.join(', ') : '')
+                            + (noData.size ? '\n\n' + noData.size + ' SSC' + (noData.size === 1 ? ' has' : 's have') + ' no probability' + (beiFile ? ' in ' + beiFile.name : ' (select the .BEI with the .FTL to bring probabilities in)') + ': ' + [...noData].slice(0, 12).join(', ') + (noData.size > 12 ? ', \u2026' : '') : ''));
+                    } catch (err) {
+                        alert('Error reading SAPHIRE fault tree logic: ' + err.message);
                     }
                 };
                 input.click();
@@ -22141,6 +22508,7 @@
                     settingsObj?.ccfBetaDistBeta,
                     settingsObj?.ccfBetaDistLow,
                     settingsObj?.ccfBetaDistHigh,
+                    ...CCF_ALPHA_KEYS.map(k => settingsObj?.[k]),
                     getBENameSeparator(settingsObj),
                 ].join(',');
                 return logicKey + '####' + sscsKey + '####' + ccfKey;
@@ -22201,8 +22569,8 @@
                     // Yield so the modal re-renders with the new stage before the next tick
                     await yieldToBrowser();
                     await yieldToBrowser();
-                    // Visible pause so each stage is actually perceptible to the user.
-                    await new Promise(resolve => setTimeout(resolve, 80));
+
+
                     if (analysisCancelledRef.current) {
                         setShowAnalysisProgress(false);
                         return;
@@ -22272,7 +22640,7 @@
                     setAnalysisProgressMsg(stages[i]);
                     await yieldToBrowser();
                     await yieldToBrowser();
-                    await new Promise(resolve => setTimeout(resolve, 80));
+
                     if (analysisCancelledRef.current) {
                         setShowAnalysisProgress(false);
                         return;
@@ -22360,7 +22728,7 @@
              * memory-efficient generation under CCF (e.g. the export/report paths).
              */
             function earlyTruncationThreshold(settings) {
-                if (settings && settings.ccfModel === 'beta') return null;
+                if (ccfModelOn(settings)) return null;
                 return parseTruncationThreshold(settings);
             }
 
@@ -22381,7 +22749,7 @@
              *       The CCF beta factor; used to compute beta * P for a group.
              */
             function buildCCFContext(basicEventData, sscsInSystem, settings) {
-                if (!settings || settings.ccfModel !== 'beta') return null;
+                if (!ccfModelOn(settings)) return null;
 
                 const parsedBeta = parseFloat(settings.ccfBetaFactor);
                 const betaFactor = (!isNaN(parsedBeta) && settings.ccfBetaFactor !== '' && settings.ccfBetaFactor !== undefined)
@@ -22418,7 +22786,23 @@
                     return `${failureMode}|${probRounded}|${dist}|${componentType}`;
                 };
 
-                return { getSignature, betaFactor };
+                // Largest CCF multiplier a group with this signature can receive. Beta: beta.
+                // Alpha: the largest Q_k^(m)/Q_t over k for the group's CCCG size m; a constant per
+                // signature, so the bound stays non-increasing as a path grows.
+                let factorFor = () => betaFactor;
+                if (settings.ccfModel === 'alpha') {
+                    const sizes = {};
+                    Object.keys(basicEventData || {}).forEach(ev => { const sg = getSignature(ev); if (sg) sizes[sg] = (sizes[sg] || 0) + 1; });
+                    const cache = {};
+                    factorFor = (sig) => {
+                        if (cache[sig] !== undefined) return cache[sig];
+                        const m = Math.max(2, sizes[sig] || 2);
+                        let f = 0;
+                        for (let k = 2; k <= Math.min(m, 4); k++) f = Math.max(f, ccfAlphaMultiplier(settings, m, k));
+                        return (cache[sig] = f);
+                    };
+                }
+                return { getSignature, betaFactor, factorFor };
             }
 
             /**
@@ -22502,7 +22886,7 @@
 
                 // Aggregate group contributions
                 let bound = independentProduct;
-                for (const g of groups.values()) {
+                for (const [sig, g] of groups.entries()) {
                     let contribution;
                     if (g.count === 1) {
                         // Singleton — no CCF yet. Bound stays at P.
@@ -22510,7 +22894,7 @@
                     } else {
                         // ≥2 members — CCF expansion produces both alternatives;
                         // upper bound is the larger.
-                        contribution = Math.max(g.productSoFar, ccfContext.betaFactor * g.prob);
+                        contribution = Math.max(g.productSoFar, (ccfContext.factorFor ? ccfContext.factorFor(sig) : ccfContext.betaFactor) * g.prob);
                     }
                     bound *= contribution;
                     if (bound === 0) return 0;
@@ -22579,7 +22963,190 @@
              *        the plain product (only safe when CCF is disabled).
              * @returns {Array} Array of minimal cut sets (each cut set is an array of event names)
              */
+            // Minimal cut sets: bottom-up engine (generateMinimalCutSetsFast), then the same final
+            // truncation the BFS engine applied. Same results as generateMinimalCutSetsBFS except where
+            // the BFS engine was wrong: it bounded a path that met an event twice as p^2 (dropping a
+            // valid minimal cut set and keeping its supersets), and let a FALSE house event through
+            // when it was not the last event on a path.
             function generateMinimalCutSets(tree, basicEventData = {}, truncThreshold = null, ccfContext = null) {
+                if (!tree) return [];
+                const minimal = generateMinimalCutSetsFast(tree, basicEventData, truncThreshold, ccfContext);
+                if (truncThreshold !== null && !ccfContext) return applyTruncation(minimal, basicEventData, truncThreshold).kept;
+                return minimal;
+            }
+
+            /**
+             * Bottom-up minimal cut set engine (algorithms ported from the KUREAS-FTL FTSolver).
+             * Returns the same minimal cut sets as the BFS engine (generateMinimalCutSetsBFS) with
+             * the same truncation rule, but:
+             *  - solves each distinct subtree once: module copies, SUBSYS injections and repeated
+             *    gates are memoized by structure, not re-expanded at every reference;
+             *  - minimizes at every gate, so non-minimal sets never propagate;
+             *  - AND: common terms pass straight through, (C v A')(C v B') = C v A'B', and the
+             *    remaining pairs are visited in descending-bound order, stopping at the first pair
+             *    that cannot survive truncation; contradictions (X and NOT-X) are dropped at merge;
+             *  - k/n voting by recursion f(i,k) = c_i f(i+1,k-1) v f(i+1,k) instead of re-solving
+             *    the children for every one of the C(n,k) combinations;
+             *  - literals are integers and cut sets sorted integer arrays (merge-based subset tests).
+             * Truncation uses exactly the BFS engine's bound: the plain product with CCF off, and
+             * pathPostCCFUpperBound (CCF-aware, monotone non-increasing) with CCF on.
+             */
+            function generateMinimalCutSetsFast(tree, basicEventData = {}, truncThreshold = null, ccfContext = null) {
+                if (!tree) return [];
+                const thr = (truncThreshold === null || truncThreshold === undefined) ? null : truncThreshold;
+                const names = [], idOf = new Map(), isNot = [], comp = [];
+                const lit = (label, notType) => {
+                    let id = idOf.get(label);
+                    if (id === undefined) {
+                        id = names.length; idOf.set(label, id); names.push(label); isNot.push(!!notType); comp.push(-1);
+                        // X and NOT-X are contradictory (same rule as the BFS engine's tautology check)
+                        const other = label.startsWith('NOT-') ? label.slice(4) : 'NOT-' + label;
+                        const o = idOf.get(other);
+                        if (o !== undefined) { comp[id] = o; comp[o] = id; }
+                    } else if (notType) isNot[id] = true;
+                    return id;
+                };
+                // Per-literal factor for the CCF-off bound: the BFS engine looks each label up in
+                // basicEventData (Infinity = unknown, never prune).
+                const lpCache = [];
+                const litP = (id) => {
+                    let v = lpCache[id];
+                    if (v !== undefined) return v;
+                    const ed = basicEventData[names[id]];
+                    v = (!ed || ed.probability === null || ed.probability === undefined) ? Infinity : (isNot[id] ? 1.0 - ed.probability : ed.probability);
+                    lpCache[id] = v; return v;
+                };
+                const bound = ccfContext
+                    ? (s) => pathPostCCFUpperBound(s.map(id => ({ type: isNot[id] ? 'BASIC_NOT' : 'BASIC', label: names[id] })), basicEventData, ccfContext)
+                    : (s) => { let p = 1.0; for (let i = 0; i < s.length; i++) { const q = litP(s[i]); if (q === Infinity) return Infinity; p *= q; if (p === 0) return 0; } return p; };
+                const keep = (b) => thr === null || b === Infinity || !(b < thr);
+                const mk = (s) => ({ s, b: bound(s) });
+
+                // sorted int arrays
+                const isSubsetArr = (a, b) => { if (a.length > b.length) return false; let i = 0, j = 0; while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; } else if (a[i] > b[j]) j++; else return false; } return i === a.length; };
+                const merge = (a, b) => {                  // union, or null if contradictory
+                    const out = []; let i = 0, j = 0;
+                    while (i < a.length || j < b.length) {
+                        const x = j >= b.length || (i < a.length && a[i] < b[j]) ? a[i++] : (i < a.length && a[i] === b[j] ? (j++, a[i++]) : b[j++]);
+                        out.push(x);
+                    }
+                    for (let k = 0; k < out.length; k++) { const c = comp[out[k]]; if (c >= 0 && c > out[k]) { let lo = k + 1, hi = out.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (out[m] === c) return null; if (out[m] < c) lo = m + 1; else hi = m - 1; } } }
+                    return out;
+                };
+                const key = (s) => s.join(',');
+                const minimize = (sets) => {
+                    if (sets.length < 2) return sets;
+                    const seen = new Set(), uniq = [];
+                    for (const x of sets) { const k = key(x.s); if (!seen.has(k)) { seen.add(k); uniq.push(x); } }
+                    if (uniq.some(x => x.s.length === 0)) return [uniq.find(x => x.s.length === 0)];
+                    uniq.sort((a, b) => a.s.length - b.s.length);
+                    // Kept sets are filed under their rarest literal (KUREAS-FTL pivot): shared support
+                    // events that start every set would otherwise put everything in one bucket.
+                    const freq = new Map();
+                    for (const x of uniq) for (const v of x.s) freq.set(v, (freq.get(v) || 0) + 1);
+                    const out = [], buckets = new Map();
+                    for (const x of uniq) {
+                        const s = x.s; let sub = false;
+                        for (let p = 0; p < s.length && !sub; p++) {
+                            const bk = buckets.get(s[p]); if (!bk) continue;
+                            for (let q = 0; q < bk.length; q++) { if (bk[q].length < s.length && isSubsetArr(bk[q], s)) { sub = true; break; } }
+                        }
+                        if (!sub) {
+                            out.push(x);
+                            let piv = s[0], pf = freq.get(piv);
+                            for (let p = 1; p < s.length; p++) { const f = freq.get(s[p]); if (f < pf) { pf = f; piv = s[p]; } }
+                            let bk = buckets.get(piv); if (!bk) { bk = []; buckets.set(piv, bk); } bk.push(s);
+                        }
+                    }
+                    return out;
+                };
+                const orSets = (A, B) => A.length === 0 ? B : B.length === 0 ? A : minimize(A.concat(B));
+                const andSets = (A, B) => {
+                    if (A.length === 0 || B.length === 0) return [];
+                    if (A.length === 1 && A[0].s.length === 0) return B;       // TRUE AND X = X
+                    if (B.length === 1 && B[0].s.length === 0) return A;
+                    // Common-term factoring
+                    const bKeys = new Map(B.map(x => [key(x.s), x]));
+                    const common = [], A2 = [];
+                    for (const x of A) { if (bKeys.has(key(x.s))) common.push(x); else A2.push(x); }
+                    const cKeys = new Set(common.map(x => key(x.s)));
+                    const B2 = B.filter(x => !cKeys.has(key(x.s)));
+                    const out = common.slice();
+                    if (A2.length && B2.length) {
+                        const Bs = B2.slice().sort((x, y) => (y.b === Infinity ? 2 : y.b) - (x.b === Infinity ? 2 : x.b));
+                        let varsB = null;
+                        if (thr !== null && !ccfContext) { varsB = new Set(); for (const x of Bs) for (const v of x.s) varsB.add(v); }
+                        for (const a of A2) {
+                            // Upper bound on any union with a B set, valid for the whole descending B list:
+                            // CCF off: prod(a without B's variables) * b.b ; CCF on: min(a.b, b.b) (monotone bound)
+                            let pa = 1;
+                            if (varsB) for (const v of a.s) { if (!varsB.has(v)) { const q = litP(v); if (q === Infinity) { pa = Infinity; break; } pa *= q; } }
+                            for (const b of Bs) {
+                                if (thr !== null && b.b !== Infinity) {
+                                    const ub = ccfContext ? Math.min(a.b, b.b) : pa * b.b;
+                                    if (ub !== Infinity && ub < thr) break;
+                                }
+                                const u = merge(a.s, b.s);
+                                if (!u) continue;
+                                const x = mk(u);
+                                if (keep(x.b)) out.push(x);
+                            }
+                        }
+                    }
+                    return minimize(out);
+                };
+                const kOfN = (kids, k) => {
+                    const memo = new Map();
+                    const f = (i, kk) => {
+                        if (kk <= 0) return [{ s: [], b: 1 }];
+                        if (kids.length - i < kk) return [];
+                        const mkey = i * 1000 + kk;
+                        if (memo.has(mkey)) return memo.get(mkey);
+                        const r = orSets(andSets(kids[i], f(i + 1, kk - 1)), f(i + 1, kk));
+                        memo.set(mkey, r); return r;
+                    };
+                    return f(0, k);
+                };
+
+                // Structural memo: identical subtrees (module copies) get the same signature id
+                const sigIds = new Map(), sigOf = new Map(), solved = new Map();
+                const sig = (node) => {
+                    if (sigOf.has(node)) return sigOf.get(node);
+                    let s;
+                    const t = node.type;
+                    if (t === 'BASIC' || t === 'BASIC_NOT' || t === 'NOT') s = t + '|' + node.label;
+                    else s = t + '(' + (node.children || []).map(sig).join(',') + ')';
+                    let id = sigIds.get(s); if (id === undefined) { id = sigIds.size; sigIds.set(s, id); }
+                    sigOf.set(node, id); return id;
+                };
+                const solve = (node) => {
+                    if (!node) return [];
+                    const sid = sig(node);
+                    if (solved.has(sid)) return solved.get(sid);
+                    let r;
+                    const t = node.type;
+                    if (t === 'BASIC' || t === 'BASIC_NOT' || t === 'NOT') {
+                        // NOT gate: its label is the complemented literal, as in the BFS engine
+                        const ed = basicEventData[node.label];
+                        if (t === 'BASIC' && ed && ed.isHouseEvent && ed.houseState === 'FALSE') r = [];
+                        else { const x = mk([lit(node.label, t !== 'BASIC')]); r = keep(x.b) ? [x] : []; }
+                    } else if (!node.children || node.children.length === 0) r = [];
+                    else if (t === 'OR') r = node.children.reduce((acc, c) => orSets(acc, solve(c)), []);
+                    else if (t === 'AND') {
+                        const kids = node.children.map(solve).sort((a, b) => a.length - b.length);
+                        r = kids.reduce((acc, c) => acc === null ? c : andSets(acc, c), null) || [];
+                    } else if (t && t.includes('/')) {
+                        const m = t.match(/(\d+)\/(\d+)/);
+                        r = m ? kOfN(node.children.map(solve), parseInt(m[1], 10)) : [];
+                    } else r = [];
+                    solved.set(sid, r);
+                    return r;
+                };
+                return solve(tree).map(x => x.s.map(id => names[id]).sort());
+            }
+
+            // Previous top-down (BFS) engine, kept for regression comparison (STP) only.
+            function generateMinimalCutSetsBFS(tree, basicEventData = {}, truncThreshold = null, ccfContext = null) {
                 if (!tree) return [];
 
                 // Generate all cut sets using BFS, with truncation pruning if a threshold is set.
@@ -22963,9 +23530,10 @@
              * @returns {Object} { expandedCutSets, ccfBasicEvents }
              */
             function applyCCFExpansion(minimalCutSets, basicEventData, sscsInSystem, settings) {
-                if (!settings || settings.ccfModel !== 'beta') {
+                if (!ccfModelOn(settings)) {
                     return { expandedCutSets: minimalCutSets, ccfBasicEvents: {} };
                 }
+                const isAlpha = settings.ccfModel === 'alpha';
                 
                 const parsedBeta = parseFloat(settings.ccfBetaFactor);
                 const betaFactor = (!isNaN(parsedBeta) && settings.ccfBetaFactor !== '' && settings.ccfBetaFactor !== undefined) ? parsedBeta : 0.02;
@@ -23015,6 +23583,11 @@
                 
                 const ccfBasicEvents = {};
                 const expandedCutSets = [];
+
+                // Alpha model: the common cause component group (CCCG) of a signature is every basic
+                // event in the system that carries it; its size m sets which alpha factors apply.
+                const cccgSize = {};
+                if (isAlpha) Object.keys(basicEventData || {}).forEach(ev => { const sg = getCCFSignature(ev); if (sg) cccgSize[sg] = (cccgSize[sg] || 0) + 1; });
                 
                 // Process each cut set
                 for (const cutSet of minimalCutSets) {
@@ -23106,16 +23679,30 @@
                         
                         // Build CCF event name: include failure mode if present
                         // Format: CommonPrefix_FailureMode_CCF (e.g., A_FM1_CCF) or CommonPrefix_CCF if no failure mode
+                        // Beta: one global event per group. Alpha: one event per combination of components
+                        // (Q_k for {A,B} and for {A,C} are separate events), named by the members' distinguishing
+                        // suffixes, e.g. PMP-AB-FTS-CCF (parts joined with the project separator).
+                        const mSize = isAlpha ? Math.max(group.length, cccgSize[signature] || group.length) : null;
+                        let namePrefix = commonPrefix;
+                        if (isAlpha) {
+                            let raw = sscNames[0];
+                            for (let i = 1; i < sscNames.length; i++) while (!sscNames[i].startsWith(raw) && raw.length > 0) raw = raw.slice(0, -1);
+                            const sfx = sscNames.map(n => n.slice(raw.length).replace(/^[_\-.]+/, '')).sort();
+                            const tag = sfx.every(x => x.length === 1) ? sfx.join('') : sfx.join(BE_TAG_SEP);
+                            namePrefix = commonPrefix + BE_TAG_SEP + (tag && (commonPrefix.length + tag.length) <= 36 ? tag : group.length + 'OF' + mSize + BE_TAG_SEP + sscNames.map(n => n.slice(-2)).sort().join(''));
+                        }
                         let ccfEventName;
                         if (failureMode) {
-                            ccfEventName = beCCFKey(commonPrefix, failureMode);
+                            ccfEventName = beCCFKey(namePrefix, failureMode);
                         } else {
-                            ccfEventName = beCCFKey(commonPrefix, '');
+                            ccfEventName = beCCFKey(namePrefix, '');
                         }
                         
-                        // Calculate CCF probability: beta * Q (where Q is the independent failure probability)
+                        // Calculate CCF probability. Beta: beta * Q. Alpha: Q_k^(m) (eq. 5.7, non-staggered),
+                        // stored as the multiplier Q_k^(m)/Q_t so sensitivity and exports treat both alike.
                         const baseProb = basicEventData[group[0]]?.probability || 0;
-                        const ccfProb = betaFactor * baseProb;
+                        const ccfMult = isAlpha ? ccfAlphaMultiplier(settings, mSize, group.length) : betaFactor;
+                        const ccfProb = ccfMult * baseProb;
                         
                         // Create CCF basic event if not already created
                         if (!ccfBasicEvents[ccfEventName]) {
@@ -23130,20 +23717,23 @@
                             } else {
                                 ccfDescription = `${commonPrefix} fails due to CCF`;
                             }
+                            if (isAlpha) ccfDescription += ` (${sscNames.slice().sort().join(', ')}; ${group.length} of ${mSize}${mSize > 4 ? ', quantified as four or more' : ''})`;
                             
                             ccfBasicEvents[ccfEventName] = {
                                 probability: ccfProb,
                                 description: ccfDescription,
                                 isCCF: true,
                                 ccfGroup: group,
-                                ccfBeta: betaFactor,
+                                ccfBeta: ccfMult,
+                                ccfModel: isAlpha ? 'alpha' : 'beta',
+                                ...(isAlpha ? { ccfK: group.length, ccfM: mSize } : {}),
                                 ccfFailureMode: failureMode,
-                                distributionType: betaDistribution,
-                                errorFactor: betaEF,
+                                distributionType: isAlpha ? 'CNI' : betaDistribution,
+                                errorFactor: isAlpha ? undefined : betaEF,
                                 data: {
-                                    distribution_type: betaDistribution,
+                                    distribution_type: isAlpha ? 'CNI' : betaDistribution,
                                     mean: ccfProb,
-                                    distribution_shape_parameter: betaEF
+                                    distribution_shape_parameter: isAlpha ? '' : betaEF
                                 }
                             };
                         }
@@ -23197,6 +23787,189 @@
                 return { expandedCutSets: minimized, ccfBasicEvents };
             }
             
+            /**
+             * Cut sets and quantification for the Failure Analysis window: minimal cut sets,
+             * CCF expansion, cut-set probabilities and the system probability by the selected
+             * method. Pure (inputs -> plain data), so the same code runs on the page or in the
+             * solver Web Worker.
+             */
+            function sysSolveFailureAnalysis(failureLogicTree, basicEventData, sscsInSystem, settings) {
+                // Full truncation threshold + a CCF context — the BFS uses a CCF-aware
+                // upper bound on post-CCF probability so we can prune sub-threshold
+                // paths during generation even with CCF enabled. See the helper docs
+                // on pathPostCCFUpperBound for the bound's monotonicity proof.
+                const truncThreshold = parseTruncationThreshold(settings);
+                const ccfContext = buildCCFContext(basicEventData, sscsInSystem, settings);
+                const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData, truncThreshold, ccfContext);
+
+                // Apply CCF expansion if enabled
+                const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(
+                    minimalCutSets, 
+                    basicEventData, 
+                    sscsInSystem, 
+                    settings
+                );
+                
+                // Merge CCF basic events into a combined event data for probability calculations
+                const combinedEventData = { ...basicEventData, ...ccfBasicEvents };
+                
+                // Calculate probabilities for each cut set
+                const cutSetsWithProb = expandedCutSets.map((cutSet, index) => {
+                    const probResult = calculateCutSetProbability(cutSet, combinedEventData);
+                    
+                    // Build description from basic event descriptions
+                    // Use the description from combinedEventData which has the combined SSC + FM description
+                    const descriptions = cutSet.map(eventName => {
+                        if (combinedEventData[eventName] && combinedEventData[eventName].description) {
+                            return combinedEventData[eventName].description;
+                        }
+                        return eventName;
+                    });
+                    // Join descriptions without adding "fails"
+                    const description = descriptions.length === 1 
+                        ? descriptions[0]
+                        : descriptions.join(' & ');
+                    
+                    // Check if this cut set contains CCF events
+                    const hasCCF = cutSet.some(e => ccfBasicEvents[e]);
+                    
+                    return {
+                        id: index + 1,
+                        events: cutSet,
+                        probability: probResult.probability,
+                        hasLinked: probResult.hasLinked,
+                        hasUnresolvedLinked: probResult.hasUnresolvedLinked,
+                        linkedEvents: probResult.linkedEvents,
+                        description: description,
+                        hasCCF: hasCCF
+                    };
+                });
+                
+                // Sort by probability (highest first), unresolved linked events go to end
+                cutSetsWithProb.sort((a, b) => {
+                    // Unresolved linked events sort to the end
+                    if (a.hasUnresolvedLinked && !b.hasUnresolvedLinked) return 1;
+                    if (!a.hasUnresolvedLinked && b.hasUnresolvedLinked) return -1;
+                    if (a.probability !== null && b.probability !== null) {
+                        return b.probability - a.probability;
+                    }
+                    if (a.probability === null) return 1;
+                    if (b.probability === null) return -1;
+                    return 0;
+                });
+                
+                // Get cut sets with valid probabilities (exclude unresolved linked)
+                const validCutSets = cutSetsWithProb.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
+                const cutSetProbabilities = validCutSets.map(cs => cs.probability);
+                
+                // Calculate system failure probability based on selected method
+                const quantMethod = settings?.quantificationMethod || 'bdd';
+                let systemProb = null;
+                let quantMethodUsed = quantMethod;
+                let quantDetails = null;
+                
+                if (cutSetProbabilities.length > 0) {
+                    if (quantMethod === 'rare') {
+                        // Rare Event Approximation: sum of cut set probabilities
+                        systemProb = cutSetProbabilities.reduce((sum, p) => sum + p, 0);
+                        // Cap at 1.0
+                        systemProb = Math.min(1.0, systemProb);
+                    } else if (quantMethod === 'bdd') {
+                        // BDD (exact) calculation
+                        const cutSetEvents = validCutSets.map(cs => cs.events);
+                        const bddResult = calculateBDD(cutSetEvents, combinedEventData, ccfBasicEvents);
+                        systemProb = bddResult.probability;
+                        quantMethodUsed = bddResult.method;
+                        quantDetails = bddResult.details;
+                    } else {
+                        // Default: MCUB
+                        systemProb = calculateMCUB(cutSetProbabilities);
+                    }
+                }
+                
+                return {
+                    cutSets: cutSetsWithProb,
+                    mcubValue: systemProb,
+                    quantMethod: quantMethodUsed,
+                    quantDetails: quantDetails,
+                    ccfEvents: ccfBasicEvents
+                };
+            }
+
+            // ── Solver Web Worker ──────────────────────────────────────────────────────
+            // A worker runs on its own thread, so a long solve no longer freezes the page. It shares
+            // no variables with the page: its script is assembled from the source of the solver
+            // functions below (the same code the page runs), and the inputs and results are copied
+            // across by postMessage. If a worker cannot be started, the solve runs on the page.
+            function sysSolverWorkerSource() {
+                const fns = [
+                    getBENameSeparator, beFMKey, beCCFKey, beIsCCFKey, beIsFMKey, beParseKey, beOutName,
+                    ccfModelOn, ccfAlphaVector, ccfBinom, ccfAlphaMultiplier,
+                    parseTruncationThreshold, buildCCFContext, pathPostCCFUpperBound, _truncationProb, applyTruncation,
+                    generateMinimalCutSets, generateMinimalCutSetsFast, minimizeCutSets, isSubset, applyCCFExpansion,
+                    calculateCutSetProbability, calculateMCUB, calculateBDD, calculateBDDMemoized, buildBDDTree, evaluateBDDTree,
+                    sysSolveFailureAnalysis
+                ];
+                const consts = { BE_FM_SEP, BE_CCF_MARK, BE_TAG_SEP, CCF_ALPHA_DEFAULTS, CCF_ALPHA_KEYS };
+                // In the browser these functions are Babel's output, which calls helpers (e.g. _objectSpread
+                // for { ...a }) defined once at the top of the transpiled script. Pull in every page-level,
+                // non-native function the code calls but does not define, repeating until none is missing.
+                let code = fns.map(f => f.toString()).join('\n\n');
+                const have = new Set([...fns.map(f => f.name), ...Object.keys(consts)]);
+                for (let pass = 0; pass < 10; pass++) {
+                    const add = [];
+                    const re = /(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g;
+                    let m;
+                    while ((m = re.exec(code))) {
+                        const n = m[1];
+                        if (have.has(n)) continue;
+                        have.add(n);
+                        const f = window[n];
+                        if (typeof f === 'function' && !/\[native code\]/.test(Function.prototype.toString.call(f))) add.push(f);
+                    }
+                    if (!add.length) break;
+                    code = add.map(f => f.toString()).join('\n\n') + '\n\n' + code;
+                }
+                return Object.entries(consts).map(([k, v]) => 'const ' + k + ' = ' + JSON.stringify(v) + ';').join('\n') + '\n'
+                    + code + '\n'
+                    + 'self.onmessage = (e) => { const d = e.data; try { self.postMessage({ ok: true, r: sysSolveFailureAnalysis(d.tree, d.bed, d.sscs, d.settings) }); }'
+                    + ' catch (err) { self.postMessage({ ok: false, error: String(err && err.message || err) }); } };';
+            }
+            function sysSolverWorkerUrl() {
+                if (!window.__kureasSysSolverUrl) window.__kureasSysSolverUrl = URL.createObjectURL(new Blob([sysSolverWorkerSource()], { type: 'text/javascript' }));
+                return window.__kureasSysSolverUrl;
+            }
+            // Returns { promise, cancel }. cancel() terminates the worker (or skips the page fallback).
+            function sysRunSolveInWorker(payload) {
+                let worker = null, cancelled = false;
+                const promise = new Promise((resolve, reject) => {
+                    const onPage = (why) => {
+                        if (why) console.warn('KUREAS-SYS: solving on the page (' + why + ')');
+                        setTimeout(() => {
+                            if (cancelled) return;
+                            try { resolve(sysSolveFailureAnalysis(payload.tree, payload.bed, payload.sscs, payload.settings)); } catch (e) { reject(e); }
+                        }, 0);
+                    };
+                    if (typeof Worker === 'undefined') { onPage('Web Workers are not available'); return; }
+                    try { worker = new Worker(sysSolverWorkerUrl()); } catch (e) { onPage('worker could not start: ' + e.message); return; }
+                    worker.onmessage = (ev) => {
+                        if (worker) { worker.terminate(); worker = null; }
+                        if (cancelled) return;
+                        // Any worker-side failure falls back to the page, where a genuine solver error
+                        // surfaces exactly as it did before the worker existed.
+                        if (ev.data && ev.data.ok) resolve(ev.data.r); else onPage('worker reported: ' + ((ev.data && ev.data.error) || 'unknown error'));
+                    };
+                    worker.onerror = (ev) => {
+                        if (ev && ev.preventDefault) ev.preventDefault();
+                        if (worker) { worker.terminate(); worker = null; }
+                        if (!cancelled) onPage('worker error: ' + ((ev && ev.message) || 'unknown'));
+                    };
+                    try { worker.postMessage(payload); }
+                    catch (e) { worker.terminate(); worker = null; onPage('inputs could not be sent to the worker: ' + e.message); }
+                });
+                return { promise, cancel: () => { cancelled = true; if (worker) { worker.terminate(); worker = null; } } };
+            }
+
             /**
              * Calculate probability of a single cut set
              * Cut set probability = product of all event probabilities
@@ -23316,13 +24089,9 @@
                 const numCutSets = cutSets.length;
                 const numEvents = allEvents.size;
                 
-                if (numCutSets <= 20) {
-                    // Direct inclusion-exclusion for small problems
-                    return calculateInclusionExclusion(cutSets, eventData);
-                } else {
-                    // BDD-based approach for larger problems
-                    return calculateBDDMemoized(cutSets, eventData, allEvents);
-                }
+                // The reduced ordered BDD is exact at every size and treats X and NOT-X as one
+                // variable (inclusion-exclusion multiplied p(X)(1 - p(X)) for sets holding both).
+                return calculateBDDMemoized(cutSets, eventData, allEvents);
             }
             
             /**
@@ -23468,188 +24237,114 @@
             }
             
             /**
-             * Build a reusable BDD tree structure from cut sets.
-             * Returns a tree of {type, varIdx, eventName, high, low} nodes plus
-             * metadata needed for fast requantification.
-             * Call this ONCE per cut-set collection, then call evaluateBDDTree
-             * repeatedly with different probability maps.
-             *
-             * Performance: when there are ≤31 unique events we use plain Number bitmasks,
-             * which are dramatically faster than BigInt for the bit ops and (crucially)
-             * for the cache-key string construction. Above 31 events we fall back to BigInt.
-             * The 31-event ceiling is the safe range for JavaScript's 32-bit-signed bitwise
-             * operators; bit 31 of a Number is the sign bit, so 1 << 31 goes negative.
+             * Reduced ordered BDD of a cut set list (the OR of each cut set's AND).
+             * Built by apply: each cut set is a chain of nodes, and the chains are ORed pairwise
+             * (balanced), with a unique table (hash-consing) and a computed table, so the cost
+             * follows the size of the BDD rather than the number of cut sets. X and NOT-X are
+             * one decision variable (NOT-X takes the low branch). Variables are ordered by how
+             * often they occur (most frequent first, ties by name).
+             * Returns { root, eventList, V, H, L, order, baseOf } where eventList holds the literal
+             * names as they appear in the cut sets (callers key probMap by these).
              */
             function buildBDDTree(cutSets, allEventsSet) {
                 if (!cutSets || cutSets.length === 0) return null;
-
-                const eventList = Array.from(allEventsSet).sort();
-                const eventIndex = new Map();
-                eventList.forEach((e, i) => eventIndex.set(e, i));
-
-                // useNumber: cap at 31 unique events so all bitwise ops (`<<`, `&`, `~`, `|`)
-                // operate within JavaScript's signed 32-bit int range and produce exact
-                // results. We use 31 (not 32) because 1 << 31 produces a negative number
-                // due to two's-complement, which would break sort-as-number cache keys.
-                const useNumber = eventList.length <= 31;
-
-                if (useNumber) {
-                    // ── Number bitmask path (≤31 events) ──────────────────────
-                    const cutSetMasks = cutSets.map(cs => {
-                        let mask = 0;
-                        for (const event of cs) {
-                            const idx = eventIndex.get(event);
-                            if (idx !== undefined) mask |= (1 << idx);
-                        }
-                        return mask;
-                    });
-
-                    const nodeCache = new Map();
-
-                    const buildNode = (varIdx, remainingMasks) => {
-                        if (remainingMasks.length === 0) return null;
-                        for (let i = 0; i < remainingMasks.length; i++) {
-                            if (remainingMasks[i] === 0) return 'ONE';
-                        }
-                        if (varIdx >= eventList.length) return null;
-
-                        // Cache key: sorted unique masks joined. Numbers sort numerically
-                        // once per call. Dedupe with a Set first — collapsed subtrees
-                        // commonly produce duplicates.
-                        const uniq = Array.from(new Set(remainingMasks)).sort((a, b) => a - b);
-                        const cacheKey = varIdx + ':' + uniq.join(',');
-                        const cached = nodeCache.get(cacheKey);
-                        if (cached !== undefined) return cached;
-
-                        const varBit = 1 << varIdx;
-                        const eventName = eventList[varIdx];
-
-                        // high branch: event = 1 (fails) — clear bit in cut sets that have it
-                        const masksHigh = new Array(remainingMasks.length);
-                        for (let i = 0; i < remainingMasks.length; i++) {
-                            const m = remainingMasks[i];
-                            masksHigh[i] = (m & varBit) ? (m & ~varBit) : m;
-                        }
-                        const high = buildNode(varIdx + 1, masksHigh);
-
-                        // low branch: event = 0 — drop cut sets requiring this event
-                        const masksLow = [];
-                        for (let i = 0; i < remainingMasks.length; i++) {
-                            if (!(remainingMasks[i] & varBit)) masksLow.push(remainingMasks[i]);
-                        }
-                        const low = buildNode(varIdx + 1, masksLow);
-
-                        if (high === low) {
-                            nodeCache.set(cacheKey, high);
-                            return high;
-                        }
-
-                        const node = { varIdx, eventName, high, low };
-                        nodeCache.set(cacheKey, node);
-                        return node;
-                    };
-
-                    const root = buildNode(0, cutSetMasks);
-                    return { root, eventList, eventIndex };
-                }
-
-                // ── BigInt fallback for >53 events ────────────────────────────
-                const cutSetMasks = cutSets.map(cs => {
-                    let mask = 0n;
-                    for (const event of cs) {
-                        const idx = eventIndex.get(event);
-                        if (idx !== undefined) mask |= (1n << BigInt(idx));
-                    }
-                    return mask;
-                });
-
-                const nodeCache = new Map();
-
-                const buildNode = (varIdx, remainingMasks) => {
-                    if (remainingMasks.length === 0) return null;
-                    for (let i = 0; i < remainingMasks.length; i++) {
-                        if (remainingMasks[i] === 0n) return 'ONE';
-                    }
-                    if (varIdx >= eventList.length) return null;
-
-                    // Dedupe and sort to canonicalise the cache key.
-                    const uniqSet = new Set();
-                    for (let i = 0; i < remainingMasks.length; i++) uniqSet.add(remainingMasks[i].toString(16));
-                    const uniq = Array.from(uniqSet).sort();
-                    const cacheKey = varIdx + ':' + uniq.join(',');
-                    const cached = nodeCache.get(cacheKey);
-                    if (cached !== undefined) return cached;
-
-                    const varBit = 1n << BigInt(varIdx);
-                    const eventName = eventList[varIdx];
-
-                    const masksHigh = new Array(remainingMasks.length);
-                    for (let i = 0; i < remainingMasks.length; i++) {
-                        const m = remainingMasks[i];
-                        masksHigh[i] = (m & varBit) ? (m & ~varBit) : m;
-                    }
-                    const high = buildNode(varIdx + 1, masksHigh);
-
-                    const masksLow = [];
-                    for (let i = 0; i < remainingMasks.length; i++) {
-                        if (!(remainingMasks[i] & varBit)) masksLow.push(remainingMasks[i]);
-                    }
-                    const low = buildNode(varIdx + 1, masksLow);
-
-                    if (high === low) {
-                        nodeCache.set(cacheKey, high);
-                        return high;
-                    }
-
-                    const node = { varIdx, eventName, high, low };
-                    nodeCache.set(cacheKey, node);
-                    return node;
+                const eventList = Array.from(allEventsSet || new Set(cutSets.flat())).sort();
+                const baseOf = (n) => n.startsWith('NOT-') ? n.slice(4) : n;
+                const freq = new Map();
+                for (const cs of cutSets) for (const e of cs) { const b = baseOf(e); freq.set(b, (freq.get(b) || 0) + 1); }
+                const order = Array.from(freq.keys()).sort((a, b) => (freq.get(b) - freq.get(a)) || (a < b ? -1 : a > b ? 1 : 0));
+                const level = new Map(); order.forEach((b, i) => level.set(b, i));
+                // Node store: 0 = FALSE, 1 = TRUE; V = variable level (terminals get order.length)
+                const V = [order.length, order.length], H = [0, 1], L = [0, 1];
+                const unique = new Map();
+                const mk = (v, h, l) => {
+                    if (h === l) return h;
+                    const k = v + ',' + h + ',' + l;
+                    let n = unique.get(k);
+                    if (n === undefined) { n = V.length; V.push(v); H.push(h); L.push(l); unique.set(k, n); }
+                    return n;
                 };
-
-                const root = buildNode(0, cutSetMasks);
-                return { root, eventList, eventIndex };
+                const orMemo = new Map();
+                const or = (a, b) => {
+                    if (a === 1 || b === 1) return 1;
+                    if (a === 0) return b;
+                    if (b === 0 || a === b) return a;
+                    if (a > b) { const t = a; a = b; b = t; }
+                    const k = a * 67108864 + b;
+                    const hit = orMemo.get(k);
+                    if (hit !== undefined) return hit;
+                    const va = V[a], vb = V[b];
+                    let r;
+                    if (va === vb) r = mk(va, or(H[a], H[b]), or(L[a], L[b]));
+                    else if (va < vb) r = mk(va, or(H[a], b), or(L[a], b));
+                    else r = mk(vb, or(a, H[b]), or(a, L[b]));
+                    orMemo.set(k, r);
+                    return r;
+                };
+                // OR the cut sets in lexicographic order of their variable levels, so the balanced
+                // reduction merges neighbours that share leading variables (a trie-like build that
+                // keeps every intermediate BDD small).
+                const litLists = cutSets.map(cs => cs.map(e => ({ v: level.get(baseOf(e)), neg: e.startsWith('NOT-') })).sort((x, y) => x.v - y.v));
+                litLists.sort((a, b) => { const n = Math.min(a.length, b.length); for (let i = 0; i < n; i++) { if (a[i].v !== b[i].v) return a[i].v - b[i].v; if (a[i].neg !== b[i].neg) return a[i].neg ? 1 : -1; } return a.length - b.length; });
+                let terms = [];
+                for (const asc of litLists) {
+                    const lits = asc.slice().reverse();
+                    let node = 1, bad = false;
+                    for (let i = 0; i < lits.length; i++) {
+                        if (i > 0 && lits[i].v === lits[i - 1].v) { if (lits[i].neg !== lits[i - 1].neg) { bad = true; break; } continue; }
+                        node = lits[i].neg ? mk(lits[i].v, 0, node) : mk(lits[i].v, node, 0);
+                    }
+                    if (!bad) terms.push(node);
+                }
+                if (terms.length === 0) return { root: null, eventList, V, H, L, order, baseOf };
+                while (terms.length > 1) {                                   // balanced OR
+                    const next = [];
+                    for (let i = 0; i < terms.length; i += 2) next.push(i + 1 < terms.length ? or(terms[i], terms[i + 1]) : terms[i]);
+                    terms = next;
+                }
+                const top = terms[0];
+                if (top === 1) return { root: 'ONE', eventList, V, H, L, order, baseOf };
+                if (top === 0) return { root: null, eventList, V, H, L, order, baseOf };
+                // Keep only the nodes reachable from the root, children before parents
+                const topo = [], seen = new Uint8Array(V.length);
+                const stack = [top];
+                while (stack.length) {
+                    const n = stack[stack.length - 1];
+                    if (n < 2 || seen[n] === 2) { stack.pop(); continue; }
+                    if (seen[n] === 0) { seen[n] = 1; if (H[n] >= 2 && !seen[H[n]]) stack.push(H[n]); if (L[n] >= 2 && !seen[L[n]]) stack.push(L[n]); }
+                    else { seen[n] = 2; topo.push(n); stack.pop(); }
+                }
+                // Compact to the reachable nodes (0 = FALSE, 1 = TRUE, then children before parents),
+                // so each evaluation costs the size of the final BDD, not of the build.
+                const idx = new Map([[0, 0], [1, 1]]);
+                topo.forEach((n, i) => idx.set(n, i + 2));
+                const cV = new Int32Array(topo.length + 2), cH = new Int32Array(topo.length + 2), cL = new Int32Array(topo.length + 2);
+                topo.forEach((n, i) => { cV[i + 2] = V[n]; cH[i + 2] = idx.get(H[n]); cL[i + 2] = idx.get(L[n]); });
+                return { root: topo.length + 1, eventList, V: cV, H: cH, L: cL, order, baseOf, size: topo.length };
             }
 
             /**
-             * Evaluate a pre-built BDD tree with a given probability map.
-             * probMap: Map<eventName, probability> or plain object {eventName: prob}
-             * Very fast — just walks the tree multiplying probabilities.
+             * Evaluate a BDD from buildBDDTree with a probability map (Map or plain object) keyed
+             * by literal names. A variable's probability is its base event's entry when set,
+             * otherwise 1 - the NOT- entry, so an override of X also governs NOT-X.
              */
             function evaluateBDDTree(bddTree, probMap) {
                 if (!bddTree) return 0;
                 const { root } = bddTree;
                 if (root === null) return 0;
                 if (root === 'ONE') return 1;
-
-                // The probMap is expected to contain the literal event names as they
-                // appear in the BDD tree, including any NOT- prefix. For NOT- events
-                // the caller is responsible for storing the pre-complemented value
-                // (1 - p_base) under the NOT-X key. See buildImportanceEngine and
-                // calculateBDDMemoized for the two callers that prepare this map.
-                const getProb = typeof probMap.get === 'function'
-                    ? (name) => probMap.get(name) ?? 0
-                    : (name) => {
-                        const entry = probMap[name];
-                        if (entry && typeof entry === 'object') return entry.probability ?? 0;
-                        return entry ?? 0;
-                    };
-
-                const evalCache = new Map();
-
-                const evalNode = (node) => {
-                    if (node === null) return 0;
-                    if (node === 'ONE') return 1;
-
-                    // Use object identity as cache key (nodes are shared via nodeCache)
-                    if (evalCache.has(node)) return evalCache.get(node);
-
-                    const p = getProb(node.eventName);
-                    const result = p * evalNode(node.high) + (1 - p) * evalNode(node.low);
-                    evalCache.set(node, result);
-                    return result;
-                };
-
-                return Math.max(0, Math.min(1, evalNode(root)));
+                const get = typeof probMap.get === 'function' ? (n) => probMap.get(n) : (n) => { const e = probMap[n]; return (e && typeof e === 'object') ? e.probability : e; };
+                const pv = bddTree.order.map(b => {
+                    const pb = get(b);
+                    if (pb !== undefined && pb !== null && !isNaN(pb)) return pb;
+                    const pn = get('NOT-' + b);
+                    return (pn !== undefined && pn !== null && !isNaN(pn)) ? 1.0 - pn : 0;
+                });
+                const { V, H, L } = bddTree;
+                const P = new Float64Array(V.length);
+                P[1] = 1;
+                for (let n = 2; n < V.length; n++) { const p = pv[V[n]]; P[n] = p * P[H[n]] + (1 - p) * P[L[n]]; }
+                return Math.max(0, Math.min(1, P[root]));
             }
 
             /**
@@ -26917,119 +27612,61 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 }, [systemLogic, systemName, sscsInSystem, basicEventData]);
                 
                 // Generate actual cut sets from fault tree
-                const { cutSets, mcubValue, quantMethod, quantDetails, ccfEvents } = React.useMemo(() => {
-                    if (cachedResults) return {
-                        cutSets: cachedResults.cutSets,
-                        mcubValue: cachedResults.mcubValue,
-                        quantMethod: cachedResults.quantMethod,
-                        quantDetails: cachedResults.quantDetails,
-                        ccfEvents: cachedResults.ccfEvents,
-                    };
+                // Cut sets and quantification run in a Web Worker (sysRunSolveInWorker), so the page
+                // stays responsive and Cancel works while a large system solves. The progress dialog
+                // stays up until the result arrives (onAnalysisReady below).
+                // The job is keyed on the content of its inputs, not their identity: the parent
+                // rebuilds its SSC list on re-render (e.g. when it dismisses the progress dialog),
+                // which used to re-run the whole solve with identical data.
+                const solveKey = React.useMemo(() => cachedResults ? 'cached'
+                    : JSON.stringify([failureLogicTree, basicEventData, (sscsInSystem || []).map(c => [c.name, c.label, c.sscType]), settings],
+                        (k, v) => k === 'id' ? undefined : v),     // node ids are regenerated (some randomly) and do not affect the solve
+                    [cachedResults, failureLogicTree, basicEventData, sscsInSystem, settings]);
+                const EMPTY_SOLVE = React.useMemo(() => ({ cutSets: [], mcubValue: null, quantMethod: settings?.quantificationMethod || 'bdd', quantDetails: null, ccfEvents: {} }), []);
+                const [solveResult, setSolveResult] = React.useState(() => cachedResults ? {
+                    cutSets: cachedResults.cutSets,
+                    mcubValue: cachedResults.mcubValue,
+                    quantMethod: cachedResults.quantMethod,
+                    quantDetails: cachedResults.quantDetails,
+                    ccfEvents: cachedResults.ccfEvents,
+                } : solveCacheGet(solveKey));
+                const [solveError, setSolveError] = React.useState(null);
+                React.useEffect(() => {
+                    if (cachedResults) return;
                     if (!failureLogicTree || !failureLogicTree.children || failureLogicTree.children.length === 0) {
-                        return { cutSets: [], mcubValue: null, quantMethod: 'mcub', quantDetails: null, ccfEvents: {} };
+                        setSolveResult({ cutSets: [], mcubValue: null, quantMethod: 'mcub', quantDetails: null, ccfEvents: {} });
+                        return;
                     }
-
-                    // Full truncation threshold + a CCF context — the BFS uses a CCF-aware
-                    // upper bound on post-CCF probability so we can prune sub-threshold
-                    // paths during generation even with CCF enabled. See the helper docs
-                    // on pathPostCCFUpperBound for the bound's monotonicity proof.
-                    const truncThreshold = parseTruncationThreshold(settings);
-                    const ccfContext = buildCCFContext(basicEventData, sscsInSystem, settings);
-                    const minimalCutSets = generateMinimalCutSets(failureLogicTree, basicEventData, truncThreshold, ccfContext);
-
-                    // Apply CCF expansion if enabled
-                    const { expandedCutSets, ccfBasicEvents } = applyCCFExpansion(
-                        minimalCutSets, 
-                        basicEventData, 
-                        sscsInSystem, 
-                        settings
-                    );
-                    
-                    // Merge CCF basic events into a combined event data for probability calculations
-                    const combinedEventData = { ...basicEventData, ...ccfBasicEvents };
-                    
-                    // Calculate probabilities for each cut set
-                    const cutSetsWithProb = expandedCutSets.map((cutSet, index) => {
-                        const probResult = calculateCutSetProbability(cutSet, combinedEventData);
-                        
-                        // Build description from basic event descriptions
-                        // Use the description from combinedEventData which has the combined SSC + FM description
-                        const descriptions = cutSet.map(eventName => {
-                            if (combinedEventData[eventName] && combinedEventData[eventName].description) {
-                                return combinedEventData[eventName].description;
-                            }
-                            return eventName;
-                        });
-                        // Join descriptions without adding "fails"
-                        const description = descriptions.length === 1 
-                            ? descriptions[0]
-                            : descriptions.join(' & ');
-                        
-                        // Check if this cut set contains CCF events
-                        const hasCCF = cutSet.some(e => ccfBasicEvents[e]);
-                        
-                        return {
-                            id: index + 1,
-                            events: cutSet,
-                            probability: probResult.probability,
-                            hasLinked: probResult.hasLinked,
-                            hasUnresolvedLinked: probResult.hasUnresolvedLinked,
-                            linkedEvents: probResult.linkedEvents,
-                            description: description,
-                            hasCCF: hasCCF
-                        };
-                    });
-                    
-                    // Sort by probability (highest first), unresolved linked events go to end
-                    cutSetsWithProb.sort((a, b) => {
-                        // Unresolved linked events sort to the end
-                        if (a.hasUnresolvedLinked && !b.hasUnresolvedLinked) return 1;
-                        if (!a.hasUnresolvedLinked && b.hasUnresolvedLinked) return -1;
-                        if (a.probability !== null && b.probability !== null) {
-                            return b.probability - a.probability;
-                        }
-                        if (a.probability === null) return 1;
-                        if (b.probability === null) return -1;
-                        return 0;
-                    });
-                    
-                    // Get cut sets with valid probabilities (exclude unresolved linked)
-                    const validCutSets = cutSetsWithProb.filter(cs => !cs.hasUnresolvedLinked && cs.probability !== null);
-                    const cutSetProbabilities = validCutSets.map(cs => cs.probability);
-                    
-                    // Calculate system failure probability based on selected method
-                    const quantMethod = settings?.quantificationMethod || 'bdd';
-                    let systemProb = null;
-                    let quantMethodUsed = quantMethod;
-                    let quantDetails = null;
-                    
-                    if (cutSetProbabilities.length > 0) {
-                        if (quantMethod === 'rare') {
-                            // Rare Event Approximation: sum of cut set probabilities
-                            systemProb = cutSetProbabilities.reduce((sum, p) => sum + p, 0);
-                            // Cap at 1.0
-                            systemProb = Math.min(1.0, systemProb);
-                        } else if (quantMethod === 'bdd') {
-                            // BDD (exact) calculation
-                            const cutSetEvents = validCutSets.map(cs => cs.events);
-                            const bddResult = calculateBDD(cutSetEvents, combinedEventData, ccfBasicEvents);
-                            systemProb = bddResult.probability;
-                            quantMethodUsed = bddResult.method;
-                            quantDetails = bddResult.details;
-                        } else {
-                            // Default: MCUB
-                            systemProb = calculateMCUB(cutSetProbabilities);
-                        }
+                    const hit = solveCacheGet(solveKey);
+                    if (hit) { setSolveResult(hit); return; }
+                    setSolveResult(null);
+                    setSolveError(null);
+                    const jobs = solveJobsRef.current;
+                    let entry = jobs.get(solveKey);
+                    if (!entry) {
+                        const job = sysRunSolveInWorker({ tree: failureLogicTree, bed: basicEventData, sscs: sscsInSystem, settings });
+                        entry = { job, users: 0 };
+                        jobs.set(solveKey, entry);
+                        const done = () => { if (jobs.get(solveKey) === entry) jobs.delete(solveKey); };
+                        job.promise.then(r => { solveCachePut(solveKey, r); done(); }, done);
                     }
-                    
-                    return {
-                        cutSets: cutSetsWithProb,
-                        mcubValue: systemProb,
-                        quantMethod: quantMethodUsed,
-                        quantDetails: quantDetails,
-                        ccfEvents: ccfBasicEvents
+                    entry.users++;
+                    let live = true;
+                    entry.job.promise.then(r => { if (live) setSolveResult(r); }).catch(err => {
+                        if (!live) return;
+                        setSolveError(String(err && err.message || err));
+                        setSolveResult({ cutSets: [], mcubValue: null, quantMethod: settings?.quantificationMethod || 'bdd', quantDetails: { error: String(err && err.message || err) }, ccfEvents: {} });
+                    });
+                    return () => {
+                        live = false;
+                        entry.users--;
+                        // A remount re-attaches after its first paint, so wait before cancelling an unused job.
+                        // Close and Cancel stop jobs at once (cancelSolveJobs).
+                        setTimeout(() => { if (entry.users <= 0 && jobs.get(solveKey) === entry) { entry.job.cancel(); jobs.delete(solveKey); } }, 2000);
                     };
-                }, [failureLogicTree, basicEventData, sscsInSystem, settings]);
+                    // eslint-disable-next-line react-hooks/exhaustive-deps
+                }, [solveKey]);
+                const { cutSets, mcubValue, quantMethod, quantDetails, ccfEvents } = solveResult || EMPTY_SOLVE;
 
                 // Importance measures — computed LAZILY, on demand. The synchronous
                 // useMemo approach used to freeze the UI for tens of seconds on large
@@ -27092,7 +27729,11 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 // We accept an `overrides` map of { eventName: multiplierExponent }
                 // where the actual multiplier is multiplierBase^exponent. exponent=0
                 // means nominal. Probabilities are clamped to [0, 1] at every step.
+                // Built only while the Reliability Designer tab is open: its BDD is otherwise paid on
+                // the main thread every time results arrive, whichever tab the user is looking at.
+                const designerOpen = activeRightTab === 'designer';
                 const designerRecalc = React.useMemo(() => {
+                    if (!designerOpen) return null;
                     if (!cutSets || cutSets.length === 0) return null;
 
                     const combinedEventData = { ...basicEventData, ...ccfEvents };
@@ -27211,7 +27852,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                     recalc.getOverriddenProb = getOverriddenProb;
                     recalc.method = method;
                     return recalc;
-                }, [cutSets, basicEventData, ccfEvents, multiplierBase, designerMethod]);
+                }, [designerOpen, cutSets, basicEventData, ccfEvents, multiplierBase, designerMethod]);
 
                 // List of basic events to display in the designer. Excludes CCF events
                 // (those are derived) and unresolved linked events (they have no
@@ -27456,12 +28097,15 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                 // progress overlay. Without this, the overlay was being dismissed before
                 // the modal mounted, leaving a visible "frozen UI with no feedback" gap
                 // between the dialog disappearing and the results window appearing.
+                const readySentRef = React.useRef(false);
                 React.useEffect(() => {
+                    if (!solveResult || readySentRef.current) return;
+                    readySentRef.current = true;
                     if (typeof onAnalysisReady === 'function') {
                         // Pass computed results back to parent so it can populate the cache.
-                        // When cachedResults was already supplied (cache hit), pass null
-                        // so the parent knows not to re-store anything.
-                        onAnalysisReady(cachedResults ? null : {
+                        // When cachedResults was already supplied (cache hit), or the solve
+                        // failed, pass null so the parent knows not to store anything.
+                        onAnalysisReady((cachedResults || solveError) ? null : {
                             cutSets,
                             mcubValue,
                             quantMethod,
@@ -27472,7 +28116,7 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                         });
                     }
                     // eslint-disable-next-line react-hooks/exhaustive-deps
-                }, []);
+                }, [solveResult]);
 
                 const toggleNode = (nodeId) => {
                     setExpandedNodes(prev => {
@@ -28087,6 +28731,12 @@ ${importanceComparison.swim.slice(0, 25).map(r => `<tr><td>${r.name}</td><td>${f
                             }}
                         >
                             <DialogHeader title="How the System Fails" onClose={onClose} />
+                            {!solveResult && (
+                                <div className="px-4 py-1.5 text-xs font-semibold flex items-center gap-2" style={{ background: '#eff6ff', color: '#1d4ed8', borderBottom: '1px solid #bfdbfe' }}>
+                                    <span className="inline-block w-3 h-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+                                    Solving cut sets in the background&hellip; the results appear here when ready.
+                                </div>
+                            )}
                             {failedNames.length > 0 && (
                                 <div className="px-4 py-1.5 text-xs border-b flex-shrink-0" style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#fcd34d' }}>
                                     <strong>FAILED:</strong> {failedNames.map(n => n.includes('.') ? 'SSCFM(' + n.slice(0, n.indexOf('.')) + ', ' + n.slice(n.indexOf('.') + 1) + ')' : n).join(', ')} {failedNames.length === 1 ? 'is' : 'are'} taken as failed (probability 1.0) in these results, per the FAILED() statement in the script.
@@ -29412,6 +30062,11 @@ RIR={formatProbability(m.rir, settings.showProbability)}, RRR={m.rrr === 999 ? '
                                     {settings?.ccfModel === 'beta' && (
                                         <span className="text-pink-600 text-xs font-normal">
                                             &mdash; CCF Model: Beta Factor (&#946;&thinsp;=&thinsp;{settings.ccfBetaFactor || '0.02'})
+                                        </span>
+                                    )}
+                                    {settings?.ccfModel === 'alpha' && (
+                                        <span className="text-pink-600 text-xs font-normal">
+                                            &mdash; CCF Model: Alpha Factor (NUREG/CR-5485, non-staggered)
                                         </span>
                                     )}
                                 </div>
@@ -31168,6 +31823,8 @@ SYSTEM WORKS = [PUMPS] AND VALVE-1;`}</pre>
                             onCancel={() => {
                                 analysisCancelledRef.current = true;
                                 setShowAnalysisProgress(false);
+                                setShowFailureAnalysis(false);
+                                cancelSolveJobs();               // terminate the solver worker
                             }}
                         />
                     )}
@@ -31195,7 +31852,7 @@ SYSTEM WORKS = [PUMPS] AND VALVE-1;`}</pre>
 
                     {showFailureAnalysis && (
                         <FailureAnalysisModal
-                            onClose={() => setShowFailureAnalysis(false)}
+                            onClose={() => { setShowFailureAnalysis(false); cancelSolveJobs(); }}
                             settings={settings}
                             backgroundStyle={backgroundStyle}
                             fontSizeClass={fontSizeClass}
@@ -31282,6 +31939,7 @@ SYSTEM WORKS = [PUMPS] AND VALVE-1;`}</pre>
                             onChooseSEQ={() => { setShowImportModal(false); loadSEQFile(); }}
                             onChooseFTL={() => { setShowImportModal(false); loadFTLFile(); }}
                             onChooseBEI={() => { setShowImportModal(false); loadBEIFile(); }}
+                            onChooseSaphireFTL={() => { setShowImportModal(false); loadSaphireFTLLogic(); }}
                             onClose={() => setShowImportModal(false)}
                         />
                     )}
