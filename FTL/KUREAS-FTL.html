@@ -249,7 +249,7 @@ function limitSets(sets,ctx){
   if(cutoff>ctx.truncThreshold){ctx.truncThreshold=cutoff;ctx.stats.autoTruncThreshold=cutoff;}
   return kept.map(o=>o.cs);
 }
-function checkLimit(n,ctx){if(n>30000000)throw new Error(`Cut set explosion: a gate would produce more than ${(30000000).toLocaleString()} intermediate cut sets before truncation. Raise the probability truncation or set a maximum cut set order in Settings.`);}
+function checkLimit(n,ctx){if(n>30000000)throw new Error(`Cut set explosion: a gate would produce more than ${(30000000).toLocaleString()} intermediate cut sets that can survive truncation. Raise the probability truncation or set a maximum cut set order in Settings.`);}
 // Base-name variable set of a cut-set collection (used for the disjointness shortcut:
 // when two minimal collections share no variables, their OR-union and AND-product are
 // already minimal, so the O(n^2) absorption pass can be skipped).
@@ -266,23 +266,33 @@ function andSets(A,B,ctx){
   // (C ∨ A') ∧ (C ∨ B') = C ∨ (A' ∧ B'). Only the train-specific remainders are multiplied.
   if(A.length>1&&B.length>1){const keys=new Set();for(const cs of A)keys.add(cs.join(SEP));const C=[],Bp=[];for(const cs of B){if(keys.has(cs.join(SEP)))C.push(cs);else Bp.push(cs);}
     if(C.length>0){const ck=new Set(C.map(cs=>cs.join(SEP)));const Ap=A.filter(cs=>!ck.has(cs.join(SEP)));ctx.stats.commonTerms=(ctx.stats.commonTerms||0)+C.length;return orSets(C,andSets(Ap,Bp,ctx),ctx);}}
-  checkLimit(A.length*B.length,ctx);
   const dj=disjoint(A,B);const out=[];
   const bA=A.map(cs=>csBound(cs,ctx.eventInfo,ctx.probCache));const bB=B.map(cs=>csBound(cs,ctx.eventInfo,ctx.probCache));
-  // Oversized product: find the probability level that keeps only the top maxCutSets
-  // products and raise the working threshold to it BEFORE materializing anything.
-  if(A.length*B.length>ctx.maxCutSets*2){const n=A.length*B.length;const arr=new Float64Array(n);let k=0;for(let i=0;i<A.length;i++){const a=bA[i];for(let j=0;j<B.length;j++)arr[k++]=a*bB[j];}arr.sort();const T=arr[n-ctx.maxCutSets];if(T>ctx.truncThreshold){ctx.truncThreshold=T;ctx.stats.autoTruncThreshold=T;}}
-  const thr=ctx.truncThreshold;const pc=ctx.probCache;
+  const pc=ctx.probCache;
   const lp=l=>{let q=pc.get(l);if(q===undefined){q=litProb(l,ctx.eventInfo);pc.set(l,q);}return q===null?1:q;};
   // Row bound: bound(a ∪ b) = ∏(a \ b)·bb ≤ ra·bb, where ra is the product over literals of a
   // that cannot be shared with B at all. Visiting B in descending bound order lets each row
   // stop at the first pair that cannot survive truncation. (Exact when A and B are disjoint.)
   const vB=dj?null:varsOf(B);
+  const rA=vB?A.map(a=>{let r=1;for(const l of a){if(!vB.has(litBase(l)))r*=lp(l);}return r;}):bA;
+  const sB=Float64Array.from(bB).sort().reverse();   // B bounds, descending
+  // Oversized product: raise the working threshold to the maxCutSets-th largest pair bound
+  // BEFORE materializing anything. Found by bisection on log(t) with O(|A|+|B|) counts, so no
+  // |A|·|B| array is allocated.
+  if(A.length*B.length>ctx.maxCutSets*2){const sA=Float64Array.from(bA).sort().reverse();const k=ctx.maxCutSets;
+    const count=t=>{let c=0,j=sB.length;for(let i=0;i<sA.length&&c<k;i++){while(j>0&&sA[i]*sB[j-1]<t)j--;if(j===0)break;c+=j;}return c;};
+    const top=sA[0]*sB[0];if(top>0){let lo=Math.log(top)-700,hi=Math.log(top);
+      if(count(Math.exp(lo))>=k){for(let it=0;it<100;it++){const mid=(lo+hi)/2;if(count(Math.exp(mid))>=k)lo=mid;else hi=mid;}
+        const T=Math.exp(lo);if(T>ctx.truncThreshold){ctx.truncThreshold=T;ctx.stats.autoTruncThreshold=T;}}}}
+  const thr=ctx.truncThreshold;
+  // Explosion guard: without truncation every pair materializes, so check |A|·|B| up front;
+  // with truncation, guard the cut sets actually materialized (checked after each row below).
+  if(!thr)checkLimit(A.length*B.length,ctx);
   const order=bB.map((b,j)=>j);if(thr)order.sort((x,y)=>bB[y]-bB[x]);
   const bP=thr?B.map(b=>{const arr=new Float64Array(b.length);for(let q=0;q<b.length;q++)arr[q]=lp(b[q]);return arr;}):null;   // per-literal probabilities, aligned with B[j]
   for(let i=0;i<A.length;i++){const a=A[i];const ba=bA[i];
     if(thr&&ba<thr){ctx.stats.truncatedProb+=B.length;continue;}
-    let ra=ba;if(vB){ra=1;for(const l of a){if(!vB.has(litBase(l)))ra*=lp(l);}}
+    const ra=rA[i];
     const aset=new Set(a);const nega=new Set();for(const l of a)nega.add(litNeg(l));
     for(let oj=0;oj<order.length;oj++){const j=order[oj];const bb=bB[j];
       if(thr&&ra*bb<thr){ctx.stats.truncatedProb+=order.length-oj;break;}
@@ -295,7 +305,8 @@ function andSets(A,B,ctx){
       if(extra===0){out.push(a);continue;}   // b ⊆ a
       const merged=a.slice();for(let q=0;q<b.length;q++){const l=b[q];if(!aset.has(l))merged.push(l);}
       if(ctx.maxOrder&&posOrder(merged)>ctx.maxOrder){ctx.stats.truncatedOrder++;continue;}
-      out.push(merged);}}
+      out.push(merged);}
+    if(thr)checkLimit(out.length,ctx);}
   return limitSets(dj?out:minimize(out),ctx);
 }
 // N-of-M over child result sets via DP: f(i,k) = OR( AND(c_i, f(i+1,k-1)), f(i+1,k) )
@@ -383,33 +394,59 @@ function quantify(cutSets,eventInfo){
   const csProbs=[];const missing=new Set();let allKnown=true;
   for(const cs of cutSets){let p=1;for(const ev of cs){const q=eventProb(ev.name,eventInfo);if(q===null){missing.add(ev.name);allKnown=false;p=null;break;}p*=ev.complement?1-q:q;}csProbs.push(p);}
   if(!allKnown||cutSets.length===0)return{mcub:null,rea:null,exact:null,exactMethod:null,missing:[...missing],csProbs};
-  let prod=1,sum=0;for(const p of csProbs){prod*=1-p;sum+=p;}
-  const mcub=1-prod;const rea=Math.min(1,sum);
+  // MCUB = 1 - ∏(1-p) evaluated as -expm1(Σ log1p(-p)): no cancellation for small p.
+  let lg=0,sum=0;for(const p of csProbs){lg+=Math.log1p(-p);sum+=p;}
+  const mcub=-Math.expm1(lg);const rea=Math.min(1,sum);
   let exact=null,exactMethod=null;
   const nEvents=new Set(cutSets.flat().map(e=>e.name)).size;
-  if(cutSets.length<=2500&&nEvents<=600){try{exact=bddProbability(cutSets,eventInfo);exactMethod='BDD';}catch(e){exact=null;exactMethod=null;}}
+  if(cutSets.length<=BDD_MAX_CUTSETS&&nEvents<=BDD_MAX_EVENTS){try{exact=bddProbability(cutSets,eventInfo);exactMethod='BDD';}catch(e){exact=null;exactMethod=null;}}
   return{mcub,rea,exact,exactMethod,missing:[],csProbs};
 }
 // MCUB with an override map {baseName:prob}; used by importance measures.
-function mcubWith(cutSets,eventInfo,override){let prod=1;for(const cs of cutSets){const p=csProbOf(cs,eventInfo,override);if(p===null)return null;prod*=1-p;}return 1-prod;}
+function mcubWith(cutSets,eventInfo,override){let lg=0;for(const cs of cutSets){const p=csProbOf(cs,eventInfo,override);if(p===null)return null;lg+=Math.log1p(-p);}return -Math.expm1(lg);}
 
-// Exact union probability via a reduced BDD over the cut sets (ported from KUREAS-SEQ).
-function bddProbability(cutSets,eventInfo,maxWork){maxWork=maxWork||1500000;let work=0;
-  const names=Array.from(new Set(cutSets.flat().map(e=>e.name))).sort();
-  const idx=new Map();names.forEach((n,i)=>idx.set(n,i));
-  const big=names.length>31;const ZERO=big?0n:0;const bit=big?i=>1n<<BigInt(i):i=>1<<i;const isZ=big?m=>m===0n:m=>m===0;const key=big?m=>m.toString(16):m=>String(m);
-  const masks=[];for(const cs of cutSets){let pos=ZERO,neg=ZERO;for(const ev of cs){const b=bit(idx.get(ev.name));if(ev.complement)neg|=b;else pos|=b;}if(!isZ(pos&neg))continue;masks.push({pos,neg});}
-  if(masks.length===0)return 0;
-  const cache=new Map();
-  const build=(v,rem)=>{work+=rem.length;if(work>maxWork)throw new Error('BDD budget exceeded');if(rem.length===0)return null;for(let i=0;i<rem.length;i++){if(isZ(rem[i].pos)&&isZ(rem[i].neg))return'ONE';}if(v>=names.length)return null;
-    const ck=v+':'+Array.from(new Set(rem.map(m=>key(m.pos)+'/'+key(m.neg)))).sort().join(',');if(cache.has(ck))return cache.get(ck);
-    const vb=bit(v);const hi=[],lo=[];
-    for(const m of rem){if(isZ(m.neg&vb))hi.push(isZ(m.pos&vb)?m:{pos:m.pos&~vb,neg:m.neg});}
-    for(const m of rem){if(isZ(m.pos&vb))lo.push(isZ(m.neg&vb)?m:{pos:m.pos,neg:m.neg&~vb});}
-    const h=build(v+1,hi),l=build(v+1,lo);const node=h===l?h:{v,high:h,low:l};cache.set(ck,node);return node;};
-  const root=build(0,masks);
-  const ev=new Map();const evalN=n=>{if(n===null)return 0;if(n==='ONE')return 1;if(ev.has(n))return ev.get(n);const p=eventProb(names[n.v],eventInfo);const r=p*evalN(n.high)+(1-p)*evalN(n.low);ev.set(n,r);return r;};
-  return Math.max(0,Math.min(1,evalN(root)));
+// Exact union probability of the cut sets via a reduced ordered BDD (canonical).
+// Variables are ordered by decreasing frequency in the cut set list. Each cut set is a sorted
+// literal list; its suffixes are interned as integer ids (head variable, head sign, tail id), so
+// the Shannon cofactor on variable v only touches cubes whose head is v. Nodes are hash-consed
+// in a per-variable unique table, which makes the diagram canonical; sub-problems (sets of cube
+// suffix ids) are memoized. Node ids are created children-first, so the probability is one
+// forward pass over typed arrays.
+const BDD_MAX_CUTSETS=10000,BDD_MAX_EVENTS=2000,BDD_MAX_NODES=2000000,BDD_MAX_WORK=20000000;
+function bddProbability(cutSets,eventInfo,maxWork){maxWork=maxWork||BDD_MAX_WORK;let work=0;
+  const freq=new Map();for(const cs of cutSets)for(const e of cs)freq.set(e.name,(freq.get(e.name)||0)+1);
+  const names=Array.from(freq.keys()).sort((a,b)=>freq.get(b)-freq.get(a)||(a<b?-1:a>b?1:0));
+  const idx=new Map();names.forEach((n,i)=>idx.set(n,i));const nv=names.length;
+  // Cube suffix table: id 0 = empty cube (TRUE). hv = head variable, hn = head negated, tl = tail id.
+  const hv=[nv],hn=[0],tl=[-1];const sfx=new Map();
+  const intern=lits=>{let id=0;for(let q=lits.length-1;q>=0;q--){const l=lits[q];const k=l+':'+id;let x=sfx.get(k);
+    if(x===undefined){x=hv.length;hv.push(l>>1);hn.push(l&1);tl.push(id);sfx.set(k,x);}id=x;}return id;};
+  const start=new Set();
+  for(const cs of cutSets){const lits=new Map();let bad=false;
+    for(const ev of cs){const v=idx.get(ev.name),g=ev.complement?1:0;const p=lits.get(v);if(p!==undefined&&p!==g){bad=true;break;}lits.set(v,g);}
+    if(bad)continue;start.add(intern(Array.from(lits.keys()).sort((a,b)=>a-b).map(v=>2*v+lits.get(v))));}
+  if(start.size===0)return 0;
+  let cap=4096,V=new Int32Array(cap),LO=new Int32Array(cap),HI=new Int32Array(cap);V[0]=V[1]=nv;let n=2;   // 0 = FALSE, 1 = TRUE
+  const U=new Map();
+  const mk=(v,lo,hi)=>{if(lo===hi)return lo;const k=v+','+lo+','+hi;const r=U.get(k);if(r!==undefined)return r;
+    if(n>=BDD_MAX_NODES)throw new Error('BDD node budget exceeded');
+    if(n>=cap){cap*=2;const g=a=>{const b=new Int32Array(cap);b.set(a);return b;};V=g(V);LO=g(LO);HI=g(HI);}
+    V[n]=v;LO[n]=lo;HI[n]=hi;U.set(k,n);return n++;};
+  const memo=new Map();
+  const build=rem=>{   // rem: sorted array of distinct suffix ids (none empty)
+    work+=rem.length;if(work>maxWork)throw new Error('BDD budget exceeded');
+    const key=rem.join(',');const c=memo.get(key);if(c!==undefined)return c;
+    let v=nv;for(const id of rem)if(hv[id]<v)v=hv[id];
+    const hi=[],lo=[];let hiOne=false,loOne=false;
+    for(const id of rem){if(hv[id]!==v){hi.push(id);lo.push(id);continue;}const t=tl[id];
+      if(hn[id]){if(t===0)loOne=true;else lo.push(t);}else{if(t===0)hiOne=true;else hi.push(t);}}
+    const norm=a=>{a.sort((x,y)=>x-y);let w=0;for(let i=0;i<a.length;i++)if(i===0||a[i]!==a[i-1])a[w++]=a[i];a.length=w;return a;};
+    const h=hiOne?1:hi.length?build(norm(hi)):0;const l=loOne?1:lo.length?build(norm(lo)):0;
+    const r=mk(v,l,h);memo.set(key,r);return r;};
+  const root=build(Array.from(start).sort((a,b)=>a-b));
+  const P=new Float64Array(n);P[1]=1;const pv=names.map(nm=>eventProb(nm,eventInfo));
+  for(let i=2;i<n;i++){const p=pv[V[i]];P[i]=p*P[HI[i]]+(1-p)*P[LO[i]];}
+  return Math.max(0,Math.min(1,P[root]));
 }
 
 // ── Importance measures (MCUB-based, SAPHIRE definitions) ─────────────────
@@ -449,6 +486,44 @@ function solveTreeAsync(project,tree,eventInfo,opts,onProgress){
     }catch(e){try{resolve(FTSolver.solve(project,tree,eventInfo,{...opts,onProgress}));}catch(e2){reject(e2);}}
   });
   return{promise,cancel:()=>{if(worker){worker.terminate();worker=null;}}};
+}
+
+// ── Parallel "Solve all": a pool of persistent workers pulls fault trees from a shared queue.
+// Each worker receives the project and event data once ('init'), then one tree per 'solve'
+// message. Results are identical to sequential solving (the gate memo is per tree in both).
+// Falls back to sequential solveTreeAsync for any unfinished trees if workers cannot start.
+const SOLVE_ALL_MAX_WORKERS=8;
+function solveTreesParallel(project,trees,eventInfo,opts,cb,nWorkers){
+  const slim={faultTrees:(project.faultTrees||[]).map(t=>({treeName:t.treeName,rootNode:t.rootNode}))};
+  const hc=(typeof navigator!=='undefined'&&navigator.hardwareConcurrency)||4;
+  const N=Math.max(1,Math.min(trees.length,nWorkers||Math.min(SOLVE_ALL_MAX_WORKERS,Math.max(1,hc-1))));
+  let workers=[],cancelled=false,next=0,seqJob=null,resolveP;const finished=new Set();
+  const promise=new Promise(r=>{resolveP=r;});
+  const close=()=>{workers.forEach(w=>{try{w.terminate();}catch(e){}});workers=[];resolveP({cancelled,workers:N});};
+  const record=(i,res,err)=>{if(finished.has(i))return;finished.add(i);if(err){if(cb.onError)cb.onError(trees[i],err);}else if(cb.onResult)cb.onResult(trees[i],res);};
+  const sequential=()=>{   // fallback: remaining trees one at a time (solveTreeAsync itself falls back to the main thread)
+    workers.forEach(w=>{try{w.terminate();}catch(e){}});workers=[];
+    const rest=trees.map((t,i)=>i).filter(i=>!finished.has(i));
+    const step=k=>{if(cancelled||k>=rest.length){resolveP({cancelled,workers:1});return;}const i=rest[k];if(cb.onStart)cb.onStart(trees[i],i);
+      seqJob=solveTreeAsync(project,trees[i],eventInfo,opts,p=>{if(cb.onProgress)cb.onProgress(trees[i],p);});
+      seqJob.promise.then(r=>record(i,r)).catch(e=>record(i,null,e)).finally(()=>{seqJob=null;step(k+1);});};
+    step(0);};
+  const feed=w=>{if(cancelled)return;if(next>=trees.length){if(finished.size===trees.length)close();return;}
+    const i=next++;w._cur=i;if(cb.onStart)cb.onStart(trees[i],i);
+    w.postMessage({type:'solve',id:i,tree:{treeName:trees[i].treeName,rootNode:trees[i].rootNode}});};
+  try{
+    if(typeof Worker==='undefined'||typeof Blob==='undefined')throw new Error('no worker');
+    const src=`const FTSolver=(${FTSolverFactory.toString()})();let P=null,EI=null,O=null;self.onmessage=e=>{const d=e.data;if(d.type==='init'){P=d.project;EI=d.eventInfo;O=d.opts;return;}try{const r=FTSolver.solve(P,d.tree,EI,{...O,onProgress:p=>self.postMessage({type:'progress',id:d.id,...p})});self.postMessage({type:'done',id:d.id,result:r});}catch(err){self.postMessage({type:'error',id:d.id,message:err&&err.message||String(err)});}};`;
+    const url=URL.createObjectURL(new Blob([src],{type:'application/javascript'}));
+    for(let k=0;k<N;k++){const w=new Worker(url);workers.push(w);
+      w.onmessage=e=>{const m=e.data;if(m.type==='progress'){if(cb.onProgress)cb.onProgress(trees[m.id],m);return;}
+        record(m.id,m.type==='done'?m.result:null,m.type==='done'?null:new Error(m.message));if(finished.size===trees.length){close();return;}feed(w);};
+      w.onerror=()=>{if(!cancelled&&workers.length)sequential();};   // worker failed to start (e.g. file:// policy)
+      w.postMessage({type:'init',project:slim,eventInfo,opts});}
+    URL.revokeObjectURL(url);
+    workers.slice().forEach(feed);
+  }catch(e){sequential();}
+  return{promise,cancel:()=>{cancelled=true;if(seqJob)seqJob.cancel();if(workers.length)close();else resolveP({cancelled,workers:N});}};
 }
 
 function calculateLayout(node,nodeMultiplier=1,spacingMultiplier=1){const nodeWidth=160*nodeMultiplier;const nodeHeight=80*nodeMultiplier;const levelHeight=150*nodeMultiplier*spacingMultiplier;// Minimal gap between siblings (just enough to see separation)
@@ -1020,7 +1095,7 @@ const _entryOf=(proj,tree,res)=>({project:proj.projectName||'',faultTree:tree.tr
 const solveJobRef=React.useRef(null);// { cancel } of the running worker
 const _solveNote=st=>{const bits=[];if(st.autoTruncThreshold)bits.push(`truncation raised to ${st.autoTruncThreshold.toExponential(1).toUpperCase()} to stay within the cut set limit`);if(st.deletedTerms)bits.push(`${st.deletedTerms} complemented term(s) deleted`);return bits;};
 const handleSolveTree=React.useCallback(treeIndex=>{const proj=currentProject;if(!proj||!proj.faultTrees[treeIndex]||solvingTree)return;const tree=proj.faultTrees[treeIndex];setSolvingTree(tree.treeName);setSolveMessage(null);solveCancelRef.current=false;setSolveProgress({done:0,total:1,current:tree.treeName,gates:0,sets:0});const ei={...(proj.eventInfo||{}),...eventInfo};const job=solveTreeAsync(proj,tree,ei,_solverOpts(),p=>setSolveProgress(sp=>sp?{...sp,gates:p.gates,sets:p.sets,gate:p.gate}:sp));solveJobRef.current=job;job.promise.then(res=>{const entry=_entryOf(proj,tree,res);setCurrentProject(prev=>({...prev,cutSets:{...(prev.cutSets||{}),[tree.treeName]:entry}}));setCutSets(prev=>({...prev,[tree.treeName]:entry}));setStaleTreeNames(prev=>{const st=new Set(prev);st.delete(tree.treeName);return st;});setIsDirty(true);const st=entry.solved.stats;logChange('Solve fault tree',`FT "${tree.treeName}" solved: ${entry.cutSets.length} cut sets, MCUB ${_fmtTop(entry.solved.quant)}${st.truncatedProb+st.truncatedOrder>0?`, ${st.truncatedProb+st.truncatedOrder} truncated`:''}${st.autoTruncThreshold?` (auto-truncation ${st.autoTruncThreshold.toExponential(1).toUpperCase()})`:''}`);const notes=[...st.warnings,..._solveNote(st)];setSolveMessage(notes.length?{kind:'warn',text:`${tree.treeName}: ${entry.cutSets.length} cut sets in ${st.elapsedMs} ms. ${notes.join('; ')}`}:{kind:'ok',text:`${tree.treeName}: ${entry.cutSets.length} cut sets in ${st.elapsedMs} ms`});if(treeIndex===selectedTreeIndex){cutSetsUserClosedRef.current=false;setCutSetsClosed(false);}}).catch(err=>{setSolveMessage({kind:'error',text:`${tree.treeName}: ${err.message}`});}).finally(()=>{if(solveCancelRef.current)setSolveMessage({kind:'warn',text:`${tree.treeName}: solve cancelled`});solveJobRef.current=null;setSolveProgress(null);setSolvingTree(null);});},[currentProject,eventInfo,selectedTreeIndex,solvingTree,logChange,_solverOpts]);
-const handleSolveAll=React.useCallback(()=>{const proj=currentProject;if(!proj||!proj.faultTrees.length||solvingTree)return;setSolvingTree('*');setSolveMessage(null);solveCancelRef.current=false;const trees=proj.faultTrees;const ei={...(proj.eventInfo||{}),...eventInfo};const results={};const errors=[];const warns=[];let total=0;const _tAll=performance.now();setSolveProgress({done:0,total:trees.length,current:trees[0].treeName,gates:0,sets:0});const finish=cancelled=>{const n=Object.keys(results).length;const elapsedMs=Math.round(performance.now()-_tAll);const _fmtT=ms=>ms<1000?`${ms} ms`:ms<60000?`${(ms/1000).toFixed(1)} s`:`${Math.floor(ms/60000)} min ${Math.round(ms%60000/1000)} s`;setLastSolveAll({elapsedMs,solved:n,total:trees.length,cutSets:total,at:new Date().toISOString(),cancelled});if(n){setCurrentProject(prev=>({...prev,cutSets:{...(prev.cutSets||{}),...results}}));setCutSets(prev=>({...prev,...results}));setStaleTreeNames(prev=>{const st=new Set(prev);Object.keys(results).forEach(k=>st.delete(k));return st;});setIsDirty(true);}logChange(cancelled?'Solve all (cancelled)':'Solve all fault trees',`${n} of ${trees.length} trees solved, ${total} cut sets in ${_fmtT(elapsedMs)}${errors.length?`; ${errors.length} failed`:''}`);if(errors.length)setSolveMessage({kind:'error',text:`${errors.join(' | ')} (${_fmtT(elapsedMs)})`});else if(cancelled)setSolveMessage({kind:'warn',text:`Cancelled after ${n} of ${trees.length} tree(s) in ${_fmtT(elapsedMs)}; ${total} cut sets kept`});else if(warns.length)setSolveMessage({kind:'warn',text:`${n} tree(s) solved, ${total} cut sets in ${_fmtT(elapsedMs)}. ${warns.join('; ')}`});else setSolveMessage({kind:'ok',text:`${n} tree(s) solved, ${total} cut sets in ${_fmtT(elapsedMs)}`});if(n){cutSetsUserClosedRef.current=false;setCutSetsClosed(false);}solveJobRef.current=null;setSolveProgress(null);setSolvingTree(null);};const step=i=>{if(solveCancelRef.current){finish(true);return;}if(i>=trees.length){finish(false);return;}const tree=trees[i];setSolveProgress({done:i,total:trees.length,current:tree.treeName,gates:0,sets:0});const job=solveTreeAsync(proj,tree,ei,_solverOpts(),p=>setSolveProgress(sp=>sp?{...sp,gates:p.gates,sets:p.sets,gate:p.gate}:sp));solveJobRef.current=job;job.promise.then(res=>{const entry=_entryOf(proj,tree,res);results[tree.treeName]=entry;total+=entry.cutSets.length;const st=entry.solved.stats;const notes=[...st.warnings,..._solveNote(st)];if(notes.length)warns.push(`${tree.treeName}: ${notes.join('; ')}`);}).catch(err=>{if(!solveCancelRef.current)errors.push(`${tree.treeName}: ${err.message}`);}).finally(()=>step(i+1));};step(0);},[currentProject,eventInfo,solvingTree,logChange,_solverOpts]);
+const handleSolveAll=React.useCallback(()=>{const proj=currentProject;if(!proj||!proj.faultTrees.length||solvingTree)return;setSolvingTree('*');setSolveMessage(null);solveCancelRef.current=false;const trees=proj.faultTrees;const ei={...(proj.eventInfo||{}),...eventInfo};const results={};const errors=[];const warns=[];let total=0;const _tAll=performance.now();setSolveProgress({done:0,total:trees.length,current:trees[0].treeName,gates:0,sets:0});const finish=cancelled=>{const n=Object.keys(results).length;const elapsedMs=Math.round(performance.now()-_tAll);const _fmtT=ms=>ms<1000?`${ms} ms`:ms<60000?`${(ms/1000).toFixed(1)} s`:`${Math.floor(ms/60000)} min ${Math.round(ms%60000/1000)} s`;setLastSolveAll({elapsedMs,solved:n,total:trees.length,cutSets:total,at:new Date().toISOString(),cancelled});if(n){setCurrentProject(prev=>({...prev,cutSets:{...(prev.cutSets||{}),...results}}));setCutSets(prev=>({...prev,...results}));setStaleTreeNames(prev=>{const st=new Set(prev);Object.keys(results).forEach(k=>st.delete(k));return st;});setIsDirty(true);}logChange(cancelled?'Solve all (cancelled)':'Solve all fault trees',`${n} of ${trees.length} trees solved, ${total} cut sets in ${_fmtT(elapsedMs)}${errors.length?`; ${errors.length} failed`:''}`);if(errors.length)setSolveMessage({kind:'error',text:`${errors.join(' | ')} (${_fmtT(elapsedMs)})`});else if(cancelled)setSolveMessage({kind:'warn',text:`Cancelled after ${n} of ${trees.length} tree(s) in ${_fmtT(elapsedMs)}; ${total} cut sets kept`});else if(warns.length)setSolveMessage({kind:'warn',text:`${n} tree(s) solved, ${total} cut sets in ${_fmtT(elapsedMs)}. ${warns.join('; ')}`});else setSolveMessage({kind:'ok',text:`${n} tree(s) solved, ${total} cut sets in ${_fmtT(elapsedMs)}`});if(n){cutSetsUserClosedRef.current=false;setCutSetsClosed(false);}solveJobRef.current=null;setSolveProgress(null);setSolvingTree(null);};const running=new Set();let doneN=0;const upd=()=>setSolveProgress(sp=>({...(sp||{gates:0,sets:0}),done:Math.min(doneN,trees.length-1),total:trees.length,current:Array.from(running).slice(0,2).join(', ')+(running.size>2?` +${running.size-2}`:'')}));const job=solveTreesParallel(proj,trees,ei,_solverOpts(),{onStart:t=>{running.add(t.treeName);upd();},onProgress:(t,p)=>setSolveProgress(sp=>sp?{...sp,gates:p.gates,sets:p.sets,gate:p.gate}:sp),onResult:(t,res)=>{running.delete(t.treeName);doneN++;const entry=_entryOf(proj,t,res);results[t.treeName]=entry;total+=entry.cutSets.length;const st=entry.solved.stats;const notes=[...st.warnings,..._solveNote(st)];if(notes.length)warns.push(`${t.treeName}: ${notes.join('; ')}`);upd();},onError:(t,err)=>{running.delete(t.treeName);doneN++;if(!solveCancelRef.current)errors.push(`${t.treeName}: ${err.message}`);upd();}});solveJobRef.current=job;job.promise.then(r=>finish(!!(r&&r.cancelled)||solveCancelRef.current));},[currentProject,eventInfo,solvingTree,logChange,_solverOpts]);
 const handleCancelSolve=React.useCallback(()=>{solveCancelRef.current=true;if(solveJobRef.current)solveJobRef.current.cancel();if(solvingTree&&solvingTree!=='*'){// single solve: terminating the worker never resolves — close out here
 solveJobRef.current=null;setSolveProgress(null);setSolvingTree(null);setSolveMessage({kind:'warn',text:`${solvingTree}: solve cancelled`});}},[solvingTree]);
 // ── BE List floating window drag ───────────────────────────────
