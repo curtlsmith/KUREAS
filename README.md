@@ -51,7 +51,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | Module | File | Version | Purpose |
 |--------|------|---------|---------|
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.2 | Hazard analysis, initiating event frequency quantification, and screening |
-| **KUREAS-FTL** | `KUREAS-FTL.html` | v1.3 | Fault tree logic editing, visualization, and analysis |
+| **KUREAS-FTL** | `KUREAS-FTL.html` | v1.4 | Fault tree logic editing, visualization, and analysis including cut set generation, uncertainty analysis, and importance measures |
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.7 | Systems modeling, P&ID, FMEA, failure analysis, CCF, Reliability Designer™, importance measures, human reliability modeling, customizable report generation, and design comparison function |
 | **KUREAS-BAYES** | `KUREAS-BAYES.html` | v1.0 | Manage knowledge of component operational behavior and experience to support Bayesian analysis of how components fail. |
@@ -85,7 +85,7 @@ Comprehensive hazard identification, screening, and frequency quantification for
 
 ---
 
-## KUREAS-FTL — Fault Tree Logic Editor
+## KUREAS-FTL — Fault Tree Logic Solver and Editor
 
 Full fault tree authoring, visualization, and analysis environment with SAPHIRE and OpenPSA interoperability.
 
@@ -94,6 +94,7 @@ Full fault tree authoring, visualization, and analysis environment with SAPHIRE 
 - **Create or import** — start a blank project from scratch or import SAPHIRE MAR-D files (.FTL, .BED, .BEI, .GTD, .FTC) via multi-file selection; also loads native `.KNOW_FTL` project files
 - **Full editing** — add, delete, rename, and edit gates and basic events; modify descriptions, probabilities, and notes; copy/paste sub-tree structures; drag-and-drop basic events and fault trees onto the canvas
 - **Graphical and Textual Tree View** — view and edit fault tree logic using a graphics- or text-based editor.
+- **Full solving and quantification** — Advanced and fast cut set generation, Monte Carlo uncertainty analysis, importance measure generation
 - **Scope-aware editing** — when editing shared nodes (appearing in multiple locations), choose to apply changes to one instance or all instances across the project; name conflict detection prevents collisions between gates and basic events
 - **Gate types** — AND, OR, NOT, NAND, N-of-M Voting, and Transfer gates; Transfer gates auto-resolve to display referenced sub-trees
 - **Interactive canvas** — zoom, pan, expand/collapse, click-to-edit, right-click-to-pin, and search by name
@@ -101,9 +102,10 @@ Full fault tree authoring, visualization, and analysis environment with SAPHIRE 
 - **Basic Event List** — floating, draggable/resizable window listing all basic events with inline editing and drag-to-canvas functionality
 - **Change tracking** — append-only change log with timestamps (View Changes button); undo support (Ctrl+Z, up to 50 levels); unsaved changes warning on close
 - **Export** — SAPHIRE MAR-D (.FTL, .BEI), KUREAS native (.KNOW_FTL), and OpenPSA Model Exchange Format (.xml) with per-tree selection
-- **Report generation** — Word (.doc) and Markdown with selectable trees, cut set limits, configurable headers, progress indicator, and saved preferences; in-browser preview with print
+- **Import** — SAPHIRE MAR-D, KUREAS native (.KNOW_FTL), and OpenPSA Model Exchange Format (.xml) 
 - **Settings** — font size, node size, color mode (full color / grayscale / single custom color), font family, connection lines (arrows / no arrows / dotted), line style (curved down / curved up / straight), line thickness, background (light / dark / blue grid / engineering green), probability display, default zoom level
-- **Persistence** — projects stored in IndexedDB for browser-session persistence; save to `.KNOW_FTL` files for portable backup
+- **Report generation** — Word (.doc) and Markdown (.md) with 11 configurable sections: System Name, Extended Description, SSC Information, FMEA Information, System Works Expression, Supercomponent Information, Fault Tree Logic, Fault Tree Graphics, Fault Tree Cut Sets, Importance Measure Graphic, Importance Measure Table; in-browser preview with print
+- **Persistence** — projects stored in IndexedDB for browser-session persistence; save to `.KNOW_FTL` files for local storage
 
 ---
 
