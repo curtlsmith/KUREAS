@@ -24,7 +24,7 @@ The suite includes full [SAPHIRE](https://saphire.inl.gov) file format interoper
 - [KUREAS-FTL — Fault Tree Logic Editor](#kureas-ftl--fault-tree-logic-editor)
 - [KUREAS-ETL — Event Tree Logic](#kureas-etl--event-tree-logic)
 - [KUREAS-SYS — System Evaluation](#kureas-sys--system-evaluation)
-- [KUREAS-SEQ — Process Operational Logic (coming soon)](#kureas-seq--process-operational-logic)
+- [KUREAS-SEQ — Process Operational Logic](#kureas-seq--process-operational-logic)
 - [KUREAS-BAYES — Bayesian Evaluation Module](#kureas-bayes--bayesian-evaluation-module)
 - [KUREAS-REPORT — Report Generator](#kureas-report--report-generator)
 - [KUREAS-KNOW — Knowledge Base Editor (coming soon)](#kureas-know--knowledge-base-editor)
@@ -51,13 +51,19 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 | Module | File | Version | Purpose |
 |--------|------|---------|---------|
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.2 | Hazard analysis, initiating event frequency quantification, and screening |
+[HA](https://github.com/curtlsmith/KUREAS/tree/main/HA)
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.7.29 | Fault tree logic editing, advanced reporting including Smart Paging, visualization, generic databases, and analysis including cut set generation, uncertainty analysis, and importance measures |
+[FTL](https://github.com/curtlsmith/KUREAS/tree/main/FTL)
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
+[ETL](https://github.com/curtlsmith/KUREAS/tree/main/ETL)
 | **KUREAS-SYS** | `KUREAS-SYS.html` | v1.8 | Systems modeling, P&ID, FMEA, failure analysis, CCF (beta and alpha factors), Reliability Designer™, importance measures, uncertainty analysis, human reliability modeling, customizable report generation, and design comparison function |
+[SYS](https://github.com/curtlsmith/KUREAS/tree/main/SYS)
 | **KUREAS-BAYES** | `KUREAS-BAYES.html` | v1.0 | Manage knowledge of component operational behavior and experience to support Bayesian analysis of how components fail. |
+[ETS](https://github.com/curtlsmith/KUREAS/tree/main/BAYES)
 | **KUREAS-SEQ** | `KUREAS-SEQ.html` | v1.2 | Facility operational diagrams, event tree generation, sequence quantification |
+[SEQ](https://github.com/curtlsmith/KUREAS/tree/main/SEQ)
 | **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
-| **KUREAS-KNOW (planned)** | `KUREAS-KNOW.html` | vX.0 | General-purpose `.KNOW` file viewer and editor |
+[REPORT](https://github.com/curtlsmith/KUREAS/tree/main/REPORT)
 
 ---
 
