@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HSMR-77 SYS One-Pagers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #ffffff; --panel: #f3f6f7; --ink: #0f1d26; --muted: #52626d; --line: #d9e1e5;
+  --accent: #0a7f8f; --accent-ink: #ffffff; --accent-soft: #0a7f8f14; --tk: #fff4e0; --tk-ink: #7a4a05; --code: #0f1d26; --code-ink: #d7e7ec;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d151b; --panel: #15222b; --ink: #e5eef2; --muted: #9aaeb8; --line: #263843;
+  --accent: #3cc6d6; --accent-ink: #0d151b; --accent-soft: #3cc6d61f; --tk: #2a2010; --tk-ink: #f3c77a; --code: #071015; --code-ink: #cfe4ea; } }
+:root[data-theme="dark"] {
+  --bg: #0d151b; --panel: #15222b; --ink: #e5eef2; --muted: #9aaeb8; --line: #263843;
+  --accent: #3cc6d6; --accent-ink: #0d151b; --accent-soft: #3cc6d61f; --tk: #2a2010; --tk-ink: #f3c77a; --code: #071015; --code-ink: #cfe4ea; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 "IBM Plex Sans", Arial, sans-serif; }
+.top { padding: 28px 32px 22px; border-bottom: 1px solid var(--line); display: flex; gap: 24px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+.kicker { font: 500 12px/1 "IBM Plex Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: 28px; line-height: 1.15; margin: 8px 0 6px; font-weight: 700; }
+.sub { color: var(--muted); margin: 0; max-width: 980px; }
+.tools { display: flex; gap: 8px; }
+.btn { font: 500 13px "IBM Plex Sans", sans-serif; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 7px 12px; cursor: pointer; text-decoration: none; }
+.btn:hover { border-color: var(--accent); }
+.wrap { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: calc(100vh - 120px); }
+nav { border-right: 1px solid var(--line); padding: 18px 12px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; }
+.nav-item { display: flex; gap: 10px; align-items: baseline; padding: 9px 12px; border-radius: 8px; color: var(--ink); text-decoration: none; font-weight: 500; }
+.nav-item:hover { background: var(--panel); }
+.nav-item.on { background: var(--accent); color: var(--accent-ink); }
+.nav-num { font: 500 12px "IBM Plex Mono", monospace; opacity: .7; }
+.nav-all { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+main { padding: 28px 32px 48px; }
+.sheet { max-width: 1180px; display: none; }
+.sheet.on, body.all .sheet { display: block; }
+body.all .sheet { margin-bottom: 56px; padding-bottom: 32px; border-bottom: 1px solid var(--line); }
+.sheet-num { font: 500 12px "IBM Plex Mono", monospace; color: var(--muted); }
+h2 { font-size: 30px; line-height: 1.15; margin: 6px 0 10px; }
+.lead { font-size: 17px; color: var(--muted); max-width: 920px; margin: 0 0 24px; }
+.sheet-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 32px; }
+h3 { font: 600 12px "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.steps li { counter-increment: s; position: relative; padding: 0 0 16px 46px; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 600 14px/30px "IBM Plex Mono", monospace; text-align: center; }
+.steps li:not(:last-child)::after { content: ""; position: absolute; left: 14.5px; top: 34px; bottom: 4px; width: 1px; background: var(--line); }
+.step-h { font-weight: 600; margin-top: 3px; }
+.step-d { color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.stat { background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; }
+.stat-v { font: 600 24px/1.1 "IBM Plex Mono", monospace; color: var(--accent); }
+.stat-l { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; background: var(--panel); font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.k { font-family: "IBM Plex Mono", monospace; font-size: 13px; white-space: nowrap; }
+.code { margin: 18px 0 0; }
+.code figcaption { font: 500 12px "IBM Plex Mono", monospace; color: var(--muted); margin-bottom: 6px; }
+pre { margin: 0; background: var(--code); color: var(--code-ink); border-radius: 10px; padding: 14px 16px; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.55 "IBM Plex Mono", monospace; }
+.takeaway { margin-top: 24px; background: var(--tk); color: var(--tk-ink); border-radius: 10px; padding: 14px 18px; display: flex; gap: 16px; align-items: baseline; }
+.takeaway p { margin: 0; }
+.tk-label { font: 600 12px "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.pager { display: flex; justify-content: space-between; max-width: 1180px; margin-top: 28px; }
+body.all .pager { display: none; }
+.foot { color: var(--muted); font-size: 12px; margin-top: 32px; max-width: 1180px; }
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  nav { position: static; display: flex; overflow-x: auto; gap: 6px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--line); max-height: none; }
+  .nav-item { white-space: nowrap; }
+  .nav-all { margin: 0; border: 0; padding: 0; }
+  .top, main { padding-left: 16px; padding-right: 16px; }
+  .sheet-body { grid-template-columns: minmax(0, 1fr); }
+  h2 { font-size: 24px; }
+}
+@media print {
+  nav, .tools, .pager { display: none !important; }
+  .wrap { display: block; }
+  .sheet { display: block !important; page-break-after: always; }
+  body { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <div class="kicker">KUREAS-SYS 1.9.0 · HSMR-77 example</div>
+    <h1>How the HSMR-77 system model was built</h1>
+    <p class="sub">Hypothetical 77 MWe integral PWR module · 17 systems · 228 SSCs · 255 failure modes · two project files (72-hour mission and 1-year unavailability)</p>
+  </div>
+  <div class="tools">
+    <button class="btn" id="allBtn" type="button">Show all topics</button>
+    <button class="btn" id="themeBtn" type="button" aria-label="Toggle dark mode">Light / dark</button>
+  </div>
+</header>
+<div class="wrap">
+  <nav aria-label="Topics"><a class="nav-item" href="#systems" data-id="systems"><span class="nav-num">01</span><span>Systems modeled</span></a><a class="nav-item" href="#fmea" data-id="fmea"><span class="nav-num">02</span><span>FMEA</span></a><a class="nav-item" href="#naming" data-id="naming"><span class="nav-num">03</span><span>Controlled Naming</span></a><a class="nav-item" href="#templates" data-id="templates"><span class="nav-num">04</span><span>Templates</span></a><a class="nav-item" href="#seismic" data-id="seismic"><span class="nav-num">05</span><span>Seismic</span></a><a class="nav-item" href="#fire" data-id="fire"><span class="nav-num">06</span><span>Fire</span></a><a class="nav-item" href="#leak" data-id="leak"><span class="nav-num">07</span><span>Leaks</span></a><a class="nav-item" href="#3d" data-id="3d"><span class="nav-num">08</span><span>3D visualization</span></a><a class="nav-item" href="#ccf" data-id="ccf"><span class="nav-num">09</span><span>CCF</span></a><a class="nav-item" href="#72h1yr" data-id="72h1yr"><span class="nav-num">10</span><span>72-hour vs 1-year</span></a></nav>
+  <main>
+    
+  <section class="sheet" id="sheet-systems" data-id="systems" aria-labelledby="h-systems">
+    <header class="sheet-head">
+      <div class="sheet-num">01 / 10</div>
+      <h2 id="h-systems">Systems modeled, and why</h2>
+      <p class="lead">Seventeen systems cover every function the plant needs to trip, cool the core, keep inventory, isolate containment and keep its operators in the control room, plus the power and signals those functions depend on. The design is a natural-circulation integral PWR in a steel containment vessel under a reactor pool, with batteries in place of diesels.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Define the plant</div><div class="step-d">One 77 MWe integral PWR module: no RCPs, helical-coil SGs, a containment vessel (CNV) submerged in a below-grade reactor pool that is the ultimate heat sink.</div></li><li><div class="step-h">Front-line functions first</div><div class="step-d">ECCS, DHRS, CIS, RPS, CVCS, FWS, UHS and CRV are the systems an event tree asks about, so each gets a SYSTEM WORKS success statement.</div></li><li><div class="step-h">Then support systems</div><div class="step-d">Offsite power, two 480 VAC divisions with BESS, two 125 VDC divisions, four sensor channels and two ESFAS divisions; reached from front-line systems with SUBSYS(...).</div></li><li><div class="step-h">Model the wiring</div><div class="step-d">73 power, MV, DC and control cables are SSCs, so cable failures appear in cut sets with their routed lengths.</div></li><li><div class="step-h">Add human actions</div><div class="step-d">Two SPAR-H HFEs: manual reactor trip (backs up RPS) and manual DHRS actuation (backs up ESFAS).</div></li><li><div class="step-h">Document as you go</div><div class="step-d">Each system has an HTML extended description and knowledge tags: @source, @boundary, @basis, @assumption, @input, @exclusion, @conservatism, @uncertainty, @note, @modeler.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">17</div><div class="stat-l">systems</div></div><div class="stat"><div class="stat-v">228</div><div class="stat-l">SSCs</div></div><div class="stat"><div class="stat-v">73</div><div class="stat-l">cables as SSCs</div></div><div class="stat"><div class="stat-v">2</div><div class="stat-l">SPAR-H HFEs</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Group</th><th>Systems</th><th>Why it is modeled</th></tr></thead>
+          <tbody><tr><td class="k">Electrical</td><td>OSP · EPA · EPB · DCA · DCB</td><td>No diesels: the 480 V divisions transfer to a Li-ion BESS by ATS; DC has 72-hour batteries</td></tr><tr><td class="k">I&amp;C</td><td>SEN · RPS · ESA · ESB</td><td>2-of-4 sensor voting; RPS series RTBs (UV + shunt), 15 of 16 rods; energize-to-actuate ESFAS</td></tr><tr><td class="k">Core cooling</td><td>DHRS · ECCS · UHS</td><td>Passive SG-to-pool cooling; vent (RVV) and recirculation (RRV) valves; the pool itself</td></tr><tr><td class="k">Inventory / isolation</td><td>CVCS · CCW · CIS</td><td>Makeup pumps cooled by CCW; 4 penetrations × 2 MOVs</td></tr><tr><td class="k">Normal / habitability</td><td>FWS · CRV</td><td>Normal heat removal; control room HVAC and filtration</td></tr></tbody>
+        </table></div>
+        <figure class="code"><figcaption>ESA HtSW logic (excerpt)</figcaption><pre><code>[SENSORS] = SUBSYS(SEN);
+[DC] = SUBSYS(DCA);
+SYSTEM WORKS = [SENSORS] AND ESA_PLC_PRES_A_ESF
+  AND ESA_SWC_RLY_A_ESF AND ESA_CABLE_DCBL_A_ESF AND [DC];</code></pre></figure>
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>72-hour failure probabilities run from 7.9E-7 (UHS) to 9.6E-4 (FWS); ESFAS (3.2E-4) and offsite power (4.5E-4) are the largest support contributors.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-fmea" data-id="fmea" aria-labelledby="h-fmea">
+    <header class="sheet-head">
+      <div class="sheet-num">02 / 10</div>
+      <h2 id="h-fmea">FMEA creation</h2>
+      <p class="lead">Every failure mode carries its effects at four levels, so the FMEA table and report are produced by KUREAS-SYS from the same records that the fault-tree logic uses. There is no separate spreadsheet to keep in step.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Pick failure modes from data</div><div class="step-d">Each template lists its modes from the NRC-INL 2020 industry averages (FTS, FTR, FTO, FTC, FTOP, SPUR, PLUG, EXRUPT …) with their distributions.</div></li><li><div class="step-h">Mark applicability</div><div class="step-d">Modes that cannot defeat the function in this role are set not applicable rather than deleted, so the decision is visible.</div></li><li><div class="step-h">Write the four effects</div><div class="step-d">Local (the component), System (the train or system), Plant (the safety function), Detection (how and when it is found).</div></li><li><div class="step-h">Tie effects to the success logic</div><div class="step-d">The System effect states the redundancy the HtSW statement models, e.g. "one of three vent paths is lost (one is enough)".</div></li><li><div class="step-h">Cover special modes</div><div class="step-d">Derived SEIS, FIRE and LEAK modes and the CCF events appear with the SSC and are listed in the report sections that go with them.</div></li><li><div class="step-h">Generate the FMEA</div><div class="step-d">Report &gt; FMEA section: one row per SSC failure mode with its effects, data source and basic event name.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">255</div><div class="stat-l">failure modes</div></div><div class="stat"><div class="stat-v">255</div><div class="stat-l">with all 4 effects</div></div><div class="stat"><div class="stat-v">4</div><div class="stat-l">effect levels</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Effect level</th><th>Example (DHRS actuation valve AV1, FTO)</th></tr></thead>
+          <tbody><tr><td class="k">Local</td><td>The valve does not open on demand</td></tr><tr><td class="k">System</td><td>Train A relies on its second actuation valve</td></tr><tr><td class="k">Plant</td><td>Decay heat is not removed through the SGs; the plant relies on ECCS</td></tr><tr><td class="k">Detection</td><td>Found on demand or at the periodic surveillance test; no alarm before the demand</td></tr></tbody>
+        </table></div>
+        
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>The Plant-level effects were written so they read as the event-tree logic later used in SEQ (DHRS fails, then ECCS).</p></footer>
+  </section>
+  <section class="sheet" id="sheet-naming" data-id="naming" aria-labelledby="h-naming">
+    <header class="sheet-head">
+      <div class="sheet-num">03 / 10</div>
+      <h2 id="h-naming">Controlled Naming</h2>
+      <p class="lead">Controlled Naming builds every SSC name, and so every basic event name, from pick lists in a fixed order. Names stay unique, sort by system and read the same way in every report, cut set and downstream SEQ script.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Choose the scheme</div><div class="step-d">SYS_SSCT_CMP_TRN_SSCID: system, SSC type, component type, train, unique SSC ID. Separator "_".</div></li><li><div class="step-h">Seed the pick lists</div><div class="step-d">Abbreviations come from the KUREAS identification lists (SSCT such as VALVE, PUMP, CABLE; CMP such as HOV, MDP, PCBL). Missing ones were added once at the project level.</div></li><li><div class="step-h">Turn it on</div><div class="step-d">Project Settings &gt; Controlled Naming = on. New SSCs are named by choosing list entries, not typing.</div></li><li><div class="step-h">Let modes append</div><div class="step-d">A basic event is the SSC name plus the failure mode: DHRS_VALVE_HOV_A_AV1 + FTO.</div></li><li><div class="step-h">Let CCF events collapse</div><div class="step-d">A CCF event drops the train and unique ID of its members: DHRS_VALVE_HOV_FTO_CCF.</div></li><li><div class="step-h">Use names everywhere</div><div class="step-d">The same names are referenced by the HtSW scripts, the 3D scripts (PART, WIRE, LEAKRATE) and later by SEQ FAILED() and SEISMIC() lines.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">5</div><div class="stat-l">name fields</div></div><div class="stat"><div class="stat-v">228</div><div class="stat-l">controlled names</div></div><div class="stat"><div class="stat-v">0</div><div class="stat-l">hand-typed names</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Field</th><th>Value</th><th>What it controls</th></tr></thead>
+          <tbody><tr><td class="k">SYS</td><td>DHRS</td><td>System acronym; groups the SSC with its system</td></tr><tr><td class="k">SSCT</td><td>VALVE</td><td>SSC type (also picks the P&amp;ID symbol family)</td></tr><tr><td class="k">CMP</td><td>HOV</td><td>Component type: picks the data and the seismic fragility</td></tr><tr><td class="k">TRN</td><td>A</td><td>Train or division (blank when not trained)</td></tr><tr><td class="k">SSCID</td><td>AV1</td><td>Unique label within the system</td></tr></tbody>
+        </table></div>
+        <figure class="code"><figcaption>Name → basic event → CCF event</figcaption><pre><code>DHRS_VALVE_HOV_A_AV1          SSC
+DHRS_VALVE_HOV_A_AV1_FTO      basic event
+DHRS_VALVE_HOV_FTO_CCF        CCF event (train and ID dropped)</code></pre></figure>
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>Because names are built, not typed, the SEQ scripts could reference 211 seismic and dozens of fire targets by name with no lookup table.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-templates" data-id="templates" aria-labelledby="h-templates">
+    <header class="sheet-head">
+      <div class="sheet-num">04 / 10</div>
+      <h2 id="h-templates">Templates</h2>
+      <p class="lead">SSCs that share the same failure data share one template. A template holds the failure modes, data and sources, duty (running or standby), test interval, fire frequency, seismic mapping, CCF participation and the P&amp;ID symbol; an SSC links to it and keeps only what is local to it.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Group by role, not by name</div><div class="step-d">A standby pump and a running pump of the same type get different templates (TPL_MDP_STANDBY, TPL_MDP_RUNNING) because their modes differ.</div></li><li><div class="step-h">Fill the template once</div><div class="step-d">Modes, means and distributions from NRC-INL 2020; illustrative values marked HSMR-ILLUS with their basis.</div></li><li><div class="step-h">Add duty and test data</div><div class="step-d">Standby templates carry test intervals and a TM unavailability; these drive the 1-year case.</div></li><li><div class="step-h">Link the SSCs</div><div class="step-d">226 of the 228 SSCs link to one of 47 templates. Only the two HFEs stand alone.</div></li><li><div class="step-h">Keep locals local</div><div class="step-d">Per-SSC values stay on the SSC: the pipe or cable length comes from the 3D route; the fire frequency can be overridden (the UAT uses yard bins 27 and 28).</div></li><li><div class="step-h">Opt out where needed</div><div class="step-d">Pipes, tanks, cables, the grid and structures are templates with CCF off.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">47</div><div class="stat-l">templates</div></div><div class="stat"><div class="stat-v">226</div><div class="stat-l">linked SSCs</div></div><div class="stat"><div class="stat-v">2</div><div class="stat-l">stand-alone (HFEs)</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Template</th><th>Used by</th><th>Carries</th></tr></thead>
+          <tbody><tr><td class="k">TPL_MDP_STANDBY</td><td>CVCS B, CCW B, FWS B</td><td>FTS, FTR first hour, FTR, TM; NUREG-2169 bin 21</td></tr><tr><td class="k">TPL_HOV_OPEN</td><td>ECCS RVV/RRV, DHRS AV</td><td>FTO; CCF group per system</td></tr><tr><td class="k">TPL_CABLE_POWER</td><td>all power cables</td><td>Per-foot rate × routed 3D length; no CCF</td></tr><tr><td class="k">TPL_BESS_BATTERY</td><td>EPA/EPB BESS</td><td>FTOP; illustrative Li-ion fire 1E-3 /yr</td></tr><tr><td class="k">TPL_CONTROL_ROD</td><td>16 rods</td><td>FTI; CCF group across the rods</td></tr></tbody>
+        </table></div>
+        
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>Changing one template value (e.g. the MDP FTS mean) updates every pump that uses it, in both project files.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-seismic" data-id="seismic" aria-labelledby="h-seismic">
+    <header class="sheet-head">
+      <div class="sheet-num">05 / 10</div>
+      <h2 id="h-seismic">Seismic analysis</h2>
+      <p class="lead">The median-fragility model gives every SSC a derived SEIS failure mode from its component type. The probability uses the lognormal fragility at one ground-motion level and is ANDed with the probability that an earthquake of that size occurs during the exposure period.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Enter the hazard curve</div><div class="step-d">Library &gt; Special Failure Modes &gt; Seismic: 11 points from 0.05 g (1E-2 /yr) to 3.0 g (1E-7 /yr), hypothetical site HSMR-77-HAZ-001.</div></li><li><div class="step-h">Set the level</div><div class="step-d">Seismic g-level 0.5 g: a review-level earthquake (about 1.67 × a 0.3 g design basis).</div></li><li><div class="step-h">Map component types</div><div class="step-d">Each component type points at a library row (NUREG/CR-3558 Table 2, NUREG/CR-4659 Table 3-1), e.g. MDP Am 3.19 g, HOV 7.61 g, relay 1.66 g.</div></li><li><div class="step-h">Override where needed</div><div class="step-d">Per-SSC custom fragilities for items with no library row: the offsite grid (ceramic insulators, Am 0.2 g), the pool and the CNV.</div></li><li><div class="step-h">Turn on P_EARTHQUAKE</div><div class="step-d">P = 1 − exp(−λ(a)·T). T = 72 h in the 72-hour file; 2,160 h (90-day restoration) in the 1-year file.</div></li><li><div class="step-h">Read the results</div><div class="step-d">SEIS events flow into cut sets and importance; the report adds the Seismic Failure Table and the hazard curve.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">11</div><div class="stat-l">hazard-curve points</div></div><div class="stat"><div class="stat-v">0.5 g</div><div class="stat-l">evaluation level</div></div><div class="stat"><div class="stat-v">266</div><div class="stat-l">library fragility rows</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Parameter</th><th>Value</th><th>What it controls</th></tr></thead>
+          <tbody><tr><td class="k">seismicModel</td><td>median</td><td>Adds SEIS = Φ(ln(a/Am)/βC) to each mapped SSC</td></tr><tr><td class="k">seismicG</td><td>0.5 g</td><td>Ground-motion level a for every system</td></tr><tr><td class="k">seismicIncludeEq</td><td>yes</td><td>ANDs each SEIS with the shared P_EARTHQUAKE event</td></tr><tr><td class="k">seismicEqYears</td><td>0.0082 / 0.2466</td><td>Exposure period T: 72 h or 2,160 h</td></tr><tr><td class="k">βC</td><td>√(βR² + βU²)</td><td>Composite uncertainty from the library row</td></tr></tbody>
+        </table></div>
+        
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>SYS evaluates one level; the full convolution over the hazard curve is done in SEQ, where the same fragilities are reused level by level.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-fire" data-id="fire" aria-labelledby="h-fire">
+    <header class="sheet-head">
+      <div class="sheet-num">06 / 10</div>
+      <h2 id="h-fire">Fire analysis</h2>
+      <p class="lead">The location-based fire model gives an SSC a FIRE failure mode from the fire frequency of its source and the room it sits in. The room comes from the 3D model, so moving a part to another room moves its fire exposure.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Make rooms fire areas</div><div class="step-d">Every ROOM in the Project 3D script is a fire area; an SSC belongs to the room it is placed IN.</div></li><li><div class="step-h">Give templates a source</div><div class="step-d">NUREG-2169 bin and plant count per template: pumps bin 21 (12), cabinets and buses bin 15 (30), transformers bin 23 (6), DC batteries bin 1 (2), chargers bin 10 (2), MCR switches bin 4 (4), HVAC bin 26 (8).</div></li><li><div class="step-h">Handle the unusual</div><div class="step-d">Li-ion BESS: user frequency 1E-3 /yr, lognormal EF 10 (no NUREG-2169 bin). UAT: yard bins 27 + 28, count 3.</div></li><li><div class="step-h">Set the fragility</div><div class="step-d">Fragility type "room": a fire in the room fails the targets in it.</div></li><li><div class="step-h">Set the exposure</div><div class="step-d">72 h in the 72-hour file; 720 h (30-day restoration) in the 1-year file.</div></li><li><div class="step-h">Check the room split</div><div class="step-d">Control room HVAC trains A and B were moved to separate rooms (CB_HVACA, CB_HVACB) once a shared room showed up in the results.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">21</div><div class="stat-l">fire areas (rooms + buildings)</div></div><div class="stat"><div class="stat-v">165</div><div class="stat-l">SSCs with fire records</div></div><div class="stat"><div class="stat-v">720 h</div><div class="stat-l">1-yr restoration</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Setting</th><th>Value</th><th>What it controls</th></tr></thead>
+          <tbody><tr><td class="k">fireModel</td><td>location</td><td>Fire exposure comes from the SSC's 3D room</td></tr><tr><td class="k">frequency</td><td>bin mean ÷ count × factor</td><td>Per-source ignition frequency</td></tr><tr><td class="k">fragility</td><td>room</td><td>Damage to the targets in the same room</td></tr><tr><td class="k">fireEqYears</td><td>0.0082 / 0.0822</td><td>Exposure: 72 h or 720 h</td></tr><tr><td class="k">fireSscJson</td><td>165 SSCs</td><td>Per-SSC frequency and fragility records</td></tr></tbody>
+        </table></div>
+        
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>SYS fire modes give system-level insight; area-by-area fire scenarios with full-room burnout are built in the PROJECT.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-leak" data-id="leak" aria-labelledby="h-leak">
+    <header class="sheet-head">
+      <div class="sheet-num">07 / 10</div>
+      <h2 id="h-leak">Leak analysis</h2>
+      <p class="lead">Leak rates are attached to pipes, tanks and the pool with LEAKRATE lines in the 3D scripts. A per-foot rate uses the routed length of the pipe, so the leak frequency grows with the run the 3D model draws.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Route the pipe</div><div class="step-d">Pipes are drawn as 3D polylines; KUREAS-SYS measures the routed length.</div></li><li><div class="step-h">Attach the rate</div><div class="step-d">LEAKRATE ON &lt;pipe&gt; RATE 2.5E-10 PER HOUR PER FT (NRC-INL 2020 normal-pipe external leakage, gamma 0.5).</div></li><li><div class="step-h">Rate tanks per part</div><div class="step-d">Tanks: 1.2E-7 /h per tank (gamma 0.5). The pool liner: 1.0E-8 /h, EF 10 (illustrative).</div></li><li><div class="step-h">Set the time</div><div class="step-d">MISSION 72 h in the 72-hour file; the restoration time in the 1-year file (pipe 168 h, tank 336 h).</div></li><li><div class="step-h">Say what leaks</div><div class="step-d">FLUID WATER, IGNITES NO: a water leak that cannot start a fire.</div></li><li><div class="step-h">Keep rupture separate</div><div class="step-d">Pipe rupture (EXRUPT) stays a per-foot mode in TPL_PIPE; LEAKRATE adds the derived LEAK mode beside it.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">12</div><div class="stat-l">LEAKRATE lines</div></div><div class="stat"><div class="stat-v">2.5E-10</div><div class="stat-l">per hour per foot</div></div><div class="stat"><div class="stat-v">168 / 336 h</div><div class="stat-l">pipe / tank restoration</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Item</th><th>Rate</th><th>Basis</th></tr></thead>
+          <tbody><tr><td class="k">Normal pipe</td><td>2.5E-10 /h-ft</td><td>NRC-INL 2020 external leakage, gamma 0.5</td></tr><tr><td class="k">Tank</td><td>1.2E-7 /h</td><td>NRC-INL 2020 external leakage, gamma 0.5</td></tr><tr><td class="k">Reactor pool liner</td><td>1.0E-8 /h, EF 10</td><td>HSMR-ILLUS (illustrative)</td></tr><tr><td class="k">Leaks modeled</td><td>12</td><td>CVCS, CCW, DHRS, FWS piping and tanks; the pool</td></tr></tbody>
+        </table></div>
+        <figure class="code"><figcaption>3D script</figcaption><pre><code>LEAKRATE LR-CCW-HDR ON CCW_PIPE_NPIPE RATE 2.5E-10 PER HOUR PER FT
+  GAMMA 0.5 MISSION 72 HOURS FLUID WATER IGNITES NO;</code></pre></figure>
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>Leak frequency follows the drawing: reroute a header in 3D and its leak contribution changes with it.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-3d" data-id="3d" aria-labelledby="h-3d">
+    <header class="sheet-head">
+      <div class="sheet-num">08 / 10</div>
+      <h2 id="h-3d">3D visualization</h2>
+      <p class="lead">The 3D model is more than a picture. Rooms set fire exposure, routed WIRE and pipe lengths set cable and pipe failure rates and leak frequencies, and collision checks keep the layout physically possible.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Build the site</div><div class="step-d">The Project 3D script sets UNITS, the FOOTPRINT, and the buildings as ROOMs: Reactor, Control, Electrical, Auxiliary and Turbine buildings, plus the switchyard and the cooling tower outdoors.</div></li><li><div class="step-h">Add the rooms</div><div class="step-d">16 rooms nested IN their buildings (MCR, I&amp;C A/B, DC A/B, HVAC A/B, 480 V A/B, BESS A/B, 13.8 kV, gallery, CVCS, CCW, FW pumps), plus the pool room.</div></li><li><div class="step-h">Place each system</div><div class="step-d">Each system's 3D script places PARTs IN rooms by SSC name. The reactor pool is a ROOM named like the UHS SSC, so ECCS and DHRS parts sit inside it.</div></li><li><div class="step-h">Route the cables</div><div class="step-d">Cables are WIREs routed through the rooms; their lengths become the local "Pipe length" of each cable's per-foot failure rate.</div></li><li><div class="step-h">Resolve collisions</div><div class="step-d">Check collisions; pumps, breakers and valves were moved until the count reached 0 (cross-system cable crossings allowed by name).</div></li><li><div class="step-h">Use it</div><div class="step-d">The derived room of every SSC (sys3dDerivedJson) feeds the fire model and, later, the PROJECT fire and flood scenarios.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">297</div><div class="stat-l">parts</div></div><div class="stat"><div class="stat-v">21</div><div class="stat-l">fire areas</div></div><div class="stat"><div class="stat-v">0</div><div class="stat-l">collisions</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Element</th><th>Count</th><th>Used for</th></tr></thead>
+          <tbody><tr><td class="k">Buildings + rooms</td><td>5 + 16 (+ pool)</td><td>Fire areas; location of every SSC</td></tr><tr><td class="k">Parts</td><td>297</td><td>SSCs and context objects</td></tr><tr><td class="k">Routed cables (WIRE)</td><td>73</td><td>Cable length → failure rate</td></tr><tr><td class="k">Collisions</td><td>0</td><td>Layout check</td></tr></tbody>
+        </table></div>
+        <figure class="code"><figcaption>Project and system 3D scripts</figcaption><pre><code>ROOM CB_MCR (W=16, L=14, H=5, T=0.3) IN CB AT (-12, 0, 0) LABEL "Main control room";
+PART CCW_PUMP_MDP_A = PUMP(D=0.3, HEAD=40) IN AUX_CCW AT (-5.5, 0.62, -3);</code></pre></figure>
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>One layout decision showed up later as a risk insight: all four pressure transmitters share the RXB piping gallery.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-ccf" data-id="ccf" aria-labelledby="h-ccf">
+    <header class="sheet-head">
+      <div class="sheet-num">09 / 10</div>
+      <h2 id="h-ccf">CCF analysis</h2>
+      <p class="lead">The beta-factor model adds one common-cause event for each group of identical components in a system. Groups are formed from the templates, so a group exists wherever two or more SSCs share a template and failure mode within a system.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Choose the model</div><div class="step-d">Library &gt; Special Failure Modes &gt; Common-Cause Failures: beta factor (alpha factors are also available).</div></li><li><div class="step-h">Set beta</div><div class="step-d">β = 0.05, lognormal EF 3, about 1 − α₁ for a group of two (INL/EXT-21-65527, 2020 update).</div></li><li><div class="step-h">Let groups form</div><div class="step-d">Same template + same mode + same system = one group (e.g. the three HOV vent valves of ECCS).</div></li><li><div class="step-h">Opt out passive items</div><div class="step-d">Pipes, tanks, cables, the grid and structures have CCF off in their templates.</div></li><li><div class="step-h">Name the events</div><div class="step-d">Controlled Naming gives the CCF event name: ECCS_VALVE_HOV_R_FTO_CCF.</div></li><li><div class="step-h">Read the dominance</div><div class="step-d">CCF events lead many systems: control rods (9.3E-6) in RPS, HOV vent valves (6.0E-5) in ECCS, bistables (2.7E-5) in SEN.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">0.05</div><div class="stat-l">beta factor</div></div><div class="stat"><div class="stat-v">21</div><div class="stat-l">CCF groups in credited systems</div></div><div class="stat"><div class="stat-v">6.0E-5</div><div class="stat-l">ECCS HOV CCF</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Setting</th><th>Value</th><th>What it controls</th></tr></thead>
+          <tbody><tr><td class="k">ccfModel</td><td>beta</td><td>One CCF event per group: Q_CCF = β × Q_total</td></tr><tr><td class="k">ccfBetaFactor</td><td>0.05</td><td>Fraction of failures that are common cause</td></tr><tr><td class="k">ccfBetaDistribution</td><td>lognormal, EF 3</td><td>Uncertainty sampled for β</td></tr><tr><td class="k">template ccf</td><td>on / off</td><td>Whether an SSC can join a group</td></tr></tbody>
+        </table></div>
+        
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>Suggested enhancement: opt-in CCF across sibling division systems (BESS A/B, batteries A/B), which today are separate systems.</p></footer>
+  </section>
+  <section class="sheet" id="sheet-72h1yr" data-id="72h1yr" aria-labelledby="h-72h1yr">
+    <header class="sheet-head">
+      <div class="sheet-num">10 / 10</div>
+      <h2 id="h-72h1yr">The 72-hour and 1-year models</h2>
+      <p class="lead">Both files come from one generator and share systems, names, templates and 3D. They answer different questions. The 72-hour file asks whether a system fails during a 72-hour mission after a demand; the 1-year file asks what fraction of a year it is unavailable.</p>
+    </header>
+    <div class="sheet-body">
+      <div class="col-steps">
+        <h3>Modeling steps</h3>
+        <ol class="steps"><li><div class="step-h">Why two files</div><div class="step-d">In 1.9.0 mission times are per failure mode and the seismic and fire exposure periods are project-wide, so the two cases cannot share one file.</div></li><li><div class="step-h">72-hour case</div><div class="step-d">Rate modes use a 72 h mission with no repair; leaks, fires and earthquakes use a 72 h exposure.</div></li><li><div class="step-h">1-year: running items</div><div class="step-d">Running and monitored failures use FM4, λτ/(1+λτ), with τ the restoration time (pump 24 h, valve 12 h, transformer 168 h …).</div></li><li><div class="step-h">1-year: standby items</div><div class="step-d">Standby rate failures use FM3 with their test intervals; mission-time failures of standby components are screened out.</div></li><li><div class="step-h">Unchanged in both</div><div class="step-d">Demand probabilities and TM unavailabilities are the same in both files.</div></li><li><div class="step-h">Exposure periods</div><div class="step-d">Leaks over restoration time (168 h / 336 h), fires over 720 h, earthquakes over 2,160 h.</div></li></ol>
+      </div>
+      <div class="col-side">
+        <div class="stats"><div class="stat"><div class="stat-v">72 h</div><div class="stat-l">mission, no repair</div></div><div class="stat"><div class="stat-v">8,760 h</div><div class="stat-l">averaging period</div></div><div class="stat"><div class="stat-v">1</div><div class="stat-l">generator, 2 files</div></div></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>System</th><th>72-hour</th><th>1-year</th></tr></thead>
+          <tbody><tr><td class="k">OSP</td><td>4.5E-4</td><td>8.2E-4</td></tr><tr><td class="k">ESA / ESB</td><td>3.2E-4</td><td>7.0E-4</td></tr><tr><td class="k">ECCS</td><td>1.2E-4</td><td>1.5E-4</td></tr><tr><td class="k">DHRS</td><td>8.7E-5</td><td>1.1E-4</td></tr><tr><td class="k">CVCS</td><td>1.4E-4</td><td>8.9E-4</td></tr><tr><td class="k">UHS</td><td>7.9E-7</td><td>2.4E-5</td></tr><tr><td class="k">FWS</td><td>9.6E-4</td><td>1.8E-3</td></tr></tbody>
+        </table></div>
+        
+      </div>
+    </div>
+    <footer class="takeaway"><span class="tk-label">Takeaway</span><p>Use the 72-hour file in event trees (failure given a demand); use the 1-year file for availability, maintenance and configuration insight.</p></footer>
+  </section>
+    <div class="pager"><button class="btn" id="prev" type="button">&larr; Previous</button><button class="btn" id="next" type="button">Next &rarr;</button></div>
+    <p class="foot">HSMR-77 is a hypothetical plant built as a KUREAS example; illustrative values are marked HSMR-ILLUS in the models. The companion page HSMR-77_PROJECT_One-Pagers covers the integrated project. Use the arrow keys or the topic list to move between topics; Show all topics (or Print) gives every page.</p>
+  </main>
+</div>
+<script>
+(function () {
+  var ids = ["systems","fmea","naming","templates","seismic","fire","leak","3d","ccf","72h1yr"];
+  var cur = 0, all = false;
+  function show(id) {
+    var i = ids.indexOf(id); if (i < 0) i = 0; cur = i;
+    document.querySelectorAll('.sheet').forEach(function (s) { s.classList.toggle('on', s.dataset.id === ids[i]); });
+    document.querySelectorAll('.nav-item').forEach(function (a) { var on = a.dataset.id === ids[i]; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    document.getElementById('prev').disabled = i === 0; document.getElementById('next').disabled = i === ids.length - 1;
+  }
+  function go(i) { if (i < 0 || i >= ids.length) return; location.hash = ids[i]; }
+  window.addEventListener('hashchange', function () { if (all) toggleAll(false); show(location.hash.slice(1)); window.scrollTo(0, 0); });
+  document.getElementById('prev').onclick = function () { go(cur - 1); };
+  document.getElementById('next').onclick = function () { go(cur + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowRight') go(cur + 1); else if (e.key === 'ArrowLeft') go(cur - 1);
+  });
+  function toggleAll(v) { all = v; document.body.classList.toggle('all', all); document.getElementById('allBtn').textContent = all ? 'One topic at a time' : 'Show all topics'; }
+  document.getElementById('allBtn').onclick = function () { toggleAll(!all); };
+  document.getElementById('themeBtn').onclick = function () {
+    var r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    r.dataset.theme = dark ? 'light' : 'dark';
+  };
+  show(location.hash.slice(1) || ids[0]);
+})();
+</script>
+</body>
+</html>
