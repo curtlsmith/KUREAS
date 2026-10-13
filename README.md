@@ -50,20 +50,63 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 
 | Module | File | Version | Purpose |
 |--------|------|---------|---------|
+| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.9 | Systems modeling, Seismic hazard and fragility, Fire frequency and fragility, 3D script-based modeling including fluid flow, P&ID, FMEA, failure analysis, CCF (beta and alpha factors), Reliability Designer™, importance measures, uncertainty analysis, human reliability modeling, customizable report generation, and design comparison function |
+[SYS](https://github.com/curtlsmith/KUREAS/tree/main/SYS)
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.2 | Hazard analysis, initiating event frequency quantification, and screening |
 [HA](https://github.com/curtlsmith/KUREAS/tree/main/HA)
 | **KUREAS-FTL** | `KUREAS-FTL.html` | v1.7.31 | Fault tree logic editing, advanced reporting including Smart Paging, visualization, generic databases, and analysis including cut set generation, uncertainty analysis, and importance measures |
 [FTL](https://github.com/curtlsmith/KUREAS/tree/main/FTL)
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 [ETL](https://github.com/curtlsmith/KUREAS/tree/main/ETL)
-| **KUREAS-SYS** | `KUREAS-SYS.html` | v1.8 | Systems modeling, P&ID, FMEA, failure analysis, CCF (beta and alpha factors), Reliability Designer™, importance measures, uncertainty analysis, human reliability modeling, customizable report generation, and design comparison function |
-[SYS](https://github.com/curtlsmith/KUREAS/tree/main/SYS)
 | **KUREAS-BAYES** | `KUREAS-BAYES.html` | v1.0 | Manage knowledge of component operational behavior and experience to support Bayesian analysis of how components fail. |
 [ETS](https://github.com/curtlsmith/KUREAS/tree/main/BAYES)
 | **KUREAS-SEQ** | `KUREAS-SEQ.html` | v1.2 | Facility operational diagrams, event tree generation, sequence quantification |
 [SEQ](https://github.com/curtlsmith/KUREAS/tree/main/SEQ)
 | **KUREAS-REPORT** | `KUREAS-REPORT.html` | v1.0 | Integrated report assembly from module outputs |
 [REPORT](https://github.com/curtlsmith/KUREAS/tree/main/REPORT)
+
+---
+
+## KUREAS-SYS — System Evaluation
+
+System-level knowledge management: define structures, systems, and components (SSCs); analyze failure modes including stochastic failures, seismic failures, fire failures, and common-cause failures; model system success logic, derive fault trees, uncertainty, importance measures; advanced JavaScript fast binary decision-diagram (BDD) based cut set solver; 3D script-based visualization and fluid flow representation.
+
+### Features
+
+- **5-pane workspace** — Component List (Pane A), System Info bar (Pane B), SSCs in System (Pane C), "How the System Works" editor (Pane D), and Edit SSC details (Pane E); all panes are resizable
+- **SSC management** — define SSCs with name, description, SSC type, and component type; reuse templates, add multiple failure modes per SSC with individual probability data; duplicate, edit, and delete SSCs and failure modes
+- **Probability types:**
+  - **Direct Probability** — mean value with distribution parameters (CNI, Lognormal, Normal, Gamma, Beta, Uniform, etc.)
+  - **Demand (Binomial)** — demand probability and number of demands
+  - **Fails While Operating (Poisson)** — failure rate and mission time
+  - **Fails While Operating (Poisson) with a per-feet failure rate ** — failure rate, mission time, and lenth of component (e.g., piping)
+  - **Fails in Standby** — failure rate and inspection interval
+  - **Fails While Operating with Repair** — failure rate, mission time, and repair time
+  - **Logic T/F Flag** — house events (TRUE/FALSE)
+  - **Qualitative** — Low / Medium / High mapped to configurable probability values in Settings
+  - **Linked System** — probability computed from another `.KNOW_SYS` file (resolved automatically in failure analysis)
+  - **Screened** — excluded from analysis (probability = 0)
+  - **SPAR-H** — human error probability
+- **System Modeling Script** — "How the System Works" text editor with clickable keyword/SSC insertion, line numbers, and syntax highlighting; keywords include `SYSTEM WORKS =`, `AND`, `OR`, `NOT`, `RELIES ON`, `WORKS`, `FAILS`, `UNLESS`, `WHEN`, `IF`/`THEN`, `IS TRUE`/`IS FALSE`, `ARE IN`/`ARE NOT IN`, comparison operators, variables, and modules
+- **Check Script** — validates logic for syntax errors, unmatched parentheses, and unknown identifiers; auto-creates missing SSCs
+- **"How the System Fails" modal** — full-screen failure analysis with:
+  - Fault tree text view and interactive graphic (canvas with zoom/pan)
+  - Minimal cut sets with MCUB and BDD probability
+  - Importance measures table: RIR, RRR, Probability of Contribution (PC), and SWIM
+  - Uncertainty analysis
+  - Configurable scatter plot of any two importance measures with labeled data points
+- **Special Failure Modes and Data** — Seismic failure modeling with build-in SSC fragilities from NUREG/CR-3558, NUREG/CR-4659, and NUREG/CR-2680; fire failure modeling with build in fire-frequencies from NUREG-2169, and CCF including beta and alpha factors from INL/EXT-21-65527
+- **FMEA editor** — full-screen modal with SSC list and auto-generated Mermaid.js FMEA block diagrams; add effects, severity, detection, and mitigation fields per failure mode
+- **P&ID editor** — full-screen Piping and Instrumentation Diagram editor with SSC icons based upon the ISA5.1 P&ID symbol standard
+- **Reliability Designer™** — A way to quickly modify component failure probabilities (higher or lower) and see the impact on the overall system. Then, for an adjusted component probability, there is an estimate (using Bayesian inference) of how many tests would be required to meet that reliability target with 95% probability.
+- **Common-Cause Failures** — automatically apply a beta-factor or alpha-factor based CCF events to cut sets
+- **Comparison** — Compare two system designs to support risk-informed decision making
+- **Built-in reliability database** — multiple generic data sources are built into the GUI
+- **Reliability database** — load `.relDB` or `.fmeaDB` files into the Component List (Pane A); drag components to add them to the system; export SSC data back to `.relDB` or `.fmeaDB`
+- **Import** — boundary conditions from SEQ files; basic events from `.KNOW_FTL` files (creates SSCs with probability data)
+- **Export** — Reliability Database (.relDB), FMEA Database (.fmeaDB), KUREAS-FTL Fault Tree (.KNOW_FTL with pre-computed cut sets)
+- **Report generation** — Word (.doc) and Markdown (.md) with 11 configurable sections: System Name, Extended Description, SSC Information, FMEA Information, System Works Expression, Supercomponent Information, Fault Tree Logic, Fault Tree Graphics, Fault Tree Cut Sets, Importance Measure Graphic, Importance Measure Table; in-browser preview with print
+- **Settings** — font size, font family, background (light / dark / gray), probability display digits, SSC sort order, qualitative probability mapping (Low/Medium/High values), and layout reset
 
 ---
 
@@ -130,48 +173,6 @@ Event tree visualization tool implementing a backwards-recursive algorithm that 
 - **Sequence analysis** — view sequence paths with end states, transfer flags, and frequency data
 - **Cut set integration** — associate sequence-level cut sets from `.SQC` files with visual sequences
 - **Multi-tree support** — load files containing multiple event trees and navigate between them
-
----
-
-## KUREAS-SYS — System Evaluation
-
-System-level knowledge management: define structures, systems, and components (SSCs), analyze failure modes, model system success logic, derive fault trees, include common-cause failures (CCF), and calculate importance measures.
-
-### Features
-
-- **5-pane workspace** — Component List (Pane A), System Info bar (Pane B), SSCs in System (Pane C), "How the System Works" editor (Pane D), and Edit SSC details (Pane E); all panes are resizable
-- **SSC management** — define SSCs with name, description, SSC type, and component type; reuse templates, add multiple failure modes per SSC with individual probability data; duplicate, edit, and delete SSCs and failure modes
-- **Probability types:**
-  - **Direct Probability** — mean value with distribution parameters (CNI, Lognormal, Normal, Gamma, Beta, Uniform, etc.)
-  - **Demand (Binomial)** — demand probability and number of demands
-  - **Fails While Operating (Poisson)** — failure rate and mission time
-  - **Fails While Operating (Poisson) with a per-feet failure rate ** — failure rate, mission time, and lenth of component (e.g., piping)
-  - **Fails in Standby** — failure rate and inspection interval
-  - **Fails While Operating with Repair** — failure rate, mission time, and repair time
-  - **Logic T/F Flag** — house events (TRUE/FALSE)
-  - **Qualitative** — Low / Medium / High mapped to configurable probability values in Settings
-  - **Linked System** — probability computed from another `.KNOW_SYS` file (resolved automatically in failure analysis)
-  - **Screened** — excluded from analysis (probability = 0)
-  - **SPAR-H** — human error probability
-- **System Modeling Script** — "How the System Works" text editor with clickable keyword/SSC insertion, line numbers, and syntax highlighting; keywords include `SYSTEM WORKS =`, `AND`, `OR`, `NOT`, `RELIES ON`, `WORKS`, `FAILS`, `UNLESS`, `WHEN`, `IF`/`THEN`, `IS TRUE`/`IS FALSE`, `ARE IN`/`ARE NOT IN`, comparison operators, variables, and modules
-- **Check Script** — validates logic for syntax errors, unmatched parentheses, and unknown identifiers; auto-creates missing SSCs
-- **"How the System Fails" modal** — full-screen failure analysis with:
-  - Fault tree text view and interactive graphic (canvas with zoom/pan)
-  - Minimal cut sets with MCUB and BDD probability
-  - Importance measures table: RIR, RRR, Probability of Contribution (PC), and SWIM
-  - Uncertainty analysis
-  - Configurable scatter plot of any two importance measures with labeled data points
-- **FMEA editor** — full-screen modal with SSC list and auto-generated Mermaid.js FMEA block diagrams; add effects, severity, detection, and mitigation fields per failure mode
-- **P&ID editor** — full-screen Piping and Instrumentation Diagram editor with SSC icons based upon the ISA5.1 P&ID symbol standard
-- **Reliability Designer™** — A way to quickly modify component failure probabilities (higher or lower) and see the impact on the overall system. Then, for an adjusted component probability, there is an estimate (using Bayesian inference) of how many tests would be required to meet that reliability target with 95% probability.
-- **Common-Cause Failures** — automatically apply a beta-factor or alpha-factor based CCF events to cut sets
-- **Comparison** — Compare two system designs to support risk-informed decision making
-- **Built-in reliability database** — multiple generic data sources are built into the GUI
-- **Reliability database** — load `.relDB` or `.fmeaDB` files into the Component List (Pane A); drag components to add them to the system; export SSC data back to `.relDB` or `.fmeaDB`
-- **Import** — boundary conditions from SEQ files; basic events from `.KNOW_FTL` files (creates SSCs with probability data)
-- **Export** — Reliability Database (.relDB), FMEA Database (.fmeaDB), KUREAS-FTL Fault Tree (.KNOW_FTL with pre-computed cut sets)
-- **Report generation** — Word (.doc) and Markdown (.md) with 11 configurable sections: System Name, Extended Description, SSC Information, FMEA Information, System Works Expression, Supercomponent Information, Fault Tree Logic, Fault Tree Graphics, Fault Tree Cut Sets, Importance Measure Graphic, Importance Measure Table; in-browser preview with print
-- **Settings** — font size, font family, background (light / dark / gray), probability display digits, SSC sort order, qualitative probability mapping (Low/Medium/High values), and layout reset
 
 ---
 
