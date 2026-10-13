@@ -52,7 +52,7 @@ Each module is entirely self-contained. All dependencies are loaded from CDNs at
 |--------|------|---------|---------|
 | **KUREAS-HA** | `KUREAS-HA.html` | v1.2 | Hazard analysis, initiating event frequency quantification, and screening |
 [HA](https://github.com/curtlsmith/KUREAS/tree/main/HA)
-| **KUREAS-FTL** | `KUREAS-FTL.html` | v1.7.29 | Fault tree logic editing, advanced reporting including Smart Paging, visualization, generic databases, and analysis including cut set generation, uncertainty analysis, and importance measures |
+| **KUREAS-FTL** | `KUREAS-FTL.html` | v1.7.31 | Fault tree logic editing, advanced reporting including Smart Paging, visualization, generic databases, and analysis including cut set generation, uncertainty analysis, and importance measures |
 [FTL](https://github.com/curtlsmith/KUREAS/tree/main/FTL)
 | **KUREAS-ETL** | `KUREAS-ETL.html` | v1.0 | Event tree logic visualization with SAPHIRE file import |
 [ETL](https://github.com/curtlsmith/KUREAS/tree/main/ETL)
